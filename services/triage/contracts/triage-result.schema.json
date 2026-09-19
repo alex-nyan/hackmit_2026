@@ -1,0 +1,361 @@
+{
+  "$defs": {
+    "BoundingBox": {
+      "additionalProperties": false,
+      "properties": {
+        "x1": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X1",
+          "type": "number"
+        },
+        "x2": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X2",
+          "type": "number"
+        },
+        "y1": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y1",
+          "type": "number"
+        },
+        "y2": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y2",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x1",
+        "y1",
+        "x2",
+        "y2"
+      ],
+      "title": "BoundingBox",
+      "type": "object"
+    },
+    "Detection": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "$ref": "#/$defs/BoundingBox"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "label": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "confidence",
+        "bbox"
+      ],
+      "title": "Detection",
+      "type": "object"
+    },
+    "Hazard": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "fire_smoke",
+            "traffic_collision",
+            "blocked_access",
+            "structural_damage",
+            "flooding",
+            "electrical_hazard",
+            "person_down",
+            "visible_weapon",
+            "other"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "detection_indices": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 20,
+          "title": "Detection Indices",
+          "type": "array"
+        },
+        "severity": {
+          "enum": [
+            "low",
+            "moderate",
+            "high",
+            "critical"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "uncertainty": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Uncertainty",
+          "type": "string"
+        },
+        "visual_evidence": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Visual Evidence",
+          "type": "string"
+        }
+      },
+      "required": [
+        "category",
+        "severity",
+        "confidence",
+        "visual_evidence",
+        "uncertainty",
+        "detection_indices"
+      ],
+      "title": "Hazard",
+      "type": "object"
+    },
+    "ModelProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "enum": [
+            "ollama",
+            "openai_compatible",
+            "ultralytics"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        }
+      },
+      "required": [
+        "provider",
+        "model"
+      ],
+      "title": "ModelProvenance",
+      "type": "object"
+    },
+    "VisionAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "hazards": {
+          "items": {
+            "$ref": "#/$defs/Hazard"
+          },
+          "maxItems": 20,
+          "title": "Hazards",
+          "type": "array"
+        },
+        "image_quality": {
+          "enum": [
+            "adequate",
+            "limited",
+            "unusable"
+          ],
+          "title": "Image Quality",
+          "type": "string"
+        },
+        "limitations": {
+          "items": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Limitations",
+          "type": "array"
+        },
+        "summary": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "summary",
+        "image_quality",
+        "hazards",
+        "limitations"
+      ],
+      "title": "VisionAssessment",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assessment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VisionAssessment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "captured_at": {
+      "format": "date-time",
+      "title": "Captured At",
+      "type": "string"
+    },
+    "confidence_semantics": {
+      "const": "uncalibrated_model_scores",
+      "default": "uncalibrated_model_scores",
+      "title": "Confidence Semantics",
+      "type": "string"
+    },
+    "detections": {
+      "items": {
+        "$ref": "#/$defs/Detection"
+      },
+      "title": "Detections",
+      "type": "array"
+    },
+    "image_sha256": {
+      "title": "Image Sha256",
+      "type": "string"
+    },
+    "incident_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Incident Id"
+    },
+    "models": {
+      "items": {
+        "$ref": "#/$defs/ModelProvenance"
+      },
+      "title": "Models",
+      "type": "array"
+    },
+    "policy_version": {
+      "const": "human-review-v1",
+      "default": "human-review-v1",
+      "title": "Policy Version",
+      "type": "string"
+    },
+    "processed_at": {
+      "format": "date-time",
+      "title": "Processed At",
+      "type": "string"
+    },
+    "prompt_version": {
+      "const": "visual-hazards-v1",
+      "default": "visual-hazards-v1",
+      "title": "Prompt Version",
+      "type": "string"
+    },
+    "request_id": {
+      "title": "Request Id",
+      "type": "string"
+    },
+    "requires_human_review": {
+      "const": true,
+      "default": true,
+      "title": "Requires Human Review",
+      "type": "boolean"
+    },
+    "review_priority": {
+      "enum": [
+        "immediate",
+        "urgent",
+        "routine",
+        "insufficient_evidence"
+      ],
+      "title": "Review Priority",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_id": {
+      "title": "Source Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "needs_review",
+        "insufficient_evidence"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "timings_ms": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Timings Ms",
+      "type": "object"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "request_id",
+    "source_id",
+    "incident_id",
+    "captured_at",
+    "processed_at",
+    "image_sha256",
+    "status",
+    "review_priority",
+    "assessment",
+    "detections",
+    "models",
+    "warnings",
+    "timings_ms"
+  ],
+  "title": "TriageResult",
+  "type": "object"
+}

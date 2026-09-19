@@ -7,5 +7,12 @@ export default defineConfig([
   ...nextVitals,
   ...nextTs,
   prettierConfig,
-  globalIgnores([".next/**", "out/**", "coverage/**", "next-env.d.ts"]),
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "coverage/**",
+    "next-env.d.ts",
+    "**/.venv/**",
+    "services/triage/.runtime/**",
+  ]),
 ]);

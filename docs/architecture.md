@@ -1,5 +1,14 @@
 # Map foundation
 
+## Visual hazard triage service
+
+`services/triage` adds authenticated visual evidence processing for incident
+verification and operational triage. It combines YOLO26 object evidence with local
+Ollama `gemma4:26b`, or an explicitly enabled OpenAI-compatible vision API. Every
+result requires human review. See [the service architecture and runbook](hazard-triage.md)
+for the editable Mermaid diagram, confidence semantics, API, and deployment limits.
+The service does not yet connect live cameras, dispatch, or clinical workflows.
+
 ## Scope
 
 The map is a port of the working GridLens preview, not a redesign. Its geographic

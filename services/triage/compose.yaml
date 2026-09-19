@@ -1,0 +1,30 @@
+services:
+  triage:
+    build: .
+    ports:
+      - "127.0.0.1:8090:8090"
+    env_file: .env
+    environment:
+      TRIAGE_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      TRIAGE_DATABASE_PATH: /app/data/triage.sqlite3
+      TRIAGE_YOLO_WEIGHTS: /app/models/yolo26n.pt
+      TRIAGE_YOLO_DEVICE: cpu
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - triage-data:/app/data
+      - ./models:/app/models:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=268435456,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
+    pids_limit: 128
+    mem_limit: 4g
+    cpus: 2
+    stop_grace_period: ${TRIAGE_STOP_GRACE_PERIOD:-210s}
+    restart: unless-stopped
+
+volumes:
+  triage-data:
