@@ -248,3 +248,35 @@ It includes an authenticated API, bounded inference, validated confidence and
 evidence contracts, durable retry handling, and mandatory human review. The map
 remains independently runnable. See the runbook for setup, the Mermaid architecture,
 testing, and the remaining production integration requirements.
+
+## Paw Patrol dashboard (consult update)
+
+The dashboard is in [`apps/paw-patrol`](apps/paw-patrol), on branch
+`codex/paw-patrol-dashboard`. It preserves the root tracking app and triage backend;
+its demonstration is not yet wired to their live feeds.
+
+Use **Node 22.23.2 and npm 11.6.2** for this independent app (the root app keeps its
+own Node/pnpm requirements):
+
+```sh
+git switch codex/paw-patrol-dashboard
+cd apps/paw-patrol
+npm ci
+npm run setup
+# Add your public Mapbox token to .env.local
+npm run dev
+```
+
+Open <http://localhost:5176>. Run `npm run verify` from that same app directory for
+its checks and production build. Do not replace either app's lockfile with the other.
+
+Features include Command, Officer and Hospital views, the supplied interactive human
+model, tactical descriptions, panic/acknowledgement, scene-gated EMS staging and MIST
+handoff observations. People, readings and coordination are explicitly simulated.
+ATAK is planned, not connected. No real dispatch or clinical decisions occur.
+
+Read the [updated team brief (PDF)](docs/paw-patrol/Paw_Patrol_Team_Brief_Updated.pdf)
+or [editable Word brief](docs/paw-patrol/Paw_Patrol_Team_Brief_Updated.docx).
+For a future Vercel project, select root directory `apps/paw-patrol` and Node 22;
+configure the Mapbox public environment variable before building. This branch does
+not itself create a hosted deployment.
