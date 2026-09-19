@@ -30,20 +30,33 @@ vi.mock("./mapboxClient", () => ({
       handlers = new Map<string, Array<(data: unknown) => void>>();
       layer = false;
       sourceLoaded = false;
-      addLayer = vi.fn(() => { this.layer = true; });
+      addLayer = vi.fn(() => {
+        this.layer = true;
+      });
       addControl = vi.fn();
       flyTo = vi.fn();
       remove = vi.fn();
       resize = vi.fn();
-      setStyle = vi.fn(() => { this.layer = false; this.sourceLoaded = false; });
+      setStyle = vi.fn(() => {
+        this.layer = false;
+        this.sourceLoaded = false;
+      });
       constructor(options: Record<string, unknown>) {
         this.options = options;
         mocked.instances.push(this);
       }
-      getStyle() { return { layers: [] }; }
-      getSource() { return {}; }
-      getLayer() { return this.layer ? {} : undefined; }
-      isSourceLoaded() { return this.sourceLoaded; }
+      getStyle() {
+        return { layers: [] };
+      }
+      getSource() {
+        return {};
+      }
+      getLayer() {
+        return this.layer ? {} : undefined;
+      }
+      isSourceLoaded() {
+        return this.sourceLoaded;
+      }
       on(event: string, callback: (data: unknown) => void) {
         const handlers = this.handlers.get(event) ?? [];
         this.handlers.set(event, [...handlers, callback]);
@@ -59,10 +72,13 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN", "pk.unit-test-not-a-real-token");
   mocked.instances.length = 0;
   mocked.supported.mockReturnValue(true);
-  vi.stubGlobal("ResizeObserver", class {
-    observe() {}
-    disconnect = mocked.disconnect;
-  });
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect = mocked.disconnect;
+    },
+  );
 });
 
 afterEach(() => {
@@ -107,8 +123,12 @@ describe("Mapbox lifecycle", () => {
   it("preserves the MIT camera and only reports ready when tiles are loaded", async () => {
     const { map, status } = await mount();
     expect(map.options).toMatchObject({
-      center: MAP_FOCUS.mit.center, zoom: 16.1, pitch: 45, bearing: -17.6,
-      antialias: true, style: "mapbox://styles/mapbox/light-v11",
+      center: MAP_FOCUS.mit.center,
+      zoom: 16.1,
+      pitch: 45,
+      bearing: -17.6,
+      antialias: true,
+      style: "mapbox://styles/mapbox/light-v11",
     });
     expect(map.addControl).toHaveBeenCalledTimes(2);
     act(() => map.emit("style.load"));
@@ -123,11 +143,15 @@ describe("Mapbox lifecycle", () => {
     act(() => map.emit("style.load"));
     rerender(<BostonMap focus="harvard" theme="dark" onStatusChange={status} />);
     expect(mocked.instances).toHaveLength(1);
-    expect(map.flyTo).toHaveBeenLastCalledWith(expect.objectContaining({ center: MAP_FOCUS.harvard.center }));
+    expect(map.flyTo).toHaveBeenLastCalledWith(
+      expect.objectContaining({ center: MAP_FOCUS.harvard.center }),
+    );
     expect(map.setStyle).toHaveBeenLastCalledWith("mapbox://styles/mapbox/dark-v11");
     act(() => map.emit("style.load"));
     expect(map.addLayer).toHaveBeenCalledTimes(2);
-    expect(map.addLayer.mock.calls[1][0]).toMatchObject({ paint: { "fill-extrusion-color": "#81939b" } });
+    expect(map.addLayer.mock.calls[1][0]).toMatchObject({
+      paint: { "fill-extrusion-color": "#81939b" },
+    });
   });
 
   it("reports authentication errors but allows transient errors to recover", async () => {
@@ -147,7 +171,11 @@ describe("Mapbox lifecycle", () => {
 
   it("does not create a leaked duplicate map under Strict Mode", async () => {
     const status = vi.fn();
-    const view = render(<StrictMode><BostonMap focus="mit" theme="light" onStatusChange={status} /></StrictMode>);
+    const view = render(
+      <StrictMode>
+        <BostonMap focus="mit" theme="light" onStatusChange={status} />
+      </StrictMode>,
+    );
     await waitFor(() => expect(mocked.instances).toHaveLength(1));
     view.unmount();
     expect(mocked.instances[0].remove).toHaveBeenCalledOnce();
@@ -168,7 +196,9 @@ describe("Mapbox lifecycle", () => {
     const status = vi.fn();
     const view = render(<BostonMap focus="mit" theme="light" onStatusChange={status} />);
     view.unmount();
-    await act(async () => { await Promise.resolve(); });
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(mocked.instances).toHaveLength(0);
   });
 

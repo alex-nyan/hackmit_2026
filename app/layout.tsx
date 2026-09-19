@@ -3,8 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "GridLens · MIT Harvard Boston Map",
-  description:
-    "Explore buildings across MIT, Harvard, Cambridge, and Boston.",
+  description: "Explore buildings across MIT, Harvard, Cambridge, and Boston.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

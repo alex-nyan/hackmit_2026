@@ -58,7 +58,7 @@ until those capabilities are requested and their data/access requirements are kn
 
 ## Verification
 
-Run `npm run verify` before submitting changes. Automated tests cover configuration
+Run `pnpm run verify` before submitting changes. Automated tests cover configuration
 and mocked rendering lifecycle behavior; they do not replace a real WebGL check.
 With a valid public token, manually verify all location buttons, both themes,
 visible building heights, zoom/rotation, resize/mobile layout, and absence of

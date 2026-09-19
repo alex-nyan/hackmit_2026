@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+dist/
+coverage/
+.git/
+.npm-cache/
+pnpm-lock.yaml
+public/*.svg

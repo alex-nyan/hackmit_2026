@@ -5,14 +5,14 @@ This repository preserves the working local map's appearance, camera presets,
 light/dark themes, and real Mapbox building extrusions.
 
 The foundation is **Next.js App Router + React + TypeScript + Mapbox GL JS**.
-It runs with normal Node/npm commands: no Codex, Sites plugin, Cloudflare account,
+It runs with normal Node/pnpm commands: no Codex, Sites plugin, Cloudflare account,
 database, or platform-specific tooling is needed.
 
 ## Quick start
 
 Requirements:
 
-- Node.js **22.23.2** and npm **11.6.2** are the tested toolchain (`.nvmrc` selects Node).
+- Node.js **26.9.0** and pnpm **12.4.2** are the tested toolchain (`.nvmrc` selects Node).
 - Git.
 - Your own **Mapbox public access token**, beginning with `pk.`.
 - An internet connection and a browser with WebGL support.
@@ -23,15 +23,15 @@ cd hackmit_2026
 ```
 
 The command clones the default `main` branch. Check `node --version` and
-`npm --version` before installing. With nvm installed, run `nvm install` and
-`nvm use` inside the repository. If your npm version differs, install the tested
-version with `npm install --global npm@11.6.2`.
+`pnpm --version` before installing. With nvm installed, run `nvm install` and
+`nvm use` inside the repository. If pnpm is not available, enable the pinned
+package manager with your Node toolchain or install pnpm 12.4.2.
 
 Then install the dependencies and create your local configuration:
 
 ```bash
-npm ci
-npm run setup
+pnpm install --frozen-lockfile
+pnpm run setup
 ```
 
 Edit the newly created `.env.local`:
@@ -45,7 +45,7 @@ secret `sk.` token. If URL restrictions are enabled, allow `http://localhost:517
 (and `http://127.0.0.1:5173/*` if you use that address).
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Open **http://localhost:5173**. The initial view is MIT, tilted to show building
@@ -71,17 +71,17 @@ integration; adding a device in Traccar does not connect it to this app.
 Set the token in `.env.local` **before building**, then run:
 
 ```bash
-npm run build
-npm start
+pnpm run build
+pnpm start
 ```
 
 Open http://localhost:5173. Stop the development server first because both use
 that port. To use another port:
 
 ```bash
-npm run dev -- --port 5174
+pnpm run dev -- --port 5174
 # Or, after a build:
-npm start -- --port 5174
+pnpm start -- --port 5174
 ```
 
 `NEXT_PUBLIC_` values are embedded into the browser bundle at build time. Restart
@@ -89,20 +89,21 @@ development after token changes; rebuild production after token changes.
 
 ## Commands and quality checks
 
-| Command | Purpose |
-| --- | --- |
-| `npm ci` | Reproduce the committed dependency lockfile |
-| `npm run setup` | Create `.env.local` safely from the tracked example |
-| `npm run dev` | Start local development at port 5173 |
-| `npm run check` | Typecheck, lint, and run tests |
-| `npm run check:lockfile` | Detect incomplete dependency metadata before installation |
-| `npm run verify` | Run all checks and a production build |
-| `npm run build` | Produce a Next.js production build |
-| `npm start` | Serve the production build locally |
-| `npm run test:watch` | Run tests during development |
+| Command                          | Purpose                                                       |
+| -------------------------------- | ------------------------------------------------------------- |
+| `pnpm install --frozen-lockfile` | Reproduce the committed dependency lockfile                   |
+| `pnpm run setup`                 | Create `.env.local` safely from the tracked example           |
+| `pnpm run dev`                   | Start local development at port 5173                          |
+| `pnpm run format`                | Format supported source and configuration files with Prettier |
+| `pnpm run format:check`          | Verify formatting without changing files                      |
+| `pnpm run check`                 | Check formatting, types, lint, and tests                      |
+| `pnpm run verify`                | Run all checks and a production build                         |
+| `pnpm run build`                 | Produce a Next.js production build                            |
+| `pnpm start`                     | Serve the production build locally                            |
+| `pnpm run test:watch`            | Run tests during development                                  |
 
 GitHub Actions runs installation, checks, and a production build on Linux and
-Windows using the same pinned Node/npm versions. CI does not need a real token:
+Windows using the same pinned Node/pnpm versions. CI does not need a real token:
 tests isolate Mapbox, and the application
 shows a setup message when a token is absent. A successful build without a token
 does **not** mean the live map has been verified.
@@ -115,13 +116,15 @@ features/boston-map/    Map lifecycle, camera settings, building layer, and UI
 public/favicon.svg     Original GridLens icon
 scripts/setup.mjs      Cross-platform, non-destructive environment setup
 .env.example           Public environment variable names; no real credentials
+.editorconfig          Shared editor defaults
+.prettierrc.json       Repository formatting rules
 .github/workflows/     Reproducible checks for team changes
 docs/architecture.md   Extension boundaries and map behavior
 ```
 
 ## Troubleshooting
 
-- **Token required:** run `npm run setup`, enter a public token in `.env.local`,
+- **Token required:** run `pnpm run setup`, enter a public token in `.env.local`,
   then restart. `.env.example` alone is not loaded as your local configuration.
 - **401/403 or blank map:** check token validity, URL restrictions, network access
   to Mapbox, browser extensions, and Mapbox account availability.
@@ -130,12 +133,12 @@ docs/architecture.md   Extension boundaries and map behavior
 - **Some buildings are missing/box-shaped:** geometry comes from Mapbox's data.
   This is vector extrusion, not photogrammetry or detailed architectural models.
 - **Port already in use:** stop the other server or use `--port 5174`.
-- **npm EACCES / unreadable cache:** use `npm ci --cache .npm-cache` to use a
-  project-local cache. Do not install project dependencies with `sudo`.
+- **pnpm cache / permissions:** use pnpm's configured store and do not install
+  project dependencies with `sudo`.
 - **WebGL unavailable:** enable hardware acceleration or use a WebGL-capable browser.
 - **Phone access:** `localhost` on a phone points to the phone, not your laptop.
   The default server binds to loopback. For a trusted LAN only, explicitly use
-  `npm run dev -- --hostname 0.0.0.0`, open the laptop's LAN address, and update
+  `pnpm run dev -- --hostname 0.0.0.0`, open the laptop's LAN address, and update
   token URL restrictions. This does not implement GPS or background tracking.
 
 ## Credentials and hosting

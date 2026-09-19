@@ -20,7 +20,9 @@
   background: rgb(11 22 30 / 88%);
   color: white;
   box-shadow: 0 8px 24px rgb(0 0 0 / 22%);
-  font: 700 11px/1 system-ui, sans-serif;
+  font:
+    700 11px/1 system-ui,
+    sans-serif;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
