@@ -1,0 +1,343 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #10202a;
+  --muted: #667680;
+  --surface: rgb(250 250 247 / 92%);
+  --accent: #e64d2e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #e4e8e9;
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+button {
+  color: inherit;
+  font: inherit;
+}
+
+button:focus-visible {
+  outline: 3px solid rgb(230 77 46 / 42%);
+  outline-offset: 2px;
+}
+
+.map-app {
+  position: relative;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #dfe4e7;
+  color: var(--ink);
+}
+
+.map-header {
+  position: fixed;
+  z-index: 20;
+  top: 18px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.map-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 8px;
+  border: 1px solid rgb(255 255 255 / 76%);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 12px 36px rgb(29 43 49 / 15%);
+  backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+
+.map-brand__mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--ink);
+  color: white;
+}
+
+.map-brand > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.map-brand strong {
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
+
+.map-brand small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.icon-button {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 76%);
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow: 0 12px 36px rgb(29 43 49 / 15%);
+  cursor: pointer;
+  backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+
+.area-picker {
+  position: fixed;
+  z-index: 20;
+  top: 20px;
+  left: 50%;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgb(255 255 255 / 76%);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 12px 36px rgb(29 43 49 / 15%);
+  transform: translateX(-50%);
+  backdrop-filter: blur(18px);
+}
+
+.area-picker__button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #50616b;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.area-picker__button:hover {
+  background: rgb(16 32 42 / 6%);
+  color: var(--ink);
+}
+
+.area-picker__button.is-active {
+  background: var(--ink);
+  color: white;
+}
+
+.map-stage {
+  position: fixed;
+  inset: 0;
+}
+
+.map-status {
+  position: absolute;
+  z-index: 12;
+  top: 88px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid rgb(255 255 255 / 76%);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgb(29 43 49 / 14%);
+  color: #52636d;
+  font-size: 12px;
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+
+.map-status--error {
+  color: #9c2f1d;
+}
+
+.map-status__spinner {
+  animation: spin 900ms linear infinite;
+}
+
+.map-config-error {
+  position: absolute;
+  z-index: 15;
+  top: 50%;
+  left: 50%;
+  width: min(460px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid rgb(161 55 37 / 24%);
+  border-radius: 16px;
+  background: rgb(255 250 247 / 96%);
+  box-shadow: 0 18px 60px rgb(38 28 25 / 16%);
+  color: #381a15;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(18px);
+}
+
+.map-config-error strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.map-config-error p {
+  margin: 0;
+  color: #72544d;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.map-config-error code {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgb(56 26 21 / 8%);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.foundation-card {
+  position: absolute;
+  z-index: 10;
+  left: 20px;
+  bottom: 20px;
+  width: min(310px, calc(100vw - 40px));
+  padding: 14px 15px;
+  border: 1px solid rgb(255 255 255 / 76%);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 14px 42px rgb(29 43 49 / 17%);
+  backdrop-filter: blur(18px);
+}
+
+.foundation-card__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.foundation-card strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 17px;
+  letter-spacing: -0.025em;
+}
+
+.foundation-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.map-app--dark {
+  --ink: #edf2f3;
+  --muted: #aab5bb;
+  --surface: rgb(17 27 34 / 90%);
+}
+
+.map-app--dark .map-brand__mark,
+.map-app--dark .area-picker__button.is-active {
+  background: white;
+  color: #10202a;
+}
+
+.map-app--dark .area-picker__button {
+  color: #b3bec3;
+}
+
+.map-app--dark .area-picker__button:hover {
+  background: rgb(255 255 255 / 7%);
+  color: white;
+}
+
+.mapboxgl-ctrl-group {
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 65%);
+  border-radius: 12px !important;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 16%) !important;
+}
+
+.mapboxgl-ctrl-attrib {
+  border-radius: 8px 0 0 0;
+  background: rgb(255 255 255 / 78%) !important;
+  font-size: 9px !important;
+  backdrop-filter: blur(8px);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .map-header {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+  }
+
+  .map-brand small {
+    display: none;
+  }
+
+  .area-picker {
+    top: 70px;
+    max-width: calc(100vw - 24px);
+    overflow-x: auto;
+  }
+
+  .area-picker__button {
+    padding-inline: 10px;
+  }
+
+  .map-status {
+    top: 122px;
+  }
+
+  .foundation-card {
+    left: 12px;
+    bottom: 12px;
+  }
+
+  .mapboxgl-ctrl-bottom-right {
+    bottom: 142px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-status__spinner {
+    animation-duration: 1600ms;
+  }
+}
