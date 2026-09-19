@@ -6,10 +6,12 @@ function fakeMap() {
   return {
     getLayer: vi.fn().mockReturnValue(undefined),
     getSource: vi.fn().mockReturnValue({}),
-    getStyle: vi.fn().mockReturnValue({ layers: [
-      { id: "roads", type: "line" },
-      { id: "place-labels", type: "symbol", layout: { "text-field": "name" } },
-    ] }),
+    getStyle: vi.fn().mockReturnValue({
+      layers: [
+        { id: "roads", type: "line" },
+        { id: "place-labels", type: "symbol", layout: { "text-field": "name" } },
+      ],
+    }),
     isSourceLoaded: vi.fn().mockReturnValue(true),
     addLayer: vi.fn(),
   };
@@ -27,15 +29,30 @@ describe("3D building layer contract", () => {
     const [layer, before] = map.addLayer.mock.calls[0];
     expect(before).toBe("place-labels");
     expect(layer).toMatchObject({
-      id: "3d-buildings", source: "composite", "source-layer": "building",
-      type: "fill-extrusion", minzoom: 15,
+      id: "3d-buildings",
+      source: "composite",
+      "source-layer": "building",
+      type: "fill-extrusion",
+      minzoom: 15,
       filter: ["==", ["get", "extrude"], "true"],
     });
     expect(layer.paint["fill-extrusion-height"]).toEqual([
-      "interpolate", ["linear"], ["zoom"], 15, 0, 15.05, ["get", "height"],
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      15,
+      0,
+      15.05,
+      ["get", "height"],
     ]);
     expect(layer.paint["fill-extrusion-base"]).toEqual([
-      "interpolate", ["linear"], ["zoom"], 15, 0, 15.05, ["get", "min_height"],
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      15,
+      0,
+      15.05,
+      ["get", "min_height"],
     ]);
     expect(layer.paint["fill-extrusion-color"]).toBe("#d2cec5");
   });
@@ -56,8 +73,9 @@ describe("3D building layer contract", () => {
   it("fails explicitly for an incompatible basemap", () => {
     const map = fakeMap();
     map.getSource.mockReturnValue(undefined);
-    expect(() => add3DBuildings(map as unknown as MapboxMap, "light"))
-      .toThrow("compatible building source");
+    expect(() => add3DBuildings(map as unknown as MapboxMap, "light")).toThrow(
+      "compatible building source",
+    );
   });
 
   it("requires both the layer and loaded source tiles to report ready", () => {

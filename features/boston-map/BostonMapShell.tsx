@@ -70,19 +70,21 @@ export function BostonMapShell() {
           <div className="map-config-error" role="alert">
             <strong>Mapbox public token required</strong>
             <p>
-              Add <code>NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code> to <code>.env.local</code>,
-              then restart the local server. See the repository README for setup.
+              Add <code>NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code> to <code>.env.local</code>, then
+              restart the local server. See the repository README for setup.
             </p>
           </div>
         )}
 
-        {status === "ready" && <aside className="foundation-card">
-          <span className="foundation-card__eyebrow">
-            <MapPin size={13} /> 3D campus view
-          </span>
-          <strong>Explore the buildings</strong>
-          <p>Zoom in for building heights. Right-drag to tilt and rotate the map.</p>
-        </aside>}
+        {status === "ready" && (
+          <aside className="foundation-card">
+            <span className="foundation-card__eyebrow">
+              <MapPin size={13} /> 3D campus view
+            </span>
+            <strong>Explore the buildings</strong>
+            <p>Zoom in for building heights. Right-drag to tilt and rotate the map.</p>
+          </aside>
+        )}
       </section>
     </main>
   );

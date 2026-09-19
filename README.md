@@ -12,7 +12,7 @@ database, or platform-specific tooling is needed.
 
 Requirements:
 
-- Node.js **22.23.2** and npm **11.6.2** are the tested toolchain (`.nvmrc` selects Node).
+- Node.js **26.9.0** and npm **12.0.2** are the tested toolchain (`.nvmrc` selects Node).
 - Git.
 - Your own **Mapbox public access token**, beginning with `pk.`.
 - An internet connection and a browser with WebGL support.
@@ -25,7 +25,7 @@ cd hackmit_2026
 The command clones the default `main` branch. Check `node --version` and
 `npm --version` before installing. With nvm installed, run `nvm install` and
 `nvm use` inside the repository. If your npm version differs, install the tested
-version with `npm install --global npm@11.6.2`.
+version with `npm install --global npm@12.0.2`.
 
 Then install the dependencies and create your local configuration:
 
@@ -89,17 +89,19 @@ development after token changes; rebuild production after token changes.
 
 ## Commands and quality checks
 
-| Command | Purpose |
-| --- | --- |
-| `npm ci` | Reproduce the committed dependency lockfile |
-| `npm run setup` | Create `.env.local` safely from the tracked example |
-| `npm run dev` | Start local development at port 5173 |
-| `npm run check` | Typecheck, lint, and run tests |
-| `npm run check:lockfile` | Detect incomplete dependency metadata before installation |
-| `npm run verify` | Run all checks and a production build |
-| `npm run build` | Produce a Next.js production build |
-| `npm start` | Serve the production build locally |
-| `npm run test:watch` | Run tests during development |
+| Command                  | Purpose                                                       |
+| ------------------------ | ------------------------------------------------------------- |
+| `npm ci`                 | Reproduce the committed dependency lockfile                   |
+| `npm run setup`          | Create `.env.local` safely from the tracked example           |
+| `npm run dev`            | Start local development at port 5173                          |
+| `npm run format`         | Format supported source and configuration files with Prettier |
+| `npm run format:check`   | Verify formatting without changing files                      |
+| `npm run check`          | Check lockfile, formatting, types, lint, and tests            |
+| `npm run check:lockfile` | Detect incomplete dependency metadata before installation     |
+| `npm run verify`         | Run all checks and a production build                         |
+| `npm run build`          | Produce a Next.js production build                            |
+| `npm start`              | Serve the production build locally                            |
+| `npm run test:watch`     | Run tests during development                                  |
 
 GitHub Actions runs installation, checks, and a production build on Linux and
 Windows using the same pinned Node/npm versions. CI does not need a real token:
@@ -115,6 +117,8 @@ features/boston-map/    Map lifecycle, camera settings, building layer, and UI
 public/favicon.svg     Original GridLens icon
 scripts/setup.mjs      Cross-platform, non-destructive environment setup
 .env.example           Public environment variable names; no real credentials
+.editorconfig          Shared editor defaults
+.prettierrc.json       Repository formatting rules
 .github/workflows/     Reproducible checks for team changes
 docs/architecture.md   Extension boundaries and map behavior
 ```

@@ -9,13 +9,18 @@ export function findInvalidLockEntries(lockfile) {
   }
   return Object.entries(lockfile.packages)
     .filter(([, entry]) => !entry.link)
-    .filter(([, entry]) => typeof entry.version !== "string" ||
-      !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(entry.version))
+    .filter(
+      ([, entry]) =>
+        typeof entry.version !== "string" ||
+        !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(entry.version),
+    )
     .map(([name]) => `${name || "(root)"}: missing or invalid package version`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const lockfile = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
+  const lockfile = JSON.parse(
+    readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"),
+  );
   const errors = findInvalidLockEntries(lockfile);
   if (errors.length) {
     console.error(`Incomplete dependency lockfile:\n${errors.join("\n")}`);
