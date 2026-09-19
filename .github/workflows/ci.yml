@@ -23,5 +23,13 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      - name: Use the tested npm version
+        run: npm install --global npm@11.6.2
+      - name: Show toolchain versions
+        run: |
+          node --version
+          npm --version
+      - name: Validate dependency lockfile
+        run: node scripts/check-lockfile.mjs
       - run: npm ci
       - run: npm run verify
