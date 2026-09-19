@@ -11,6 +11,8 @@ const mocked = vi.hoisted(() => ({
     sourceLoaded: boolean;
     addLayer: ReturnType<typeof vi.fn>;
     addControl: ReturnType<typeof vi.fn>;
+    setFeatureState: ReturnType<typeof vi.fn>;
+    features: unknown[];
     flyTo: ReturnType<typeof vi.fn>;
     setStyle: ReturnType<typeof vi.fn>;
     remove: ReturnType<typeof vi.fn>;
@@ -34,6 +36,12 @@ vi.mock("./mapboxClient", () => ({
         this.layer = true;
       });
       addControl = vi.fn();
+      setFeatureState = vi.fn();
+      features: unknown[] = [];
+      queryRenderedFeatures = vi.fn(() => this.features);
+      getCanvas() {
+        return { style: {} as Record<string, string> };
+      }
       flyTo = vi.fn();
       remove = vi.fn();
       resize = vi.fn();
@@ -57,9 +65,13 @@ vi.mock("./mapboxClient", () => ({
       isSourceLoaded() {
         return this.sourceLoaded;
       }
-      on(event: string, callback: (data: unknown) => void) {
-        const handlers = this.handlers.get(event) ?? [];
-        this.handlers.set(event, [...handlers, callback]);
+      // Mapbox accepts on(event, cb) and the layer-scoped on(event, layer, cb).
+      on(event: string, second: unknown, third?: unknown) {
+        const layerScoped = typeof second === "string";
+        const key = layerScoped ? `${event}:${second}` : event;
+        const callback = (layerScoped ? third : second) as (data: unknown) => void;
+        const handlers = this.handlers.get(key) ?? [];
+        this.handlers.set(key, [...handlers, callback]);
       }
       emit(event: string, data: unknown = {}) {
         for (const callback of this.handlers.get(event) ?? []) callback(data);
@@ -90,7 +102,16 @@ afterEach(() => {
 
 async function mount() {
   const status = vi.fn();
-  const view = render(<BostonMap focus="mit" theme="light" onStatusChange={status} />);
+  const view = render(
+    <BostonMap
+      focus="mit"
+      theme="light"
+      liveDevices={[]}
+      focusRequest={null}
+      onStatusChange={status}
+      onBuildingSelect={() => {}}
+    />,
+  );
   await waitFor(() => expect(mocked.instances).toHaveLength(1));
   return { ...view, status, map: mocked.instances[0] };
 }
@@ -99,7 +120,16 @@ describe("Mapbox lifecycle", () => {
   it("shows setup feedback without requesting Mapbox when the token is absent", () => {
     vi.stubEnv("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN", "");
     const status = vi.fn();
-    render(<BostonMap focus="mit" theme="light" onStatusChange={status} />);
+    render(
+      <BostonMap
+        focus="mit"
+        theme="light"
+        liveDevices={[]}
+        focusRequest={null}
+        onStatusChange={status}
+        onBuildingSelect={() => {}}
+      />,
+    );
     expect(status).toHaveBeenLastCalledWith("missing-token");
     expect(mocked.instances).toHaveLength(0);
   });
@@ -107,7 +137,16 @@ describe("Mapbox lifecycle", () => {
   it("rejects a secret token rather than using it for map requests", () => {
     vi.stubEnv("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN", "sk.not-a-real-token");
     const status = vi.fn();
-    render(<BostonMap focus="mit" theme="light" onStatusChange={status} />);
+    render(
+      <BostonMap
+        focus="mit"
+        theme="light"
+        liveDevices={[]}
+        focusRequest={null}
+        onStatusChange={status}
+        onBuildingSelect={() => {}}
+      />,
+    );
     expect(status).toHaveBeenLastCalledWith("error");
     expect(mocked.instances).toHaveLength(0);
   });
@@ -115,7 +154,16 @@ describe("Mapbox lifecycle", () => {
   it("reports unavailable WebGL without creating a map", async () => {
     mocked.supported.mockReturnValue(false);
     const status = vi.fn();
-    render(<BostonMap focus="mit" theme="light" onStatusChange={status} />);
+    render(
+      <BostonMap
+        focus="mit"
+        theme="light"
+        liveDevices={[]}
+        focusRequest={null}
+        onStatusChange={status}
+        onBuildingSelect={() => {}}
+      />,
+    );
     await waitFor(() => expect(status).toHaveBeenLastCalledWith("error"));
     expect(mocked.instances).toHaveLength(0);
   });
@@ -141,7 +189,16 @@ describe("Mapbox lifecycle", () => {
   it("moves the existing map and restores buildings after a theme change", async () => {
     const { map, status, rerender } = await mount();
     act(() => map.emit("style.load"));
-    rerender(<BostonMap focus="harvard" theme="dark" onStatusChange={status} />);
+    rerender(
+      <BostonMap
+        focus="harvard"
+        theme="dark"
+        liveDevices={[]}
+        focusRequest={null}
+        onStatusChange={status}
+        onBuildingSelect={() => {}}
+      />,
+    );
     expect(mocked.instances).toHaveLength(1);
     expect(map.flyTo).toHaveBeenLastCalledWith(
       expect.objectContaining({ center: MAP_FOCUS.harvard.center }),
@@ -149,9 +206,10 @@ describe("Mapbox lifecycle", () => {
     expect(map.setStyle).toHaveBeenLastCalledWith("mapbox://styles/mapbox/dark-v11");
     act(() => map.emit("style.load"));
     expect(map.addLayer).toHaveBeenCalledTimes(2);
-    expect(map.addLayer.mock.calls[1][0]).toMatchObject({
-      paint: { "fill-extrusion-color": "#81939b" },
-    });
+    // The unselected branch of the colour expression carries the dark palette.
+    const restored = map.addLayer.mock.calls[1][0];
+    expect(restored.id).toBe("3d-buildings");
+    expect(restored.paint["fill-extrusion-color"][3]).toBe("#81939b");
   });
 
   it("reports authentication errors but allows transient errors to recover", async () => {
@@ -173,7 +231,14 @@ describe("Mapbox lifecycle", () => {
     const status = vi.fn();
     const view = render(
       <StrictMode>
-        <BostonMap focus="mit" theme="light" onStatusChange={status} />
+        <BostonMap
+          focus="mit"
+          theme="light"
+          liveDevices={[]}
+          focusRequest={null}
+          onStatusChange={status}
+          onBuildingSelect={() => {}}
+        />
       </StrictMode>,
     );
     await waitFor(() => expect(mocked.instances).toHaveLength(1));
@@ -183,8 +248,26 @@ describe("Mapbox lifecycle", () => {
 
   it("uses the latest area and theme when controls change before lazy loading finishes", async () => {
     const status = vi.fn();
-    const view = render(<BostonMap focus="mit" theme="light" onStatusChange={status} />);
-    view.rerender(<BostonMap focus="boston" theme="dark" onStatusChange={status} />);
+    const view = render(
+      <BostonMap
+        focus="mit"
+        theme="light"
+        liveDevices={[]}
+        focusRequest={null}
+        onStatusChange={status}
+        onBuildingSelect={() => {}}
+      />,
+    );
+    view.rerender(
+      <BostonMap
+        focus="boston"
+        theme="dark"
+        liveDevices={[]}
+        focusRequest={null}
+        onStatusChange={status}
+        onBuildingSelect={() => {}}
+      />,
+    );
     await waitFor(() => expect(mocked.instances).toHaveLength(1));
     expect(mocked.instances[0].options).toMatchObject({
       center: MAP_FOCUS.boston.center,
@@ -194,7 +277,16 @@ describe("Mapbox lifecycle", () => {
 
   it("does not create a map after unmounting during lazy loading", async () => {
     const status = vi.fn();
-    const view = render(<BostonMap focus="mit" theme="light" onStatusChange={status} />);
+    const view = render(
+      <BostonMap
+        focus="mit"
+        theme="light"
+        liveDevices={[]}
+        focusRequest={null}
+        onStatusChange={status}
+        onBuildingSelect={() => {}}
+      />,
+    );
     view.unmount();
     await act(async () => {
       await Promise.resolve();
@@ -206,7 +298,16 @@ describe("Mapbox lifecycle", () => {
     vi.useFakeTimers();
     const status = vi.fn();
     await act(async () => {
-      render(<BostonMap focus="mit" theme="light" onStatusChange={status} />);
+      render(
+        <BostonMap
+          focus="mit"
+          theme="light"
+          liveDevices={[]}
+          focusRequest={null}
+          onStatusChange={status}
+          onBuildingSelect={() => {}}
+        />,
+      );
     });
     const map = mocked.instances[0];
     act(() => map.emit("style.load"));
@@ -215,5 +316,115 @@ describe("Mapbox lifecycle", () => {
     map.sourceLoaded = true;
     act(() => map.emit("idle"));
     expect(status).toHaveBeenLastCalledWith("ready");
+  });
+});
+
+describe("building selection", () => {
+  const FOOTPRINT = {
+    type: "Polygon",
+    coordinates: [
+      [
+        [-71.0921, 42.3601],
+        [-71.092, 42.3601],
+        [-71.092, 42.3602],
+        [-71.0921, 42.3602],
+        [-71.0921, 42.3601],
+      ],
+    ],
+  };
+
+  async function mountWithSelect() {
+    const status = vi.fn();
+    const onBuildingSelect = vi.fn();
+    render(
+      <BostonMap
+        focus="mit"
+        theme="light"
+        liveDevices={[]}
+        focusRequest={null}
+        onStatusChange={status}
+        onBuildingSelect={onBuildingSelect}
+      />,
+    );
+    await waitFor(() => expect(mocked.instances).toHaveLength(1));
+    const map = mocked.instances[0];
+    act(() => map.emit("style.load"));
+    onBuildingSelect.mockClear();
+    return { map, onBuildingSelect };
+  }
+
+  it("reports the clicked building and highlights it", async () => {
+    const { map, onBuildingSelect } = await mountWithSelect();
+    map.features = [{ id: 7, properties: { height: 32 }, geometry: FOOTPRINT }];
+
+    act(() => map.emit("click", { point: { x: 10, y: 10 } }));
+
+    expect(onBuildingSelect).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 7, heightM: 32 }),
+    );
+    expect(map.setFeatureState).toHaveBeenLastCalledWith(
+      { source: "composite", sourceLayer: "building", id: 7 },
+      { selected: true },
+    );
+  });
+
+  it("clears the previous highlight before applying a new one", async () => {
+    const { map } = await mountWithSelect();
+    map.features = [{ id: 7, properties: { height: 32 }, geometry: FOOTPRINT }];
+    act(() => map.emit("click", { point: { x: 10, y: 10 } }));
+
+    map.setFeatureState.mockClear();
+    map.features = [{ id: 9, properties: { height: 12 }, geometry: FOOTPRINT }];
+    act(() => map.emit("click", { point: { x: 20, y: 20 } }));
+
+    expect(map.setFeatureState).toHaveBeenNthCalledWith(
+      1,
+      { source: "composite", sourceLayer: "building", id: 7 },
+      { selected: false },
+    );
+    expect(map.setFeatureState).toHaveBeenNthCalledWith(
+      2,
+      { source: "composite", sourceLayer: "building", id: 9 },
+      { selected: true },
+    );
+  });
+
+  it("clears the selection when the click misses every building", async () => {
+    const { map, onBuildingSelect } = await mountWithSelect();
+    map.features = [{ id: 7, properties: { height: 32 }, geometry: FOOTPRINT }];
+    act(() => map.emit("click", { point: { x: 10, y: 10 } }));
+
+    onBuildingSelect.mockClear();
+    map.features = [];
+    act(() => map.emit("click", { point: { x: 99, y: 99 } }));
+
+    expect(onBuildingSelect).toHaveBeenLastCalledWith(null);
+    expect(map.setFeatureState).toHaveBeenLastCalledWith(
+      { source: "composite", sourceLayer: "building", id: 7 },
+      { selected: false },
+    );
+  });
+
+  it("still reports a building whose tile carries no id, without highlighting", async () => {
+    const { map, onBuildingSelect } = await mountWithSelect();
+    map.features = [{ properties: { height: 18 }, geometry: FOOTPRINT }];
+
+    act(() => map.emit("click", { point: { x: 10, y: 10 } }));
+
+    expect(onBuildingSelect).toHaveBeenLastCalledWith(
+      expect.objectContaining({ heightM: 18, id: null }),
+    );
+    expect(map.setFeatureState).not.toHaveBeenCalled();
+  });
+
+  it("drops the selection when the style is replaced, since feature state is lost", async () => {
+    const { map, onBuildingSelect } = await mountWithSelect();
+    map.features = [{ id: 7, properties: { height: 32 }, geometry: FOOTPRINT }];
+    act(() => map.emit("click", { point: { x: 10, y: 10 } }));
+
+    onBuildingSelect.mockClear();
+    act(() => map.emit("style.load"));
+
+    expect(onBuildingSelect).toHaveBeenLastCalledWith(null);
   });
 });

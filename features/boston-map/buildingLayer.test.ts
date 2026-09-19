@@ -1,6 +1,13 @@
 import type { Map as MapboxMap } from "mapbox-gl";
 import { describe, expect, it, vi } from "vitest";
-import { add3DBuildings, basemapStyle, isBuildingMapReady } from "./buildingLayer";
+import {
+  SELECTED_BUILDING_COLOR,
+  add3DBuildings,
+  basemapStyle,
+  clearSelectedBuilding,
+  isBuildingMapReady,
+  setSelectedBuilding,
+} from "./buildingLayer";
 
 function fakeMap() {
   return {
@@ -54,13 +61,52 @@ describe("3D building layer contract", () => {
       15.05,
       ["get", "min_height"],
     ]);
-    expect(layer.paint["fill-extrusion-color"]).toBe("#d2cec5");
+    // Colour is an expression now, but the unselected branch is the original.
+    expect(layer.paint["fill-extrusion-color"]).toEqual([
+      "case",
+      ["boolean", ["feature-state", "selected"], false],
+      SELECTED_BUILDING_COLOR,
+      "#d2cec5",
+    ]);
   });
 
   it("retains the original dark building color", () => {
     const map = fakeMap();
     add3DBuildings(map as unknown as MapboxMap, "dark");
-    expect(map.addLayer.mock.calls[0][0].paint["fill-extrusion-color"]).toBe("#81939b");
+    const color = map.addLayer.mock.calls[0][0].paint["fill-extrusion-color"];
+    expect(color[3]).toBe("#81939b");
+    expect(color[2]).toBe(SELECTED_BUILDING_COLOR);
+  });
+
+  it("adds depth without touching the height data", () => {
+    const map = fakeMap();
+    add3DBuildings(map as unknown as MapboxMap, "light");
+    const [layer] = map.addLayer.mock.calls[0];
+
+    expect(layer.paint["fill-extrusion-ambient-occlusion-intensity"]).toBeGreaterThan(0);
+    expect(layer.paint["fill-extrusion-ambient-occlusion-radius"]).toBeGreaterThan(0);
+    expect(layer.paint["fill-extrusion-vertical-gradient"]).toBe(true);
+    // edge-radius is a layout property, not paint.
+    expect(layer.layout["fill-extrusion-edge-radius"]).toBeGreaterThan(0);
+    expect(layer.paint["fill-extrusion-height"]).toEqual([
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      15,
+      0,
+      15.05,
+      ["get", "height"],
+    ]);
+  });
+
+  it("shades dark buildings more strongly than light ones", () => {
+    const light = fakeMap();
+    const dark = fakeMap();
+    add3DBuildings(light as unknown as MapboxMap, "light");
+    add3DBuildings(dark as unknown as MapboxMap, "dark");
+    const intensity = (map: ReturnType<typeof fakeMap>) =>
+      map.addLayer.mock.calls[0][0].paint["fill-extrusion-ambient-occlusion-intensity"];
+    expect(intensity(dark)).toBeGreaterThan(intensity(light));
   });
 
   it("does not register duplicate building layers", () => {
@@ -76,6 +122,29 @@ describe("3D building layer contract", () => {
     expect(() => add3DBuildings(map as unknown as MapboxMap, "light")).toThrow(
       "compatible building source",
     );
+  });
+
+  it("moves the highlight through feature state", () => {
+    const map = { setFeatureState: vi.fn() };
+    setSelectedBuilding(map as unknown as MapboxMap, 17);
+    expect(map.setFeatureState).toHaveBeenCalledWith(
+      { source: "composite", sourceLayer: "building", id: 17 },
+      { selected: true },
+    );
+
+    map.setFeatureState.mockClear();
+    clearSelectedBuilding(map as unknown as MapboxMap, 17);
+    expect(map.setFeatureState).toHaveBeenCalledWith(
+      { source: "composite", sourceLayer: "building", id: 17 },
+      { selected: false },
+    );
+  });
+
+  it("does nothing when there is no feature to highlight or clear", () => {
+    const map = { setFeatureState: vi.fn() };
+    setSelectedBuilding(map as unknown as MapboxMap, null);
+    clearSelectedBuilding(map as unknown as MapboxMap, null);
+    expect(map.setFeatureState).not.toHaveBeenCalled();
   });
 
   it("requires both the layer and loaded source tiles to report ready", () => {

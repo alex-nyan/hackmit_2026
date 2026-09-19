@@ -11,7 +11,7 @@ The service does not yet connect live cameras, dispatch, or clinical workflows.
 
 ## Scope
 
-The map is a port of the working GridLens preview, not a redesign. Its geographic
+The map is a port of the working local preview, not a redesign. Its geographic
 scope is Greater Boston; the original reference document's NUS coordinates and
 energy overlays have intentionally not been carried over.
 
@@ -41,29 +41,97 @@ layer, and real `height` / `min_height` values. Extrusions animate from zero at
 zoom 15 to real height at 15.05. Labels remain above buildings. Switching styles
 removes custom layers, so they must be registered again on `style.load`.
 
+Depth comes from lighting, not from recolouring: ambient occlusion (stronger on
+the dark theme, where flat silhouettes merge), the vertical gradient, and a small
+`fill-extrusion-edge-radius` bevel. The original palette is unchanged —
+`#d2cec5` light and `#81939b` dark — but colour is now a `case` expression whose
+unselected branch carries those values, so a picked building can recolour without
+a second layer. `fill-extrusion-edge-radius` is a **layout** property and is
+marked experimental by Mapbox; if it is dropped, edges fall back to square.
+
 Initialization is asynchronous. Latest theme/focus values must be used even when
 the user clicks before Mapbox finishes importing. Cleanup must cancel pending
 work, clear load timers, disconnect observers, and remove the Mapbox instance.
 Strict Mode is enabled to exercise mount/unmount behavior during development.
 
-## Future live GPS
+## Building selection
 
-No GPS connection exists in this foundation. A future implementation should:
+Clicking queries `3d-buildings` at the click point and moves a `selected` feature
+state, which the colour expression reads. One map-level `click` handler decides
+both selection and dismissal, because a layer-scoped handler and a map-level one
+would race over which fires first. Feature state does not survive a style change,
+so `style.load` drops the selection rather than leaving a highlight Mapbox can no
+longer draw.
 
-1. Establish an authenticated server-side connection to the selected tracking
-   service (for example Traccar), without putting credentials into browser code.
-2. Authorize access to the device and send only the position data the viewer needs.
-3. Validate coordinates and timestamps at the boundary; represent accuracy and
-   stale/offline readings honestly, rather than simulating movement.
-4. Add a separate GeoJSON source/layer and update it with `setData` instead of
-   replacing the map or rebuilding the 3D buildings.
-5. Restore that source/layer after style changes and clean up subscriptions.
-6. Provide explicit opt-in/stop controls and avoid retaining location history by
-   default. Use an appropriate hosted realtime service if the deployment platform
-   cannot sustain the required long-lived connections.
+`buildingSelection.ts` derives the facts shown in the panel. Values come from the
+tile and nothing is inferred: a missing `height` reads "not recorded" rather than
+zero, `min_height` of 0 is reported as no base rather than a base at ground level,
+and floor counts are never estimated from height. Footprint area is real spherical
+area (Chamberlain & Duquette), outer ring minus holes — but vector tiles clip
+geometry at tile boundaries, so a building crossing an edge measures only the part
+in the clicked tile. The panel says so rather than presenting a partial figure as
+the whole.
 
-Do not add phone tracking, analytics, database scaffolding, or placeholder data
-until those capabilities are requested and their data/access requirements are known.
+Not every tile carries a feature id. Without one there is nothing to attach state
+to, so the building is still reported but not highlighted.
+
+## Live GPS
+
+The dashboard shows every unit reporting to a shared [Traccar](https://www.traccar.org)
+server, so a team can see each other simultaneously. Tracking is **opt-in**:
+nothing is requested until the viewer presses the locate button, and turning it off
+aborts the in-flight request and drops the positions.
+
+The fleet costs two upstream requests regardless of its size — one for devices, one
+for latest positions — and positions are grouped by device in a single pass. Adding
+a unit in Traccar needs no redeploy; it appears on the next poll. `TRACCAR_DEVICE_IDS`
+optionally restricts the view to named ids; blank means every device the account
+can see.
+
+- `app/api/live-position/route.ts` is the only place that talks to Traccar. It is
+  `force-dynamic` and `no-store`, because a cached location is a wrong location.
+- `traccarSource.ts` holds the credentials boundary. It reads `TRACCAR_URL`,
+  `TRACCAR_EMAIL`, `TRACCAR_PASSWORD`, and `TRACCAR_DEVICE_ID` from the server
+  environment and authenticates with HTTP Basic. None of these may be prefixed
+  `NEXT_PUBLIC_`; that would ship the password to the browser. Upstream errors are
+  reduced to a status code so a Traccar response body cannot echo the account back
+  to the client.
+- `position.ts` is the validation boundary. It rejects records that are not usable
+  positions — `valid: false`, non-finite or out-of-range coordinates, the 0,0
+  placeholder a device reports before its first fix, unparseable timestamps — and
+  nulls accuracy, speed, and heading rather than inventing them. Only the eight
+  viewer-facing fields cross into the browser.
+- `liveLayer.ts` owns a `live-position` GeoJSON source updated through `setData`,
+  carrying one point, one accuracy ring and one name label per unit. The map
+  instance and the 3D buildings are never rebuilt for a position update.
+  `style.load` re-adds the source and layers, because Mapbox drops them when the
+  style is replaced, and label colour follows the theme.
+- A unit with no usable fix stays in the roster and is left off the map, rather
+  than being hidden or drawn at a placeholder coordinate.
+
+### Device time, not server time
+
+Traccar Client buffers fixes while it cannot reach the server and flushes them
+later, so `serverTime` can trail `deviceTime` by many minutes, and rows can arrive
+out of order relative to when they were recorded. Two consequences shape this code:
+
+1. Every freshness decision uses the device fix time. `serverTime` is never used to
+   age a fix.
+2. `newestFix` orders explicitly by device time instead of trusting Traccar's own
+   latest-position pointer, which follows `deviceTime` and can therefore point at
+   an older row than the one most recently inserted.
+
+Freshness is reported honestly rather than smoothed: `live` within 90 seconds
+(green), `stale` within 10 minutes (amber), `lost` beyond that (grey), each with its
+own label. Only green means "here now". With several units on one map this is a
+correctness property, not decoration — a stale position rendered as current is the
+failure that matters, so degraded states keep distinct colours.
+Traccar's `online` flag tracks when data last arrived, not how fresh the fix is, so
+the two are surfaced as separate facts — a device can be online with a fix that is
+half an hour old. Positions are never interpolated and movement is never simulated.
+
+No location history is retained: the client holds only the latest fix, and the
+server stores nothing.
 
 ## Verification
 

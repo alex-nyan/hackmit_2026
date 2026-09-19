@@ -1,4 +1,4 @@
-# GridLens · HackMIT 2026
+# Paw Patrol · HackMIT 2026
 
 A full-screen, interactive 3D building map of MIT, Harvard, Cambridge, and Boston.
 This repository preserves the working local map's appearance, camera presets,
@@ -53,13 +53,83 @@ heights. The setup script works on macOS, Windows, and Linux, and **never overwr
 an existing `.env.local`**. Mapbox serves the remote map data; its account limits
 and pricing still apply.
 
+## Live fleet tracking (optional)
+
+The locate button in the header shows every unit reporting to a shared
+[Traccar](https://www.traccar.org) server, so a team can see each other on one
+map. Leave the settings blank and the dashboard runs exactly as before; the button
+then explains what is missing instead of failing.
+
+Add to `.env.local`:
+
+```dotenv
+TRACCAR_URL=http://localhost:8082
+TRACCAR_EMAIL=you@example.com
+TRACCAR_PASSWORD=your_traccar_password
+TRACCAR_DEVICE_IDS=
+```
+
+Leave `TRACCAR_DEVICE_IDS` blank to show every device the account can see — that
+is what you want for a shared map. Set it to a comma-separated list of Traccar
+numeric device ids (`1,2,5`) to restrict the view. The older single-device
+`TRACCAR_DEVICE_ID` still works.
+
+These are read on the server only. **Never prefix them with `NEXT_PUBLIC_`** — that
+would send your Traccar password to every visitor's browser.
+
+### Enrolling another device
+
+One device slot per person. For each:
+
+1. In Traccar's web UI press **+**, give the unit a name, and set a device
+   identifier you choose (`unit-07`). Or from the command line:
+
+   ```bash
+   curl -u "$TRACCAR_EMAIL:$TRACCAR_PASSWORD" \
+     -X POST "$TRACCAR_URL/api/devices" \
+     -H 'Content-Type: application/json' \
+     -d '{"name":"Unit 07","uniqueId":"unit-07"}'
+   ```
+
+2. Install **Traccar Client** on that phone and set:
+   - **Device identifier** — the identifier from step 1, exactly
+   - **Server URL** — `http://YOUR_SERVER:5055`
+   - **Accuracy** high, **Distance** 10–20 m
+3. Turn **Service status** on and allow **Always** location.
+
+The new unit appears on the map and in the roster on the next poll; no redeploy is
+needed. Picking a unit in the roster centres the map on it.
+
+Every phone must be able to reach port `5055` on the server. On one LAN that is the
+machine's address; for phones on cellular the server needs a publicly reachable
+address, since a laptop behind NAT is not addressable from outside.
+
+### What the colours mean
+
+A unit is green only when its phone reported within the last 90 seconds. Amber is
+up to 10 minutes old and grey is older — those mark **where a unit was last seen,
+not where it is now**. The distinction is not cosmetic: the Traccar phone app
+buffers fixes while it has no signal and flushes them later, so a position can
+arrive long after it was recorded. Freshness is measured from the phone's own fix
+time, never from when the server received it.
+
+Traccar's own "online" flag means data arrived recently, which is not the same as
+a fresh fix; the roster reports the two separately.
+
+Tracking is off until you press the button, only the latest fix per unit is held,
+and no location history is kept by the dashboard.
+
 ## What is included
 
 - Real vector basemaps: Mapbox `light-v11` and `dark-v11`.
-- Real 3D building heights from `composite` → `building` → `fill-extrusion`.
+- Real 3D building heights from `composite` → `building` → `fill-extrusion`,
+  with ambient occlusion and bevelled edges for depth.
+- Click any building for its real height, base, and footprint area.
 - MIT, Harvard, Boston, and All Boston camera presets.
 - Theme toggle, zoom, compass/pitch, fullscreen, keyboard and touch navigation.
 - Responsive layout, loading feedback, missing-token and failed-load states.
+- Optional live fleet tracking from a Traccar server: every unit on one map,
+  opt-in and server-authenticated.
 - Isolated map feature modules, TypeScript, tests, and CI checks.
 
 There are intentionally **no energy overlays, mock metrics, heatmap circles,
@@ -111,9 +181,11 @@ does **not** mean the live map has been verified.
 ## Project layout
 
 ```text
-app/                    Next.js route, metadata, and shared map styling
+app/                    Next.js routes, metadata, and shared map styling
+app/api/live-position/  Server-only Traccar bridge; credentials never reach the browser
 features/boston-map/    Map lifecycle, camera settings, building layer, and UI
-public/favicon.svg     Original GridLens icon
+features/live-track/    Position validation, freshness, live map layer, and panel
+public/favicon.svg     App icon
 scripts/setup.mjs      Cross-platform, non-destructive environment setup
 .env.example           Public environment variable names; no real credentials
 .editorconfig          Shared editor defaults
@@ -139,7 +211,20 @@ docs/architecture.md   Extension boundaries and map behavior
 - **Phone access:** `localhost` on a phone points to the phone, not your laptop.
   The default server binds to loopback. For a trusted LAN only, explicitly use
   `pnpm run dev -- --hostname 0.0.0.0`, open the laptop's LAN address, and update
-  token URL restrictions. This does not implement GPS or background tracking.
+  token URL restrictions. Phone positions come from Traccar (see **Live fleet
+  tracking**), not from the browser's geolocation API.
+
+- **The locate button says tracking is not configured.** `TRACCAR_URL`,
+  `TRACCAR_EMAIL` and `TRACCAR_PASSWORD` must all be set in `.env.local`, and the
+  server restarted afterwards.
+- **A unit is grey or amber, not green.** That is the fix age, not a fault. That
+  phone has not sent a recent position — check that Traccar Client's service is on,
+  that it can reach port 5055, and that the person is outdoors.
+- **A unit is missing from the roster.** The device must exist in Traccar and be
+  visible to the account in `TRACCAR_EMAIL`. If `TRACCAR_DEVICE_IDS` is set, the
+  unit's numeric id must be in it.
+- **The device shows online but the fix is old.** Traccar's online flag means data
+  arrived recently, not that the GPS fix is fresh. The panel reports both.
 
 ## Credentials and hosting
 
