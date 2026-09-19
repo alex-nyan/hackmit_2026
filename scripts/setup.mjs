@@ -8,4 +8,4 @@ if (existsSync(target)) {
   copyFileSync(new URL(".env.example", root), target, constants.COPYFILE_EXCL);
   console.log("Created .env.local. Add your Mapbox public token before starting.");
 }
-console.log("Run npm run dev, then open http://localhost:5173.");
+console.log("Run pnpm run dev, then open http://localhost:5173.");
