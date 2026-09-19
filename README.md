@@ -154,3 +154,12 @@ Add the deployed domain to your token's allowed URLs. No hosted deployment is
 created by these local setup instructions.
 
 See [architecture](docs/architecture.md) and [contributing](CONTRIBUTING.md).
+
+## Visual hazard triage infrastructure
+
+The separate [hazard-triage service](docs/hazard-triage.md) combines YOLO26 object
+evidence with local Ollama `gemma4:26b` and an optional OpenAI-compatible vision API.
+It includes an authenticated API, bounded inference, validated confidence and
+evidence contracts, durable retry handling, and mandatory human review. The map
+remains independently runnable. See the runbook for setup, the Mermaid architecture,
+testing, and the remaining production integration requirements.

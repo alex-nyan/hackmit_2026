@@ -14,3 +14,11 @@ next-env.d.ts
 *.log
 .idea/
 .vscode/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+services/triage/data/
+services/triage/models/
+services/triage/.runtime/
+*.egg-info/

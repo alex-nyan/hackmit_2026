@@ -7,3 +7,12 @@ coverage/
 .npm-cache/
 pnpm-lock.yaml
 public/*.svg
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+services/triage/data/
+services/triage/models/
+services/triage/.runtime/
+services/triage/uv.lock
+services/triage/contracts/
