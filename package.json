@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.6.2",
   "engines": { "node": ">=22.13.0" },
   "scripts": {
     "setup": "node scripts/setup.mjs",
@@ -10,10 +11,11 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1 --port 5173",
     "lint": "eslint . --max-warnings 0",
+    "check:lockfile": "node scripts/check-lockfile.mjs",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run",
+    "test": "node --test scripts/check-lockfile.test.mjs && vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run lint && npm test",
+    "check": "npm run check:lockfile && npm run typecheck && npm run lint && npm test",
     "verify": "npm run check && npm run build"
   },
   "dependencies": {

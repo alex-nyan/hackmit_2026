@@ -12,20 +12,27 @@ database, or platform-specific tooling is needed.
 
 Requirements:
 
-- Node.js **22.13+** (Node 22 LTS is recommended; `.nvmrc` selects it).
-- npm and Git.
+- Node.js **22.23.2** and npm **11.6.2** are the tested toolchain (`.nvmrc` selects Node).
+- Git.
 - Your own **Mapbox public access token**, beginning with `pk.`.
 - An internet connection and a browser with WebGL support.
 
 ```bash
-git clone --branch codex/boston-map-foundation https://github.com/alex-nyan/hackmit_2026.git
+git clone https://github.com/alex-nyan/hackmit_2026.git
 cd hackmit_2026
+```
+
+The command clones the default `main` branch. Check `node --version` and
+`npm --version` before installing. With nvm installed, run `nvm install` and
+`nvm use` inside the repository. If your npm version differs, install the tested
+version with `npm install --global npm@11.6.2`.
+
+Then install the dependencies and create your local configuration:
+
+```bash
 npm ci
 npm run setup
 ```
-
-The command selects the map feature branch. Once it is merged into `main`, the
-`--branch codex/boston-map-foundation` option can be omitted.
 
 Edit the newly created `.env.local`:
 
@@ -88,13 +95,15 @@ development after token changes; rebuild production after token changes.
 | `npm run setup` | Create `.env.local` safely from the tracked example |
 | `npm run dev` | Start local development at port 5173 |
 | `npm run check` | Typecheck, lint, and run tests |
+| `npm run check:lockfile` | Detect incomplete dependency metadata before installation |
 | `npm run verify` | Run all checks and a production build |
 | `npm run build` | Produce a Next.js production build |
 | `npm start` | Serve the production build locally |
 | `npm run test:watch` | Run tests during development |
 
 GitHub Actions runs installation, checks, and a production build on Linux and
-Windows. CI does not need a real token: tests isolate Mapbox, and the application
+Windows using the same pinned Node/npm versions. CI does not need a real token:
+tests isolate Mapbox, and the application
 shows a setup message when a token is absent. A successful build without a token
 does **not** mean the live map has been verified.
 
@@ -121,6 +130,8 @@ docs/architecture.md   Extension boundaries and map behavior
 - **Some buildings are missing/box-shaped:** geometry comes from Mapbox's data.
   This is vector extrusion, not photogrammetry or detailed architectural models.
 - **Port already in use:** stop the other server or use `--port 5174`.
+- **npm EACCES / unreadable cache:** use `npm ci --cache .npm-cache` to use a
+  project-local cache. Do not install project dependencies with `sudo`.
 - **WebGL unavailable:** enable hardware acceleration or use a WebGL-capable browser.
 - **Phone access:** `localhost` on a phone points to the phone, not your laptop.
   The default server binds to loopback. For a trusted LAN only, explicitly use
