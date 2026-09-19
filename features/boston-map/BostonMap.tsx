@@ -5,23 +5,51 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useRef } from "react";
 import type { Map as MapboxMap } from "mapbox-gl";
 
+import { addLiveLayers, updateLiveLayers, type LiveDevice } from "@/features/live-track";
 import styles from "./BostonMap.module.css";
 import { MAP_FOCUS, type MapFocus, type MapTheme, type MapStatus } from "./types";
-import { add3DBuildings, basemapStyle, isBuildingMapReady } from "./buildingLayer";
+import {
+  BUILDING_LAYER_ID,
+  add3DBuildings,
+  basemapStyle,
+  clearSelectedBuilding,
+  isBuildingMapReady,
+  setSelectedBuilding,
+} from "./buildingLayer";
+import { describeBuilding, type BuildingFacts } from "./buildingSelection";
 import { loadMapbox } from "./mapboxClient";
 
 interface BostonMapProps {
   focus: MapFocus;
   theme: MapTheme;
+  /** Every tracked unit; empty when tracking is off. */
+  liveDevices: LiveDevice[];
+  /** Bumped to re-centre on a unit, so repeat clicks still move the camera. */
+  focusRequest: { longitude: number; latitude: number; nonce: number } | null;
   onStatusChange: (status: MapStatus) => void;
+  onBuildingSelect: (building: BuildingFacts | null) => void;
 }
 
-export function BostonMap({ focus, theme, onStatusChange }: BostonMapProps) {
+export function BostonMap({
+  focus,
+  theme,
+  liveDevices,
+  focusRequest,
+  onStatusChange,
+  onBuildingSelect,
+}: BostonMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
   const themeRef = useRef(theme);
   const focusRef = useRef(focus);
   const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveDevicesRef = useRef<LiveDevice[]>(liveDevices);
+  const selectedIdRef = useRef<string | number | null>(null);
+  const onBuildingSelectRef = useRef(onBuildingSelect);
+
+  useEffect(() => {
+    onBuildingSelectRef.current = onBuildingSelect;
+  }, [onBuildingSelect]);
 
   useEffect(() => {
     focusRef.current = focus;
@@ -94,6 +122,12 @@ export function BostonMap({ focus, theme, onStatusChange }: BostonMapProps) {
           if (cancelled) return;
           try {
             add3DBuildings(map, themeRef.current);
+            // Feature state does not survive a style change; drop the selection
+            // rather than leave a highlight the map can no longer render.
+            selectedIdRef.current = null;
+            onBuildingSelectRef.current(null);
+            addLiveLayers(map, themeRef.current);
+            updateLiveLayers(map, liveDevicesRef.current);
             handleReady();
           } catch {
             onStatusChange("error");
@@ -121,6 +155,38 @@ export function BostonMap({ focus, theme, onStatusChange }: BostonMapProps) {
           }
         }, 20000);
 
+        // One click handler decides both selection and dismissal, so the two
+        // cannot race the way separate layer and map handlers would.
+        map.on("click", (event) => {
+          if (cancelled || !map.getLayer(BUILDING_LAYER_ID)) return;
+
+          const [hit] = map.queryRenderedFeatures(event.point, {
+            layers: [BUILDING_LAYER_ID],
+          });
+
+          clearSelectedBuilding(map, selectedIdRef.current);
+          selectedIdRef.current = null;
+
+          if (!hit) {
+            onBuildingSelectRef.current(null);
+            return;
+          }
+
+          const facts = describeBuilding(hit);
+          if (facts?.id != null) {
+            selectedIdRef.current = facts.id;
+            setSelectedBuilding(map, facts.id);
+          }
+          onBuildingSelectRef.current(facts);
+        });
+
+        map.on("mouseenter", BUILDING_LAYER_ID, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", BUILDING_LAYER_ID, () => {
+          map.getCanvas().style.cursor = "";
+        });
+
         resizeObserver = new ResizeObserver(() => map.resize());
         resizeObserver.observe(containerRef.current);
       } catch {
@@ -138,6 +204,26 @@ export function BostonMap({ focus, theme, onStatusChange }: BostonMapProps) {
       mapRef.current = null;
     };
   }, [onStatusChange]);
+
+  useEffect(() => {
+    liveDevicesRef.current = liveDevices;
+    const map = mapRef.current;
+    if (!map) return;
+    updateLiveLayers(map, liveDevices);
+  }, [liveDevices]);
+
+  useEffect(() => {
+    if (!focusRequest) return;
+    const map = mapRef.current;
+    if (!map) return;
+
+    map.flyTo({
+      center: [focusRequest.longitude, focusRequest.latitude],
+      zoom: Math.max(map.getZoom(), 16.5),
+      duration: 900,
+    });
+    // Keyed on the nonce so selecting the same unit twice still re-centres.
+  }, [focusRequest]);
 
   useEffect(() => {
     themeRef.current = theme;
