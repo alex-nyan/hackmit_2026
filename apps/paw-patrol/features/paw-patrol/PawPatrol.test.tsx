@@ -32,7 +32,7 @@ describe("workspace entry points", () => {
     expect(nav.textContent).toBe(label);
     expect(within(nav).queryAllByRole("button")).toHaveLength(0);
     expect(ui.getByRole("heading", { level: 1 }).textContent).toBe(heading);
-    fireEvent.change(ui.getByLabelText(/Selected person/), { target: { value: "P-02" } });
+    fireEvent.change(ui.getByRole("combobox", { name: /^Selected person$/ }), { target: { value: "P-02" } });
     fireEvent.click(ui.getByRole("button", { name: "Reset demo" }));
     expect(ui.getByRole("heading", { level: 1 }).textContent).toBe(heading);
   });

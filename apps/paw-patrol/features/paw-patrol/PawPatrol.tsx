@@ -25,7 +25,6 @@ import {
   Check,
   ArrowRight,
   Ambulance,
-  WifiOff,
   Info,
   ChevronDown,
 } from "lucide-react";
@@ -49,6 +48,8 @@ import { useDemoTools } from "./useDemoTools";
 import { sceneAt, emsStatus, type MistRecord } from "./consult";
 import { SceneCoordination, TacticalBrief, MistHandoff, emptyTactical } from "./ConsultPanels";
 import { WORKSPACE_LABELS, WORKSPACE_VIEWS, type Workspace } from "./workspace";
+import { useHeartRate, type HeartRateConnection, type HeartRateSample } from "../heart-rate/useHeartRate";
+import { HeartRatePanel } from "../heart-rate/HeartRatePanel";
 
 const AnatomyViewer = dynamic(() => import("../anatomy/AnatomyViewer"), {
   ssr: false,
@@ -64,20 +65,32 @@ const VIEW_NAMES = {
   hospital: "Hospital",
 };
 
-function HeartChart({ time, id }: { time: number; id: string }) {
-  const values = Array.from({ length: 24 }, (_, i) =>
+function HeartChart({ time, id, deviceSamples }: { time: number; id: string; deviceSamples?: HeartRateSample[] }) {
+  const values = deviceSamples?.map(sample => sample.bpm) ?? Array.from({ length: 24 }, (_, i) =>
     sampleHeartRate(id, Math.max(0, time - (23 - i) * 2)),
   );
+  if (deviceSamples && deviceSamples.length < 2) {
+    return <p className="small-note">The device trend appears after two readings. No synthetic points are added.</p>;
+  }
+  const minimum = Math.min(...values) - 5;
+  const range = Math.max(...values) + 5 - minimum;
+  const y = (value: number) => deviceSamples ? 75 - ((value - minimum) / range) * 65 : 80 - (value - 65) * 0.85;
+  const firstAt = deviceSamples?.[0]?.receivedAt ?? 0;
+  const elapsed = (deviceSamples?.at(-1)?.receivedAt ?? 0) - firstAt;
+  const x = (index: number) => deviceSamples && elapsed > 0
+    ? ((deviceSamples[index].receivedAt - firstAt) / elapsed) * 230
+    : (index / Math.max(1, values.length - 1)) * 230;
   const path = values
-    .map((v, i) => `${i * 10},${80 - (v - 65) * 0.85}`)
+    .map((v, i) => `${x(i)},${y(v)}`)
     .join(" ");
   return (
     <svg
       className="heart-chart"
       viewBox="0 0 230 84"
       role="img"
-      aria-label="Synthetic heart rate trend"
+      aria-label={deviceSamples ? "Received heart rate trend" : "Synthetic heart rate trend"}
     >
+      <title>{deviceSamples ? "Recent device readings by browser receipt time; not an ECG" : "Synthetic scenario readings"}</title>
       <path d="M0 75H230M0 40H230M0 5H230" stroke="#dedfd9" strokeWidth="1" />
       <polyline
         points={path}
@@ -88,12 +101,21 @@ function HeartChart({ time, id }: { time: number; id: string }) {
       />
       <circle
         cx="230"
-        cy={80 - (values[23] - 65) * 0.85}
+        cy={y(values[values.length - 1])}
         r="3"
         fill="#343e8a"
       />
     </svg>
   );
+}
+
+function HeartRateReadout({ connection, time, personId }: { connection: HeartRateConnection; time: number; personId: string }) {
+  const deviceMode = connection.mode === "device";
+  const current = connection.status === "receiving" ? connection.bpm : null;
+  return <div className="reading" aria-label="Selected person heart rate">
+    <strong id="heart-rate">{deviceMode ? current ?? "--" : sampleHeartRate(personId, time)}</strong>
+    <span>bpm<small>{deviceMode ? current !== null ? "Live device reading" : "Device test · no current reading" : `Synthetic sample · ${stamp(time)}`}</small></span>
+  </div>;
 }
 
 export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }) {
@@ -115,6 +137,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
   const [hardware, setHardware] = useState(false);
   const [evidence, setEvidence] = useState<"camera" | "audio" | null>(null);
   const person = PEOPLE.find((p) => p.id === selectedId) ?? PEOPLE[0];
+  const heartRate = useHeartRate(person.id, session);
   const vehicle = vehicleAt(person.id, time);
   const phase = phaseAt(time),
     medical = phase >= 3,
@@ -270,8 +293,8 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
           onClick={() => setHardware(!hardware)}
           aria-expanded={hardware}
         >
-          <WifiOff size={16} />
-          <span>Devices offline</span>
+          <Watch size={16} />
+          <span>{heartRate.status === "receiving" ? "Heart rate live" : "Devices & HeartCast"}</span>
         </button>
       </header>
       <main id="workspace">
@@ -320,7 +343,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
         <div className="demo-notice">
           <span className="tag">SIMULATION</span>
           <span>
-            Synthetic people and signals. No live monitoring or real dispatch.
+            Demo people, scenes & dispatch. Optional Bluetooth heart rate stays in this tab.
           </span>
           <span className="auto-label">
             {complete
@@ -356,8 +379,8 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
                 {
                   icon: Watch,
                   name: "Apple Watch SE",
-                  purpose: "Heart rate · generation not specified",
-                  state: "Not connected",
+                  purpose: "Heart rate via iPhone HeartCast · optional local test",
+                  state: heartRate.mode === "device" ? heartRate.status : "Not connected",
                 },
                 {
                   icon: Laptop,
@@ -375,8 +398,9 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               ))}
             </div>
             <p className="small-note">
-              The device inventory is recorded, but this build does not pair
-              devices, run models, record media or collect health data.
+              HeartCast can provide heart rate after you choose a Bluetooth device.
+              Readings stay in this tab’s memory and are not uploaded or saved.
+              Camera, microphone, GPS and model inference are not connected here.
             </p>
             <p className="small-note"><strong>ATAK integration · planned, not connected.</strong> A native Android plugin or validated TAK adapter is a separate integration. This browser demo does not send CoT events, tactical messages or real dispatch requests.</p>
           </section>
@@ -433,13 +457,8 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               <div className="selected-summary">
                 <span className="eyebrow">SELECTED OFFICER</span>
                 <h3>{person.name}</h3>
-                <div className="reading">
-                  <strong>{sampleHeartRate(person.id, time)}</strong>
-                  <span>
-                    bpm <small>synthetic</small>
-                  </span>
-                  <HeartPulse size={21} />
-                </div>
+                <HeartRateReadout connection={heartRate} time={time} personId={person.id} />
+                <HeartRatePanel connection={heartRate} personId={person.id} personName={person.name} compact />
                 {!workspace && (
                   <button className="text-button" onClick={() => inspect(person)}>
                     Open officer & body view <ArrowUpRight size={15} />
@@ -560,13 +579,9 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
                   <h3>Heart rate</h3>
                   <HeartPulse size={20} />
                 </div>
-                <div className="reading">
-                  <strong>{sampleHeartRate(person.id, time)}</strong>
-                  <span>
-                    bpm<small>Synthetic sample · {stamp(time)}</small>
-                  </span>
-                </div>
-                <HeartChart time={time} id={person.id} />
+                <HeartRateReadout connection={heartRate} time={time} personId={person.id} />
+                <HeartChart time={time} id={person.id} deviceSamples={heartRate.mode === "device" ? heartRate.history : undefined} />
+                <HeartRatePanel connection={heartRate} personId={person.id} personName={person.name} />
               </section>
               <section className="panel support-card">
                 <p className="eyebrow">INCIDENT RESPONSE UNITS</p>
@@ -606,7 +621,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               <span>Video, audio & GPS not connected</span>
               <Watch size={20} />
               <strong>Apple Watch SE</strong>
-              <span>Heart-rate feed not connected</span>
+              <span>{heartRate.mode === "device" ? `HeartCast local test · ${heartRate.status}` : "Heart-rate feed not connected"}</span>
             </section>
           </>
         )}
@@ -701,23 +716,20 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               annotation={annotation}
             />
             <section className="panel observations">
-              <p className="eyebrow">SAMPLE OBSERVATIONS</p>
+              <p className="eyebrow">{heartRate.mode === "device" ? "LOCAL DEVICE TEST" : "SAMPLE OBSERVATIONS"}</p>
               <h2>Context, not conclusions.</h2>
-              <div className="reading">
-                <strong>{sampleHeartRate(person.id, time)}</strong>
-                <span>
-                  bpm<small>Scripted heart rate</small>
-                </span>
-              </div>
-              <HeartChart time={time} id={person.id} />
+              <HeartRateReadout connection={heartRate} time={time} personId={person.id} />
+              <HeartChart time={time} id={person.id} deviceSamples={heartRate.mode === "device" ? heartRate.history : undefined} />
+              <HeartRatePanel connection={heartRate} personId={person.id} personName={person.name} />
               <p className="small-note">
-                No measurements received from a watch. No live blood pressure, oxygen
-                saturation, ECG or diagnosis is available.
+                Bluetooth heart rate is a local connectivity test, not a clinical assessment.
+                No live blood pressure, oxygen saturation, ECG or diagnosis is available.
+                Device readings are excluded from the simulated MIST handoff below.
               </p>
               <h3 className="section-label">Handoff contents</h3>
               {[
                 "Scenario event timeline",
-                "Sample heart-rate series",
+                "Synthetic heart-rate series in demo MIST only",
                 "Scripted transport status",
               ].map((s) => (
                 <div className="check-row" key={s}>
