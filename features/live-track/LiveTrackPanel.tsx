@@ -100,9 +100,10 @@ export function LiveTrackPanel({ state, onFocusDevice }: LiveTrackPanelProps) {
       <aside className="live-card" role="status">
         <span className="panel-label">No units</span>
         <p>
-          Nobody is publishing a position. Open <code>/capture</code> on a phone, name the unit and
-          share its location — it appears here within a few seconds.
+          Nobody is publishing a position. Scan the join code with a phone and tap “Put me on the
+          map” — it appears here within a few seconds.
         </p>
+        {state.note && <p className="panel-note">{state.note}</p>}
       </aside>
     );
   }
@@ -131,6 +132,9 @@ export function LiveTrackPanel({ state, onFocusDevice }: LiveTrackPanelProps) {
           last seen, not where it is now.
         </p>
       )}
+
+      {/* How this picture was arrived at, when it was not the usual way. */}
+      {state.note && <p className="panel-note">{state.note}</p>}
     </aside>
   );
 }

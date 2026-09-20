@@ -155,7 +155,7 @@ describe("reading the roster", () => {
   it("returns the view model the map already draws", async () => {
     holds([{ ...submission(), publishedAt: NOW.toISOString() }]);
 
-    const devices = await listPublishedDevices(NOW.getTime());
+    const { devices } = await listPublishedDevices(NOW.getTime());
     expect(devices).toEqual([
       {
         id: "unit-01",
@@ -176,7 +176,7 @@ describe("reading the roster", () => {
   });
 
   it("is empty rather than failing when nobody has published", async () => {
-    expect(await listPublishedDevices(NOW.getTime())).toEqual([]);
+    expect((await listPublishedDevices(NOW.getTime())).devices).toEqual([]);
   });
 
   it("leaves out a unit whose fix is old enough to be a previous demo", async () => {
@@ -188,7 +188,7 @@ describe("reading the roster", () => {
       },
     ]);
 
-    const devices = await listPublishedDevices(NOW.getTime());
+    const { devices } = await listPublishedDevices(NOW.getTime());
     expect(devices.map((device) => device.id)).toEqual(["unit-01"]);
   });
 });

@@ -39,6 +39,48 @@ function isWriteConflict(error: unknown): boolean {
   return /precondition|etag|already exists|conflict/i.test(`${error.name} ${error.message}`);
 }
 
+/**
+ * Whether the store itself has gone away, rather than one write losing a race.
+ *
+ * A suspended Blob store is a particularly quiet way to break: the API plane
+ * keeps answering, so the token still looks valid and `list` still returns the
+ * objects, while every read and write on the data plane is refused with a bare
+ * 403. Nothing retries its way out of that, and nothing the caller did caused
+ * it, so it is worth telling apart from a fix that simply failed to land.
+ */
+export function isStoreUnavailable(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /store has been suspended|store does not exist|blob service is currently not available|40[13] (Forbidden|Unauthorized)/i.test(
+    `${error.name} ${error.message}`,
+  );
+}
+
+/**
+ * Where positions go when the Blob store will not take them.
+ *
+ * Memory was rejected as the store for exactly the reason it is worth having as
+ * a fallback: it belongs to one server instance, so two dashboards can be told
+ * different things. That is a bad way to run a deployment and a good way to
+ * survive one — a demo whose map goes blank because a storage product was
+ * suspended is worse than a map that is occasionally a fix behind.
+ *
+ * Every reader is told which of the two answered, so the difference shows up on
+ * screen instead of being inferred from a map that looks wrong.
+ */
+let fallbackPositions: StoredPosition[] = [];
+
+/** Which store actually answered. Reported, never guessed at by a caller. */
+export type PositionSource = "store" | "memory";
+
+export interface PublishedPositions {
+  devices: LiveDevice[];
+  source: PositionSource;
+}
+
+/** The sentence a dashboard shows when the shared store is not the one answering. */
+export const MEMORY_FALLBACK_NOTE =
+  "The shared position store is unavailable, so units are being held in this server's memory. They will be visible here but may not reach another instance, and they are lost on redeploy.";
+
 interface StoredPositions {
   positions: StoredPosition[];
   etag: string | null;
@@ -75,6 +117,22 @@ export async function publishPosition(
 ): Promise<StoredPosition> {
   const stored = storePosition(submission, now);
 
+  try {
+    return await writePosition(stored, now, sleep);
+  } catch (error) {
+    if (!isStoreUnavailable(error)) throw error;
+    // The phone did its part. Holding the fix here keeps it on this instance's
+    // map rather than dropping it because a storage product said no.
+    fallbackPositions = mergePosition(activePositions(fallbackPositions, now.getTime()), stored);
+    return stored;
+  }
+}
+
+async function writePosition(
+  stored: StoredPosition,
+  now: Date,
+  sleep: Sleep,
+): Promise<StoredPosition> {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const { positions, etag } = await readPositions();
     // Expired units are dropped on the way past rather than in a sweep of their
@@ -121,6 +179,17 @@ export async function removePosition(
   now: Date = new Date(),
   sleep: Sleep = realSleep,
 ): Promise<boolean> {
+  try {
+    return await deletePosition(sourceId, now, sleep);
+  } catch (error) {
+    if (!isStoreUnavailable(error)) throw error;
+    const before = fallbackPositions.length;
+    fallbackPositions = fallbackPositions.filter((position) => position.sourceId !== sourceId);
+    return fallbackPositions.length !== before;
+  }
+}
+
+async function deletePosition(sourceId: string, now: Date, sleep: Sleep): Promise<boolean> {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const { positions, etag } = await readPositions();
     // Nothing of this unit's to remove. Writing anyway would cost a round trip
@@ -149,13 +218,27 @@ export async function removePosition(
 }
 
 /** Every unit currently publishing, as the view model the map already draws. */
-export async function listPublishedDevices(nowMs: number = Date.now()): Promise<LiveDevice[]> {
-  const { positions } = await readPositions();
+export async function listPublishedDevices(
+  nowMs: number = Date.now(),
+): Promise<PublishedPositions> {
+  try {
+    const { positions } = await readPositions();
+    return { devices: toDevices(positions, nowMs), source: "store" };
+  } catch (error) {
+    if (!isStoreUnavailable(error)) throw error;
+    // Whatever this instance accepted while the store was refusing. Saying
+    // "no units" here would report an outage as an empty street.
+    return { devices: toDevices(fallbackPositions, nowMs), source: "memory" };
+  }
+}
+
+function toDevices(positions: readonly StoredPosition[], nowMs: number): LiveDevice[] {
   return activePositions(positions, nowMs).map((position) => toLiveDevice(position, nowMs));
 }
 
 /** Demo reset, paired with the wall's and the incident log's. */
 export async function clearPositions(): Promise<void> {
+  fallbackPositions = [];
   await del(POSITION_PATH).catch(() => undefined);
 }
 
