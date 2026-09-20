@@ -75,6 +75,85 @@
   font-size: 12px;
 }
 
+.pairing {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #414141;
+}
+
+.pairing h3,
+.pairing p {
+  margin: 0;
+}
+
+.pairing h3 {
+  font-size: 15px;
+}
+
+.pairing .pairButton {
+  justify-self: start;
+  background: #eee;
+  color: #111;
+  font-weight: 600;
+}
+
+.pairingHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pairingGrid {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.qr {
+  width: 200px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pairingGrid ol {
+  padding-left: 20px;
+  margin: 0 0 12px;
+}
+
+.pairingGrid li + li {
+  margin-top: 8px;
+}
+
+.pairingGrid a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  color: #fafafa;
+  text-decoration: underline;
+}
+
+@media (max-width: 520px) {
+  .pairingGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .qr {
+    justify-self: center;
+  }
+}
+
 .stage {
   aspect-ratio: 16 / 9;
   background: #000;
@@ -148,6 +227,12 @@
 .instructions summary {
   cursor: pointer;
   font-weight: 600;
+}
+
+.instructions > form,
+.instructions > p,
+.instructions > button {
+  margin-top: 12px;
 }
 
 .instructions ol {

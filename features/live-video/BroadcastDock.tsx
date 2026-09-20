@@ -1,12 +1,48 @@
 "use client";
 
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { usePathname } from "next/navigation";
 import { ExternalLink, Maximize2, Minimize2, Radio, RotateCw, X } from "lucide-react";
 import styles from "./BroadcastDock.module.css";
 
 const STORAGE_KEY = "paw-patrol-broadcast-view";
+const PAIRING_KEY = "paw-patrol-broadcast-pairing";
 const WORKSPACES = new Set(["/", "/dispatch", "/officer", "/hospital", "/capture", "/map"]);
+
+type PhonePairing = { streamId: string; password: string };
+
+function readPairing(raw: string | null): PhonePairing | null {
+  if (!raw) return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (
+      value &&
+      typeof value === "object" &&
+      "streamId" in value &&
+      "password" in value &&
+      typeof value.streamId === "string" &&
+      typeof value.password === "string" &&
+      /^[a-f0-9]{32}$/.test(value.streamId) &&
+      /^[a-f0-9]{32}$/.test(value.password)
+    ) {
+      return { streamId: value.streamId, password: value.password };
+    }
+  } catch {
+    // Ignore stale or damaged storage; the user can create a fresh pairing.
+  }
+  return null;
+}
+
+function pairingLink(pairing: PhonePairing, mode: "push" | "view"): string {
+  const link = new URL("https://vdo.ninja/");
+  link.searchParams.set(mode, pairing.streamId);
+  link.searchParams.set("password", pairing.password);
+  if (mode === "push") {
+    link.searchParams.set("webcam", "");
+    link.searchParams.set("facing", "rear");
+  }
+  return link.href;
+}
 
 /** Only a single receiving stream; never embed a publishing or arbitrary URL. */
 function viewerLink(input: string): string | null {
@@ -54,14 +90,52 @@ function BroadcastControls() {
   const [relay, setRelay] = useState(false);
   const [stats, setStats] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [pairing, setPairing] = useState<PhonePairing | null>(null);
+  const [showQr, setShowQr] = useState(true);
 
   function show() {
     try {
       setDraft(sessionStorage.getItem(STORAGE_KEY) ?? "");
+      const saved = readPairing(sessionStorage.getItem(PAIRING_KEY));
+      if (saved) {
+        setPairing(saved);
+        setActive(pairingLink(saved, "view"));
+      }
     } catch {
       // Viewing still works when browser storage is disabled.
     }
     setOpen(true);
+  }
+
+  function receive(link: string) {
+    setDraft(link);
+    setActive(link);
+    setError(null);
+    setAttempt((value) => value + 1);
+    try {
+      sessionStorage.setItem(STORAGE_KEY, link);
+    } catch {
+      // Saving is optional; never prevent a connection.
+    }
+  }
+
+  function pairPhone() {
+    try {
+      const next = {
+        streamId: crypto.randomUUID().replaceAll("-", ""),
+        password: crypto.randomUUID().replaceAll("-", ""),
+      };
+      setPairing(next);
+      setShowQr(true);
+      receive(pairingLink(next, "view"));
+      try {
+        sessionStorage.setItem(PAIRING_KEY, JSON.stringify(next));
+      } catch {
+        // The current session still works without storage.
+      }
+    } catch {
+      setError("Could not create a pairing. Open this dashboard over HTTPS and try again.");
+    }
   }
 
   function close() {
@@ -78,13 +152,12 @@ function BroadcastControls() {
       setError("Paste the VDO.Ninja VIEW link, starting with https://vdo.ninja/?view=.");
       return;
     }
-    setError(null);
-    setActive(link);
-    setAttempt((value) => value + 1);
+    receive(link);
+    setPairing(null);
     try {
-      sessionStorage.setItem(STORAGE_KEY, link);
+      sessionStorage.removeItem(PAIRING_KEY);
     } catch {
-      // Saving the link is optional; never prevent a connection.
+      // Manual links still work without storage.
     }
   }
 
@@ -121,6 +194,39 @@ function BroadcastControls() {
             </button>
           </header>
 
+          <div className={styles.pairing}>
+            {!pairing ? (
+              <>
+                <h3>Connect a body camera</h3>
+                <p>Scan a QR code on the iPhone to send its camera and sound straight here.</p>
+                <button type="button" onClick={pairPhone} className={styles.pairButton}>
+                  Pair iPhone
+                </button>
+              </>
+            ) : (
+              <>
+                <div className={styles.pairingHeading}>
+                  <h3>{showQr ? "Scan with your iPhone" : "iPhone pairing"}</h3>
+                  <button
+                    type="button"
+                    aria-expanded={showQr}
+                    onClick={() => setShowQr((value) => !value)}
+                  >
+                    {showQr ? "Hide QR code" : "Show QR code"}
+                  </button>
+                </div>
+                {showQr && (
+                  <PhonePairingCode key={pairing.streamId} link={pairingLink(pairing, "push")} />
+                )}
+                {!active && (
+                  <button type="button" onClick={() => receive(pairingLink(pairing, "view"))}>
+                    Resume paired camera
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
           {embed && (
             <div className={styles.stage}>
               <iframe
@@ -135,29 +241,11 @@ function BroadcastControls() {
           )}
 
           <div className={styles.body}>
-            <form onSubmit={connect}>
-              <label htmlFor={`${id}-link`}>Viewing link from the publishing Mac</label>
-              <div className={styles.inputRow}>
-                <input
-                  id={`${id}-link`}
-                  type="url"
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  placeholder="https://vdo.ninja/?view=…"
-                  autoComplete="off"
-                  spellCheck={false}
-                  required
-                  aria-invalid={!!error}
-                  aria-describedby={error ? `${id}-error` : undefined}
-                />
-                <button type="submit">{active ? "Load link" : "Connect"}</button>
-              </div>
-              {error && (
-                <p id={`${id}-error`} role="alert" className={styles.error}>
-                  {error}
-                </p>
-              )}
-            </form>
+            {error && (
+              <p id={`${id}-error`} role="alert" className={styles.error}>
+                {error}
+              </p>
+            )}
 
             {active && (
               <>
@@ -199,28 +287,47 @@ function BroadcastControls() {
               Show stream statistics (reconnects)
             </label>
 
-            <details open={!active} className={styles.instructions}>
-              <summary>Set up the publishing Mac</summary>
-              <ol>
-                <li>Connect the iPhone to the Mac by USB, trust the Mac, then lock the iPhone.</li>
-                <li>
-                  Open{" "}
-                  <a href="https://vdo.ninja/" target="_blank" rel="noreferrer">
-                    VDO.Ninja <ExternalLink size={12} />
-                  </a>{" "}
-                  in Chrome and choose <strong>Add your Camera to OBS</strong>. OBS is not required.
-                </li>
-                <li>Select the iPhone camera and its microphone separately, then press Start.</li>
-                <li>
-                  Copy the VIEW link to the receiving Mac and paste it above. Keep the publisher tab
-                  open.
-                </li>
-              </ol>
+            {pairing && (
+              <details className={styles.instructions}>
+                <summary>Pair another phone</summary>
+                <p className={styles.note}>
+                  A new code switches this dashboard to a new session. Stop the old broadcast on the
+                  phone before switching.
+                </p>
+                <button type="button" onClick={pairPhone}>
+                  Create new pairing
+                </button>
+              </details>
+            )}
+
+            <details className={styles.instructions}>
+              <summary>Use an existing viewing link</summary>
+              <form onSubmit={connect}>
+                <label htmlFor={`${id}-link`}>VDO.Ninja viewing link</label>
+                <div className={styles.inputRow}>
+                  <input
+                    id={`${id}-link`}
+                    type="url"
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    placeholder="https://vdo.ninja/?view=…"
+                    autoComplete="off"
+                    spellCheck={false}
+                    required
+                    aria-invalid={!!error}
+                    aria-describedby={error ? `${id}-error` : undefined}
+                  />
+                  <button type="submit">{active ? "Load link" : "Connect"}</button>
+                </div>
+              </form>
               <p className={styles.note}>
-                This feed carries video and sound. It does not submit media for AI analysis. Keep
-                the viewing link within your team.
+                A phone or Mac can also publish from VDO.Ninja and share its VIEW link here.
               </p>
             </details>
+            <p className={styles.note}>
+              Live viewing only; this feed does not submit media for AI analysis. Keep the QR code
+              and links within your team.
+            </p>
           </div>
         </section>
       )}
@@ -235,6 +342,64 @@ function BroadcastControls() {
         <Radio size={17} aria-hidden="true" />
         {open ? "Close camera & audio" : "Camera & audio"}
       </button>
+    </div>
+  );
+}
+
+function PhonePairingCode({ link }: { link: string }) {
+  const [svg, setSvg] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void import("qrcode")
+      .then((module) =>
+        module.default.toString(link, {
+          type: "svg",
+          errorCorrectionLevel: "M",
+          margin: 4,
+          color: { dark: "#000000ff", light: "#ffffffff" },
+        }),
+      )
+      .then((code) => {
+        if (!cancelled) setSvg(code);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [link]);
+
+  return (
+    <div className={styles.pairingGrid}>
+      {svg ? (
+        <div
+          className={styles.qr}
+          role="img"
+          aria-label="QR code to start this iPhone camera broadcast"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      ) : (
+        <p role="status">
+          {failed ? "QR unavailable. Open the phone setup link instead." : "Preparing QR code…"}
+        </p>
+      )}
+      <div>
+        <ol>
+          <li>Scan with the iPhone Camera app and open in Safari.</li>
+          <li>
+            Allow camera and microphone. Select the rear camera and microphone, then tap{" "}
+            <strong>Start</strong>.
+          </li>
+          <li>The feed appears here automatically. Hide this code to make room for the video.</li>
+        </ol>
+        <p className={styles.note}>Keep Safari open and the phone unlocked while wearing it.</p>
+        <a href={link} target="_blank" rel="noreferrer">
+          Open phone setup <ExternalLink size={12} />
+        </a>
+      </div>
     </div>
   );
 }
