@@ -12,17 +12,22 @@ export interface ContainerScrollProps {
 
 /** Finish the tilt as the tablet reaches the viewing area, independent of page length. */
 export function ContainerScroll({ titleComponent, children, className }: ContainerScrollProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress, scrollY } = useScroll({
+  const { scrollYProgress } = useScroll({
     target: frameRef,
     offset: ["start 0.6", "start 0.18"],
   });
+  const { scrollYProgress: titleProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "start -240px"],
+  });
   const rotate = useTransform(scrollYProgress, [0, 1], [20, 0]);
   const scale = useTransform(scrollYProgress, [0, 1], [1.05, 1]);
-  const translate = useTransform(scrollY, [0, 240], [0, -100]);
+  const translate = useTransform(titleProgress, [0, 1], [0, -100]);
 
   return (
-    <div className={[styles.container, className].filter(Boolean).join(" ")}>
+    <div ref={containerRef} className={[styles.container, className].filter(Boolean).join(" ")}>
       <div className={styles.stage}>
         <Header translate={translate} titleComponent={titleComponent} />
         <div ref={frameRef} className={styles.frame}>

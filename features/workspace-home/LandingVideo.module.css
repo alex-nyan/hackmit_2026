@@ -1,0 +1,130 @@
+.video {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #080b10;
+  color: #fff;
+}
+
+.poster {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background:
+    radial-gradient(ellipse at 50% 20%, #34506a 0%, transparent 65%),
+    linear-gradient(145deg, #1c2c3f, #090d15 80%);
+  cursor: pointer;
+}
+
+.fallback {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  opacity: 0.85;
+}
+
+.fallback img {
+  width: clamp(32px, 6vw, 64px);
+  height: clamp(32px, 6vw, 64px);
+}
+
+.thumbnail {
+  object-fit: cover;
+}
+
+.shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #0001, #0005 55%, #0009);
+}
+
+.playLabel {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 13px;
+  padding: 16px;
+  font-size: clamp(12px, 1.5vw, 17px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-shadow: 0 2px 12px #000;
+}
+
+.playIcon {
+  display: grid;
+  place-items: center;
+  width: clamp(48px, 7vw, 76px);
+  height: clamp(48px, 7vw, 76px);
+  padding-left: 3px;
+  border: 1px solid #ffffff8c;
+  border-radius: 50%;
+  color: #142537;
+  background: #fffffff0;
+  box-shadow: 0 8px 32px #0005;
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease;
+}
+
+.poster:hover .playIcon {
+  transform: scale(1.06);
+  background: #fff;
+}
+
+.video .poster:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: -7px;
+}
+
+.player {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.external {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid #ffffff35;
+  border-radius: 6px;
+  background: #0b111de6;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.external:hover {
+  background: #1c2c43;
+}
+
+.video .external:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playIcon {
+    transition: none;
+  }
+
+  .poster:hover .playIcon {
+    transform: none;
+  }
+}

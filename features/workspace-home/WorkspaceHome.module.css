@@ -114,6 +114,17 @@
   width: min(1100px, calc(100% - 48px));
   margin: 0 auto;
 }
+.workflow {
+  padding-top: clamp(16px, 3vw, 48px);
+}
+.workflowTitle {
+  margin: 0;
+  color: var(--landing-text);
+  font-size: clamp(30px, 4.5vw, 56px);
+  font-weight: 550;
+  line-height: 1.1;
+  letter-spacing: -0.05em;
+}
 .cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -3,7 +3,9 @@ import Image from "next/image";
 import { ArrowDown, ArrowRight, Map, Video } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
+import { ScrollWordReveal } from "@/components/ui/motion-scroll-word-reveal";
 import { LandingTheme, LandingThemeToggle } from "./LandingTheme";
+import { LandingVideo } from "./LandingVideo";
 import { ResponseNetwork } from "./ResponseNetwork";
 import styles from "./WorkspaceHome.module.css";
 
@@ -16,6 +18,13 @@ const workspaces = [
   },
   { title: "Officer", href: "/officer", image: "officers", label: "Stay connected in the field" },
   { title: "Hospital", href: "/hospital", image: "medic", label: "Prepare for the handoff" },
+];
+
+const story = [
+  "In an emergency, missing information can have serious consequences.",
+  "Field teams, dispatchers and clinicians need a shared picture to coordinate care.",
+  "This HackMIT, we built something to support the people responding—and the communities counting on them.",
+  "Welcome to Paw Patrol.",
 ];
 
 export function WorkspaceHome() {
@@ -50,6 +59,13 @@ export function WorkspaceHome() {
               </Link>
             </div>
           }
+        >
+          <LandingVideo />
+        </ContainerScroll>
+        <ScrollWordReveal paragraphs={story} />
+        <ContainerScroll
+          className={styles.workflow}
+          titleComponent={<h2 className={styles.workflowTitle}>From field to care.</h2>}
         >
           <ResponseNetwork />
         </ContainerScroll>
