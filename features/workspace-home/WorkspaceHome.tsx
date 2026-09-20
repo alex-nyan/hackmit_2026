@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowDown, ArrowRight, HeartPulse, Map, Radio, Shield, Video } from "lucide-react";
 import styles from "./WorkspaceHome.module.css";
+import { ResponseNetwork } from "./ResponseNetwork";
 
 const workspaces = [
   {
@@ -77,54 +78,7 @@ export function WorkspaceHome() {
             </div>
             <p className={styles.demoNote}>HackMIT demonstration · Simulated incident signals</p>
           </div>
-          <div
-            className={styles.diagram}
-            role="img"
-            aria-label="Response workflow: field observations connect to dispatch, then to hospital handoff. Illustrative diagram, not live data."
-          >
-            <div className={styles.diagramHeading}>
-              <span>THE RESPONSE NETWORK</span>
-              <span>ILLUSTRATION</span>
-            </div>
-            <div className={styles.network}>
-              <div className={styles.orbit} />
-              <div className={styles.orbitInner} />
-              <div className={styles.networkLine} />
-              <div className={styles.hub}>
-                <Shield size={34} aria-hidden="true" />
-                <strong>One shared picture</strong>
-                <span>Connected response</span>
-              </div>
-              <div className={`${styles.node} ${styles.field}`}>
-                <Shield size={20} aria-hidden="true" />
-                <div>
-                  <strong>Field team</strong>
-                  <span>Observe &amp; share</span>
-                </div>
-              </div>
-              <div className={`${styles.node} ${styles.dispatch}`}>
-                <Radio size={20} aria-hidden="true" />
-                <div>
-                  <strong>Dispatch</strong>
-                  <span>Review &amp; coordinate</span>
-                </div>
-              </div>
-              <div className={`${styles.node} ${styles.hospital}`}>
-                <HeartPulse size={20} aria-hidden="true" />
-                <div>
-                  <strong>Hospital</strong>
-                  <span>Prepare &amp; receive</span>
-                </div>
-              </div>
-            </div>
-            <div className={styles.diagramFooter}>
-              <span>FIELD OBSERVATION</span>
-              <ArrowRight size={14} aria-hidden="true" />
-              <span>HUMAN REVIEW</span>
-              <ArrowRight size={14} aria-hidden="true" />
-              <span>HANDOFF</span>
-            </div>
-          </div>
+          <ResponseNetwork />
         </section>
         <section id="workspaces" className={styles.workspaces} aria-labelledby="workspaces-title">
           <div className={styles.sectionHeading}>
