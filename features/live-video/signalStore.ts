@@ -5,6 +5,7 @@ import {
   isForReader,
   messagePath,
   newNonce,
+  parseSignalPost,
   parseMessagePath,
   sourcePrefix,
   type SignalMessage,
@@ -30,7 +31,10 @@ import {
  */
 
 /** Enough for a few peers mid-handshake; the rest have expired. */
-const MAX_LISTED = 200;
+const MAX_LISTED = 1_000;
+const MAX_LIST_PAGES = 4;
+/** Account for delayed object visibility and requests finishing out of order. */
+const READ_OVERLAP_MS = 5_000;
 
 /** Listing on every write would double the cost of a handshake. */
 const PRUNE_ODDS = 1 / 8;
@@ -84,14 +88,32 @@ export async function readSignals(
   peerId: string,
   now: number = Date.now(),
 ): Promise<SignalPage> {
-  const { blobs } = await list({ prefix: sourcePrefix(sourceId), limit: MAX_LISTED });
+  const blobs: Awaited<ReturnType<typeof list>>["blobs"] = [];
+  let listingCursor: string | undefined;
+  for (let page = 0; page < MAX_LIST_PAGES; page++) {
+    const listing = await list({
+      prefix: sourcePrefix(sourceId),
+      limit: MAX_LISTED,
+      cursor: listingCursor,
+    });
+    blobs.push(...listing.blobs);
+    if (!listing.hasMore) break;
+    listingCursor = listing.cursor;
+    // Never silently advance past a truncated mailbox. Pruning frees the
+    // oldest page and a subsequent bounded client retry can read the rest.
+    if (page === MAX_LIST_PAGES - 1) {
+      await pruneSignals(sourceId, now);
+      throw new Error("Signal mailbox backlog");
+    }
+  }
   const earliest = now - SIGNAL_TTL_MS;
+  const resumeAt = since ? Number.parseInt(since.slice(0, 13), 10) - READ_OVERLAP_MS : earliest;
 
   const fresh = blobs
     .map((blob) => ({ blob, name: parseMessagePath(blob.pathname, sourceId) }))
     .filter(
       (entry): entry is { blob: (typeof blobs)[number]; name: NonNullable<typeof entry.name> } =>
-        entry.name !== null && entry.name.at >= earliest && entry.name.cursor > since,
+        entry.name !== null && entry.name.at >= earliest && entry.name.at >= resumeAt,
     )
     .sort((a, b) => a.name.cursor.localeCompare(b.name.cursor));
 
@@ -101,11 +123,12 @@ export async function readSignals(
       try {
         const found = await get(entry.blob.pathname, { access: "private", useCache: false });
         if (!found?.stream) return null;
-        const parsed: unknown = JSON.parse(await new Response(found.stream).text());
+        const parsed = parseSignalPost(JSON.parse(await new Response(found.stream).text()));
+        if (!parsed) return null;
         // The name is the authority on ordering, whatever the body claims.
-        return { ...(parsed as SignalMessage), cursor: entry.name.cursor, at: entry.name.at };
+        return { ...parsed, cursor: entry.name.cursor, at: entry.name.at };
       } catch {
-        // A message that cannot be read is one the sender will repeat.
+        // The overlap gives transient read failures another chance next poll.
         return null;
       }
     }),
@@ -114,7 +137,7 @@ export async function readSignals(
   return {
     messages: bodies.filter((message): message is SignalMessage => message !== null),
     // Past everything listed, not just everything fetched.
-    cursor: fresh.at(-1)?.name.cursor ?? since,
+    cursor: [fresh.at(-1)?.name.cursor ?? "", since].sort().at(-1) ?? since,
   };
 }
 

@@ -2,221 +2,324 @@
 
 import { useEffect, useState } from "react";
 
+import { monitorPeer, reportPeerIssue } from "./diagnostics";
+import { createIceExchange } from "./iceExchange";
 import {
+  CONNECTED_POLL_MS,
   CONNECT_TIMEOUT_MS,
+  DISCONNECT_GRACE_MS,
   HANDSHAKE_POLL_MS,
+  MEDIA_STALL_MS,
   RETRY_MS,
   closePeer,
+  connectionFailureReason,
+  createSignalDeduplicator,
   fetchSignals,
-  gathered,
   isDead,
   loadIceConfig,
+  primeLocalCandidates,
   sendBye,
   sendSignal,
-  sleep,
 } from "./peer";
 import { newPeerId, type SignalMessage } from "./signal";
 
-/**
- * Asks one officer's camera for a direct link, and keeps asking.
- *
- * Reported honestly rather than optimistically, because the caller's job is
- * to decide what to show: `live` is a real video track arriving, and anything
- * else means the frame tile is still the truthful picture. A source can be
- * publishing frames perfectly well while this never connects — an officer on
- * a network that blocks peer traffic, or a camera already serving its limit
- * of watchers — and that is a working wall, not a broken one.
- */
-export type WatchState = "idle" | "connecting" | "live" | "unavailable";
+export type WatchState = "idle" | "connecting" | "live" | "stalled" | "unavailable";
 
+interface WatchAttempt {
+  id: string;
+  publisher: string;
+  pc: RTCPeerConnection | null;
+  abort: AbortController;
+  exchange?: ReturnType<typeof createIceExchange>;
+  pollTimer?: ReturnType<typeof setTimeout>;
+  setupTimer?: ReturnType<typeof setTimeout>;
+  disconnectTimer?: ReturnType<typeof setTimeout>;
+  mediaTimer?: ReturnType<typeof setTimeout>;
+  stopDiagnostics?: () => void;
+  trackCleanup: (() => void)[];
+}
+
+/** Each attempt owns its IDs, requests, candidate queues, and deadlines. */
 export function useLiveWatcher(sourceId: string, enabled = true) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [state, setState] = useState<WatchState>("idle");
-
   const watching = enabled && sourceId !== "";
 
   useEffect(() => {
     if (!watching) return;
-
     let cancelled = false;
-    let pc: RTCPeerConnection | null = null;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let watchdog: ReturnType<typeof setTimeout> | null = null;
-    let cursor = "";
-    let publisher = "";
-    const me = newPeerId();
+    let active: WatchAttempt | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    function teardown() {
-      if (watchdog) {
-        clearTimeout(watchdog);
-        watchdog = null;
-      }
-      closePeer(pc);
-      pc = null;
-      if (!cancelled) setStream(null);
+    function isCurrent(attempt: WatchAttempt) {
+      return !cancelled && active === attempt && !attempt.abort.signal.aborted;
     }
 
-    function retry() {
-      teardown();
-      if (cancelled) return;
+    function teardown(attempt: WatchAttempt) {
+      attempt.abort.abort();
+      if (attempt.pollTimer) clearTimeout(attempt.pollTimer);
+      if (attempt.setupTimer) clearTimeout(attempt.setupTimer);
+      if (attempt.disconnectTimer) clearTimeout(attempt.disconnectTimer);
+      if (attempt.mediaTimer) clearTimeout(attempt.mediaTimer);
+      attempt.stopDiagnostics?.();
+      attempt.exchange?.dispose();
+      attempt.trackCleanup.forEach((cleanup) => cleanup());
+      // An unaddressed bye also releases a publisher still preparing its answer.
+      sendBye(sourceId, attempt.id, attempt.publisher);
+      closePeer(attempt.pc);
+    }
+
+    function retry(attempt: WatchAttempt) {
+      if (!isCurrent(attempt)) return;
+      active = null;
+      teardown(attempt);
+      setStream(null);
       setState("unavailable");
-      // Spaced out rather than immediate: a source with no video publisher
-      // behind it would otherwise be asked as fast as the network answers.
-      timer = setTimeout(() => void attempt(), RETRY_MS);
-    }
-
-    async function waitForAnswer(deadline: number): Promise<SignalMessage | null> {
-      while (!cancelled && Date.now() < deadline) {
-        const page = await fetchSignals(sourceId, cursor, me);
-        if (cancelled) return null;
-        if (page) {
-          cursor = page.cursor;
-          const answer = page.messages.find(
-            (message) => message.kind === "answer" && message.to === me && message.sdp,
-          );
-          if (answer) return answer;
-        }
-        await sleep(HANDSHAKE_POLL_MS);
+      if (!retryTimer) {
+        retryTimer = setTimeout(() => {
+          retryTimer = null;
+          void connect();
+        }, RETRY_MS);
       }
-      return null;
     }
 
-    async function attempt() {
-      if (cancelled) return;
-      setState((current) => (current === "live" ? current : "connecting"));
-
-      const { iceServers } = await loadIceConfig();
-      if (cancelled) return;
-
-      const connection = new RTCPeerConnection({ iceServers });
-      pc = connection;
-
-      connection.ontrack = (event) => {
-        if (cancelled || pc !== connection) return;
-        // Keep a small cushion for Wi-Fi jitter without accumulating a long
-        // playback delay. This is a hint; the browser retains its safety floor.
-        if ("jitterBufferTarget" in event.receiver) {
-          try {
-            event.receiver.jitterBufferTarget = 50;
-          } catch {
-            // Older browsers may expose the property without allowing writes.
-          }
-        }
-        const media = event.streams[0] ?? new MediaStream([event.track]);
-
-        const show = () => {
-          if (cancelled || pc !== connection) return;
-          setStream(media);
-          setState("live");
-        };
-
-        /**
-         * A remote track mutes when media stops arriving, which happens some
-         * seconds before the connection itself admits anything is wrong. It
-         * is the earliest honest answer to "is this still a live picture?",
-         * and the tile goes back to the published still on it.
-         *
-         * The connection is deliberately not torn down: a mute is as often a
-         * hiccup as a death, and `unmute` brings the picture straight back
-         * without paying for another handshake. What must not survive a mute
-         * is the claim that the frozen frame on screen is live.
-         */
-        const hide = () => {
-          if (cancelled || pc !== connection) return;
-          setStream(null);
-          setState("connecting");
-        };
-
-        event.track.onunmute = show;
-        event.track.onmute = hide;
-        event.track.onended = hide;
-        // Tracks usually arrive muted and unmute when the first frame lands,
-        // but not always, so both routes into `show` are wired.
-        if (!event.track.muted) show();
+    async function connect() {
+      if (cancelled || active) return;
+      const attempt: WatchAttempt = {
+        id: newPeerId(),
+        publisher: "",
+        pc: null,
+        abort: new AbortController(),
+        trackCleanup: [],
       };
-
-      connection.onconnectionstatechange = () => {
-        if (cancelled || pc !== connection) return;
-        // Connected means the two agreed on a route, not that a picture is
-        // arriving. Only a track says that, so only a track declares `live`.
-        if (connection.connectionState === "connected") {
-          if (watchdog) {
-            clearTimeout(watchdog);
-            watchdog = null;
-          }
-          return;
-        }
-        if (isDead(connection.connectionState)) retry();
-      };
-
+      active = attempt;
+      let hasRelay: boolean | undefined;
+      setStream(null);
+      setState("connecting");
+      attempt.setupTimer = setTimeout(() => {
+        reportPeerIssue(
+          attempt.id,
+          `No first video arrived before the connection deadline.${attempt.publisher && hasRelay === false ? ` ${connectionFailureReason(false)}` : ""}`,
+          "watcher",
+        );
+        retry(attempt);
+      }, CONNECT_TIMEOUT_MS);
       try {
-        // Receive only. A dashboard watching a scene has no camera to offer
-        // back, and saying so keeps the officer's browser from asking.
-        connection.addTransceiver("video", { direction: "recvonly" });
-        await connection.setLocalDescription(await connection.createOffer());
-        // Candidates travel inside the description, so the offer is not worth
-        // sending until gathering has had its moment.
-        await gathered(connection);
-        if (cancelled || pc !== connection) return;
+        const { iceServers, relay } = await loadIceConfig(attempt.abort.signal);
+        if (!isCurrent(attempt)) return;
+        hasRelay = relay;
+        const pc = new RTCPeerConnection({ iceServers });
+        attempt.pc = pc;
+        const media = new MediaStream();
+        let cursor = "";
+        const unseen = createSignalDeduplicator();
+        const pendingCandidates: SignalMessage[] = [];
+        let lastFrames: number | undefined;
+        let lastProgress = performance.now();
+        let showing = false;
+        const startedAt = performance.now();
 
-        const sdp = connection.localDescription?.sdp;
-        if (!sdp) {
-          retry();
-          return;
-        }
-
-        // Read from where the mailbox is now. An answer already sitting there
-        // was addressed to a previous attempt, under a name this one dropped.
-        const opening = await fetchSignals(sourceId, "", me);
-        if (cancelled || pc !== connection) return;
-        cursor = opening?.cursor ?? "";
-
-        if (!(await sendSignal(sourceId, { kind: "offer", from: me, to: "", sdp }))) {
-          retry();
-          return;
-        }
-        if (cancelled || pc !== connection) return;
-
-        const answer = await waitForAnswer(Date.now() + CONNECT_TIMEOUT_MS);
-        if (cancelled || pc !== connection) return;
-        if (!answer?.sdp) {
-          // Nobody is offering video on this source. Common and not an error:
-          // the officer's page may predate this, or be serving its limit.
-          retry();
-          return;
-        }
-
-        publisher = answer.from;
-        await connection.setRemoteDescription({ type: "answer", sdp: answer.sdp });
-        if (cancelled || pc !== connection) return;
-
-        // Described, but not yet connected. On a network that isolates its
-        // clients from each other this is exactly where it stops, silently,
-        // so it is given a deadline rather than left hanging.
-        watchdog = setTimeout(() => {
-          if (!cancelled && pc === connection && connection.connectionState !== "connected") {
-            retry();
+        function show() {
+          if (
+            !isCurrent(attempt) ||
+            !media.getVideoTracks().some((track) => track.readyState === "live")
+          )
+            return;
+          if (attempt.setupTimer) clearTimeout(attempt.setupTimer);
+          if (attempt.mediaTimer) clearTimeout(attempt.mediaTimer);
+          attempt.mediaTimer = undefined;
+          if (!showing) {
+            showing = true;
+            setStream(media);
+            setState("live");
           }
-        }, CONNECT_TIMEOUT_MS);
-      } catch {
-        retry();
+        }
+
+        function stalled() {
+          if (!isCurrent(attempt)) return;
+          showing = false;
+          setStream(null);
+          setState("stalled");
+          // Track mute is still useful on browsers without frame counters.
+          if (!attempt.mediaTimer) {
+            attempt.mediaTimer = setTimeout(() => retry(attempt), MEDIA_STALL_MS);
+          }
+        }
+
+        attempt.stopDiagnostics = monitorPeer(pc, {
+          sourceId,
+          peerId: attempt.id,
+          role: "watcher",
+          onSample(sample) {
+            if (!isCurrent(attempt) || sample.framesDecoded === undefined) return;
+            if (lastFrames === undefined || sample.framesDecoded !== lastFrames) {
+              const advancing = sample.framesDecoded > (lastFrames ?? 0);
+              lastFrames = sample.framesDecoded;
+              if (advancing) {
+                lastProgress = sample.timestamp;
+                show();
+              }
+            }
+            if (pc.connectionState !== "connected" && pc.connectionState !== "disconnected") return;
+            const stalledFor = sample.timestamp - lastProgress;
+            if (stalledFor > MEDIA_STALL_MS) {
+              reportPeerIssue(
+                attempt.id,
+                "Incoming video stopped decoding; reconnecting.",
+                "watcher",
+              );
+              retry(attempt);
+            } else if (showing && stalledFor > MEDIA_STALL_MS / 2) stalled();
+          },
+        });
+        attempt.exchange = createIceExchange(pc, {
+          sourceId,
+          from: attempt.id,
+          to: () => attempt.publisher,
+          signal: attempt.abort.signal,
+          onIssue: (message) => reportPeerIssue(attempt.id, message, "watcher"),
+          onFailure: () => {
+            if (isCurrent(attempt) && pc.connectionState !== "connected") retry(attempt);
+          },
+        });
+
+        pc.ontrack = (event) => {
+          if (!isCurrent(attempt)) return;
+          if (!media.getTracks().some((track) => track.id === event.track.id))
+            media.addTrack(event.track);
+          if (event.track.kind !== "video") return;
+          if ("jitterBufferTarget" in event.receiver) {
+            try {
+              event.receiver.jitterBufferTarget = 50;
+            } catch (error) {
+              reportPeerIssue(
+                attempt.id,
+                `Receiver buffer hint unavailable: ${String(error)}`,
+                "watcher",
+              );
+            }
+          }
+          const unmute = () => {
+            lastProgress = performance.now();
+            show();
+          };
+          const ended = () => retry(attempt);
+          event.track.addEventListener("unmute", unmute);
+          event.track.addEventListener("mute", stalled);
+          event.track.addEventListener("ended", ended);
+          attempt.trackCleanup.push(() => {
+            event.track.removeEventListener("unmute", unmute);
+            event.track.removeEventListener("mute", stalled);
+            event.track.removeEventListener("ended", ended);
+          });
+          if (!event.track.muted) unmute();
+        };
+
+        pc.onconnectionstatechange = () => {
+          if (!isCurrent(attempt)) return;
+          if (pc.connectionState === "connected") {
+            lastProgress = performance.now();
+            if (attempt.disconnectTimer) clearTimeout(attempt.disconnectTimer);
+            attempt.disconnectTimer = undefined;
+          } else if (pc.connectionState === "disconnected" && !attempt.disconnectTimer) {
+            attempt.disconnectTimer = setTimeout(() => {
+              if (isCurrent(attempt) && pc.connectionState === "disconnected") retry(attempt);
+            }, DISCONNECT_GRACE_MS);
+          } else if (isDead(pc.connectionState)) {
+            if (pc.connectionState === "failed") {
+              reportPeerIssue(attempt.id, connectionFailureReason(relay), "watcher");
+            }
+            retry(attempt);
+          }
+        };
+
+        async function poll() {
+          if (!isCurrent(attempt)) return;
+          const page = await fetchSignals(sourceId, cursor, attempt.id, attempt.abort.signal);
+          if (!isCurrent(attempt)) return;
+          if (page) {
+            cursor = page.cursor;
+            for (const message of page.messages) {
+              if (message.to !== attempt.id || !unseen(message)) continue;
+              if (message.kind === "answer" && !attempt.publisher && message.sdp) {
+                attempt.publisher = message.from;
+                try {
+                  await pc.setRemoteDescription({ type: "answer", sdp: message.sdp });
+                  if (!isCurrent(attempt)) return;
+                  await attempt.exchange?.remoteDescriptionReady();
+                  for (const pending of pendingCandidates) {
+                    if (pending.from === attempt.publisher)
+                      await attempt.exchange?.receive(pending);
+                  }
+                  pendingCandidates.length = 0;
+                  attempt.exchange?.start();
+                } catch (error) {
+                  reportPeerIssue(attempt.id, `Answer rejected: ${String(error)}`, "watcher");
+                  retry(attempt);
+                  return;
+                }
+              } else if (message.kind === "candidates") {
+                if (message.from === attempt.publisher) await attempt.exchange?.receive(message);
+                else if (!attempt.publisher && pendingCandidates.length < 16)
+                  pendingCandidates.push(message);
+              } else if (message.kind === "bye" && message.from === attempt.publisher) {
+                retry(attempt);
+                return;
+              }
+              if (!isCurrent(attempt)) return;
+            }
+          }
+          const connected =
+            pc.connectionState === "connected" &&
+            (attempt.exchange?.complete || performance.now() - startedAt > CONNECT_TIMEOUT_MS);
+          if (isCurrent(attempt)) {
+            attempt.pollTimer = setTimeout(
+              () => void poll(),
+              connected ? CONNECTED_POLL_MS : HANDSHAKE_POLL_MS,
+            );
+          }
+        }
+
+        pc.addTransceiver("video", { direction: "recvonly" });
+        pc.addTransceiver("audio", { direction: "recvonly" });
+        await pc.setLocalDescription(await pc.createOffer());
+        if (!isCurrent(attempt)) return;
+        await primeLocalCandidates(pc, attempt.abort.signal);
+        if (!isCurrent(attempt)) return;
+        const sdp = pc.localDescription?.sdp;
+        if (
+          !sdp ||
+          !(await sendSignal(
+            sourceId,
+            { kind: "offer", from: attempt.id, to: "", sdp },
+            attempt.abort.signal,
+          ))
+        ) {
+          reportPeerIssue(
+            attempt.id,
+            "Could not deliver the offer through the signaling service.",
+            "watcher",
+          );
+          retry(attempt);
+          return;
+        }
+        if (isCurrent(attempt)) void poll();
+      } catch (error) {
+        if (isCurrent(attempt)) {
+          reportPeerIssue(attempt.id, `Viewer setup failed: ${String(error)}`, "watcher");
+          retry(attempt);
+        }
       }
     }
 
-    void attempt();
-
+    void connect();
     return () => {
       cancelled = true;
-      if (timer) clearTimeout(timer);
-      if (watchdog) clearTimeout(watchdog);
-      if (publisher) sendBye(sourceId, me, publisher);
-      closePeer(pc);
-      pc = null;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (active) teardown(active);
+      active = null;
     };
   }, [watching, sourceId]);
 
-  // Derived rather than cleared from the effect: a hook that is not watching
-  // has no stream and nothing to report, which is a fact about its arguments
-  // rather than a state to be driven into.
   return watching ? { stream, state } : { stream: null, state: "idle" as const };
 }

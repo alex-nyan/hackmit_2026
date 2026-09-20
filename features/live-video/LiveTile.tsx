@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { LiveVideo } from "./LiveVideo";
 import { useLiveWatcher, type WatchState } from "./useLiveWatcher";
@@ -8,7 +8,10 @@ import { useLiveWatcher, type WatchState } from "./useLiveWatcher";
 interface LiveTileProps {
   sourceId: string;
   /** The latest published frame, shown whenever there is no direct link. */
-  fallbackSrc: string;
+  fallbackSrc?: string;
+  fallback?: ReactNode;
+  /** Enabled by an explicit viewer interaction, never autoplayed with sound. */
+  audioEnabled?: boolean;
   alt: string;
   className?: string;
   /**
@@ -34,13 +37,15 @@ interface LiveTileProps {
 export function LiveTile({
   sourceId,
   fallbackSrc,
+  fallback,
+  audioEnabled = false,
   alt,
   className,
   onLiveChange,
   onStateChange,
 }: LiveTileProps) {
   const { stream, state } = useLiveWatcher(sourceId);
-  const live = stream !== null;
+  const live = stream !== null && state === "live";
 
   useEffect(() => {
     onLiveChange?.(live);
@@ -50,8 +55,53 @@ export function LiveTile({
     onStateChange?.(state);
   }, [onStateChange, state]);
 
-  if (stream) return <LiveVideo stream={stream} className={className} label={alt} />;
+  if (stream && live)
+    return (
+      <LiveVideo
+        stream={stream}
+        sourceId={sourceId}
+        className={className}
+        label={alt}
+        audioEnabled={audioEnabled}
+      />
+    );
+
+  const waiting = fallback ?? (
+    <span className={className} role="status">
+      {state === "connecting"
+        ? "Connecting to camera…"
+        : state === "stalled"
+          ? "Video interrupted. Reconnecting…"
+          : "Waiting for live camera"}
+    </span>
+  );
+  if (!fallbackSrc) return waiting;
+
+  return (
+    <Snapshot
+      key={fallbackSrc}
+      src={fallbackSrc}
+      alt={alt}
+      className={className}
+      fallback={waiting}
+    />
+  );
+}
+
+function Snapshot({
+  src,
+  alt,
+  className,
+  fallback,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  fallback: ReactNode;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return fallback;
 
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className={className} src={fallbackSrc} alt={alt} />;
+  return <img className={className} src={src} alt={alt} onError={() => setFailed(true)} />;
 }

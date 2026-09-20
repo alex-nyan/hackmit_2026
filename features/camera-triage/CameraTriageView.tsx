@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import type { Officer } from "@/features/access/roster";
 import { BodyCamWall } from "@/features/body-cam";
 import { useDevicePosition } from "@/features/live-track";
 import { useLivePublisher } from "@/features/live-video";
+import { LiveDiagnostics } from "@/features/live-video/LiveDiagnostics";
 
 import { describeTranscript } from "./audio";
 import styles from "./CameraTriageView.module.css";
@@ -28,11 +29,13 @@ export function CameraTriageView({ officer }: { officer?: Officer } = {}) {
   const sourceId = officer?.id ?? typedId;
   const { devices, cameraId, setCameraId, resolveDevices } = useCaptureDevices();
   const { state, videoRef, start, stop, stream } = useCameraTriage({ sourceId });
-  // The same track the triage loop is screenshotting, offered directly to any
-  // dashboard watching this unit. Frames keep going to the model and to the
-  // archive; the live picture stops being made out of them.
-  const { watchers } = useLivePublisher(sourceId, stream);
   const audio = useAudioTranscription(sourceId);
+  const [sharedAudioSession, setSharedAudioSession] = useState<{
+    camera: MediaStream;
+    microphone: MediaStream;
+    sourceId: string;
+  } | null>(null);
+  const liveAudioDescriptionId = useId();
   // Location is its own switch: a unit that turns the camera off to save
   // battery should still be findable, and somebody who will share a camera has
   // not thereby agreed to share where they are.
@@ -43,6 +46,16 @@ export function CameraTriageView({ officer }: { officer?: Officer } = {}) {
   const listening =
     audio.state.state === "recording" || audio.state.state === "requesting-microphone";
   const active = running || state.state === "requesting-camera";
+  const canShareAudio = running && audio.state.state === "recording" && audio.stream !== null;
+  const sharingAudio = Boolean(
+    canShareAudio &&
+    sharedAudioSession?.camera === stream &&
+    sharedAudioSession?.microphone === audio.stream &&
+    sharedAudioSession?.sourceId === sourceId,
+  );
+  // Publish the existing capture tracks. Only the operator's explicit choice
+  // shares microphone audio; its recording continues independently.
+  const { watchers } = useLivePublisher(sourceId, stream, sharingAudio ? audio.stream : null);
 
   async function startCamera() {
     const chosen = await resolveDevices();
@@ -120,6 +133,30 @@ export function CameraTriageView({ officer }: { officer?: Officer } = {}) {
             {sharing ? "Stop sharing location" : "Share my location"}
           </button>
         </div>
+
+        <button
+          type="button"
+          className={`${styles.secondary} ${styles.liveAudio}`}
+          data-on={sharingAudio ? "true" : undefined}
+          aria-pressed={sharingAudio}
+          aria-describedby={liveAudioDescriptionId}
+          disabled={!canShareAudio}
+          onClick={() => {
+            if (!stream || !audio.stream || !canShareAudio) return;
+            setSharedAudioSession(
+              sharingAudio ? null : { camera: stream, microphone: audio.stream, sourceId },
+            );
+          }}
+        >
+          Share live audio
+        </button>
+        <p id={liveAudioDescriptionId} className={styles.notice} role="status">
+          {sharingAudio
+            ? "Live microphone audio is shared with connected viewers."
+            : canShareAudio
+              ? "Live audio off. Transcription continues."
+              : "Start the camera and audio transcription to share live audio."}
+        </p>
 
         {position.state.state === "requesting" && (
           <p className={styles.notice}>Waiting for location permission…</p>
@@ -200,6 +237,7 @@ export function CameraTriageView({ officer }: { officer?: Officer } = {}) {
             Streaming live to {watchers} {watchers === 1 ? "dashboard" : "dashboards"}
           </p>
         )}
+        {running && <LiveDiagnostics sourceId={sourceId} />}
 
         {/* No triage service behind this deployment. Worth saying once,
             plainly: the capture still works and still feeds the wall. */}

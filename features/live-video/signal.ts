@@ -3,17 +3,9 @@ import { isValidToken } from "@/features/camera-triage/frame";
 /**
  * The few messages two browsers exchange before they can talk directly.
  *
- * Signalling is not the stream. Once an offer and an answer have crossed, the
- * video flows peer to peer and this path carries nothing at all — which is
- * why it can afford to be slow, polled and stored in the same place as
- * everything else here. A second of latency in a handshake that happens once
- * is invisible; a second of latency per frame is the problem we are fixing.
- *
- * Candidates are not sent separately. Trickle ICE is the better protocol on a
- * real signalling channel, but on a polled one it turns one handshake into a
- * dozen round trips through blob storage. Each side instead waits for its own
- * gathering to finish and sends the candidates inside the SDP, so a connection
- * costs exactly two messages.
+ * Media flows directly between browsers. This mailbox carries descriptions,
+ * bounded batches of ICE routes, and departure messages. A new watcher ID is
+ * generated for every attempt so late messages cannot affect a later attempt.
  */
 
 /** A page load's name for itself. Never a person, and never reused. */
@@ -35,7 +27,11 @@ export const SIGNAL_TTL_MS = 30_000;
  */
 export const MAX_SDP_CHARS = 64_000;
 
-export type SignalKind = "offer" | "answer" | "bye";
+export const MAX_CANDIDATES_PER_BATCH = 8;
+export const MAX_CANDIDATE_CHARS = 2_048;
+export const MAX_CANDIDATES_PER_PEER = 64;
+
+export type SignalKind = "offer" | "answer" | "candidates" | "bye";
 
 export interface SignalMessage {
   /**
@@ -51,6 +47,10 @@ export interface SignalMessage {
   /** Empty addresses every publisher on the source; an offer has no one yet. */
   to: string;
   sdp?: string;
+  candidates?: RTCIceCandidateInit[];
+  complete?: boolean;
+  /** Monotonic within one sender's ICE exchange; blob visibility may reorder. */
+  batch?: number;
 }
 
 export type SignalPost = Omit<SignalMessage, "cursor" | "at">;
@@ -71,7 +71,7 @@ export function isPeerId(value: string): boolean {
 }
 
 function isKind(value: unknown): value is SignalKind {
-  return value === "offer" || value === "answer" || value === "bye";
+  return value === "offer" || value === "answer" || value === "candidates" || value === "bye";
 }
 
 export function parseSignalPost(raw: unknown): SignalPost | null {
@@ -87,6 +87,48 @@ export function parseSignalPost(raw: unknown): SignalPost | null {
   // A farewell carries no description: it exists to make the other side tear
   // down now rather than wait out a timeout.
   if (body.kind === "bye") return { kind: "bye", from, to };
+
+  if (body.kind === "candidates") {
+    if (!to || !Array.isArray(body.candidates)) return null;
+    if (body.candidates.length > MAX_CANDIDATES_PER_BATCH) return null;
+    if (typeof body.complete !== "boolean") return null;
+    if (
+      typeof body.batch !== "number" ||
+      !Number.isInteger(body.batch) ||
+      body.batch < 0 ||
+      body.batch > MAX_CANDIDATES_PER_PEER
+    )
+      return null;
+    if (body.candidates.length === 0 && !body.complete) return null;
+    const candidates: RTCIceCandidateInit[] = [];
+    for (const raw of body.candidates) {
+      if (typeof raw !== "object" || raw === null) return null;
+      const candidate = raw as Record<string, unknown>;
+      if (
+        typeof candidate.candidate !== "string" ||
+        !candidate.candidate ||
+        candidate.candidate.length > MAX_CANDIDATE_CHARS ||
+        (candidate.sdpMid != null &&
+          (typeof candidate.sdpMid !== "string" || candidate.sdpMid.length > 256)) ||
+        (candidate.sdpMLineIndex != null &&
+          (typeof candidate.sdpMLineIndex !== "number" ||
+            !Number.isInteger(candidate.sdpMLineIndex) ||
+            candidate.sdpMLineIndex < 0 ||
+            candidate.sdpMLineIndex > 64)) ||
+        (candidate.usernameFragment != null &&
+          (typeof candidate.usernameFragment !== "string" ||
+            candidate.usernameFragment.length > 256))
+      )
+        return null;
+      candidates.push({
+        candidate: candidate.candidate,
+        sdpMid: candidate.sdpMid as string | null | undefined,
+        sdpMLineIndex: candidate.sdpMLineIndex as number | null | undefined,
+        usernameFragment: candidate.usernameFragment as string | null | undefined,
+      });
+    }
+    return { kind: "candidates", from, to, candidates, complete: body.complete, batch: body.batch };
+  }
 
   const sdp = typeof body.sdp === "string" ? body.sdp : "";
   if (!sdp || sdp.length > MAX_SDP_CHARS) return null;

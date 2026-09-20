@@ -1,10 +1,14 @@
 "use client";
 
-import { HeartPulse, VideoOff, X } from "lucide-react";
-import { useState } from "react";
+import { HeartPulse, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { useBodyCamWall } from "@/features/body-cam";
 import { LiveTile } from "@/features/live-video";
+import { LiveDiagnostics } from "@/features/live-video/LiveDiagnostics";
+import type { WatchState } from "@/features/live-video/useLiveWatcher";
+import { describeAge } from "@/features/body-cam/BodyCamWall";
+import { ageMs } from "@/features/body-cam/frames";
 import type { HeartRateConnection } from "@/features/heart-rate/useHeartRate";
 
 import {
@@ -49,8 +53,16 @@ interface UnitCardProps {
 export function UnitCard({ device, heartRate, onDismiss }: UnitCardProps) {
   const { frames, status } = useBodyCamWall();
   const [live, setLive] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [streamState, setStreamState] = useState<WatchState>("idle");
+  const [now, setNow] = useState(() => Date.now());
   const frame = frames.find((published) => published.sourceId === device.id) ?? null;
   const { fix } = device;
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <aside className="live-card" role="status" aria-label={`Unit ${device.name}`}>
@@ -76,46 +88,50 @@ export function UnitCard({ device, heartRate, onDismiss }: UnitCardProps) {
       <h3 className={styles.name}>{device.name}</h3>
 
       <div className={styles.stage}>
-        {frame ? (
-          // A direct video link where the two browsers could make one, and
-          // this unit's latest still where they could not.
-          //
-          // The fallback query is `live` rather than `at`: `at` names a moment
-          // in the archive and would send this looking for a frame nobody
-          // kept. This one is only a cache key — a new publish is a new URL,
-          // so the browser refetches exactly when there is something new and
-          // never twice for the same still. The route always answers with the
-          // latest.
-          <LiveTile
-            sourceId={device.id}
-            className={styles.frame}
-            onLiveChange={setLive}
-            alt={
-              live ? `Live camera from ${device.name}` : `Latest frame published by ${device.name}`
-            }
-            fallbackSrc={`/api/streams/${encodeURIComponent(device.id)}/frame?live=${Date.parse(frame.at)}`}
-          />
-        ) : (
-          <p className={styles.stageHint}>
-            <VideoOff size={15} aria-hidden="true" />
-            {status === "offline"
-              ? "This dashboard has stopped seeing the camera wall."
-              : "Camera off. This unit is publishing a position but no video."}
-          </p>
-        )}
+        {/* A selected unit always gets a live attempt, even before its first
+            AI snapshot or when discovery is temporarily unavailable. */}
+        <LiveTile
+          key={device.id}
+          sourceId={device.id}
+          className={styles.frame}
+          onLiveChange={setLive}
+          onStateChange={setStreamState}
+          audioEnabled={audioEnabled}
+          alt={
+            live ? `Live camera from ${device.name}` : `Latest frame published by ${device.name}`
+          }
+          fallbackSrc={
+            frame
+              ? `/api/streams/${encodeURIComponent(device.id)}/frame?live=${Date.parse(frame.at)}`
+              : undefined
+          }
+        />
       </div>
 
-      {/* Video and stills are never given the same words. A direct link is
-          what this unit's camera is seeing now; the fallback is a picture at
-          roughly one every two seconds, and is never presented as though it
-          were video. */}
-      {frame && (
-        <p className={styles.frameNote}>
-          {live
-            ? "Live · direct from this unit's camera"
-            : "Latest frame · about one every two seconds"}
-        </p>
+      {/* Snapshot age remains visible independently from live-media health. */}
+      <p className={styles.frameNote}>
+        {live
+          ? "Live · direct from this unit's camera"
+          : frame
+            ? `Latest still · ${describeAge(ageMs(frame, now))}`
+            : streamState === "connecting"
+              ? "Connecting to this unit's camera…"
+              : status === "offline"
+                ? "Camera discovery is unavailable. The live connection will retry."
+                : "No live video or recent still is available."}
+      </p>
+      {live && (
+        <label className={styles.frameNote}>
+          <input
+            type="checkbox"
+            checked={audioEnabled}
+            onChange={(event) => setAudioEnabled(event.target.checked)}
+          />{" "}
+          Listen to shared audio
+        </label>
       )}
+
+      <LiveDiagnostics sourceId={device.id} />
 
       <HeartRate connection={heartRate ?? null} />
 

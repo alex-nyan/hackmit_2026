@@ -1,0 +1,63 @@
+.details {
+  margin-top: 12px;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.details summary {
+  width: fit-content;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.details summary:focus-visible,
+.readings button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+.readings {
+  display: grid;
+  gap: 10px;
+  max-width: 65ch;
+  padding-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+.readings p {
+  margin: 0;
+}
+
+.peer {
+  padding-top: 10px;
+  border-top: 1px solid currentColor;
+}
+
+.peer dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 8px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.peer dd {
+  margin: 0;
+}
+
+.readings button {
+  width: fit-content;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.readings button:hover {
+  text-decoration: underline;
+}

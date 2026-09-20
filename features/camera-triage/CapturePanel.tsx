@@ -1,13 +1,15 @@
 "use client";
 
 import QRCode from "qrcode";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { distressTerms, significantHazard } from "@/features/paw-patrol/hazardSignal";
 import { useLiveTrack } from "@/features/live-track";
 import { useLivePublisher } from "@/features/live-video";
+import { LiveDiagnostics } from "@/features/live-video/LiveDiagnostics";
 
 import { describeTranscript, type TranscriptionResult } from "./audio";
+import styles from "./CapturePanel.module.css";
 import type { TriageResult } from "./types";
 import { useAudioTranscription } from "./useAudioTranscription";
 import { useCameraTriage } from "./useCameraTriage";
@@ -82,7 +84,6 @@ export function CapturePanel({
       onResult?.(result);
     },
   });
-  const { watchers } = useLivePublisher(sourceId, stream);
   const liveTrack = useLiveTrack(stream !== null);
   const audio = useAudioTranscription(
     sourceId,
@@ -121,6 +122,21 @@ export function CapturePanel({
     },
   );
   const running = state.state === "running";
+  const [sharedAudioSession, setSharedAudioSession] = useState<{
+    camera: MediaStream;
+    microphone: MediaStream;
+    sourceId: string;
+  } | null>(null);
+  const liveAudioDescriptionId = useId();
+  const canShareAudio = running && audio.state.state === "recording" && audio.stream !== null;
+  // Consent belongs to this capture session; restarting either device starts muted.
+  const sharingAudio = Boolean(
+    canShareAudio &&
+    sharedAudioSession?.camera === stream &&
+    sharedAudioSession?.microphone === audio.stream &&
+    sharedAudioSession?.sourceId === sourceId,
+  );
+  const { watchers } = useLivePublisher(sourceId, stream, sharingAudio ? audio.stream : null);
   const busy = discovering || running || state.state === "requesting-camera";
   const listening =
     audioDiscovering ||
@@ -214,6 +230,7 @@ export function CapturePanel({
   }, [deviceLabel, onPhoneConnectionChange, running, sourceId, videoRef]);
 
   const startedAutomatically = useRef(false);
+  const startAudio = audio.start;
   const startListening = useCallback(async () => {
     if (audioAttempt.current) return;
     const attempt = Symbol();
@@ -222,14 +239,14 @@ export function CapturePanel({
     try {
       const chosen = await resolveDevices({ microphone: true });
       if (audioAttempt.current !== attempt) return;
-      await audio.start(chosen.microphoneId);
+      await startAudio(chosen.microphoneId);
     } finally {
       if (audioAttempt.current === attempt) {
         audioAttempt.current = null;
         setAudioDiscovering(false);
       }
     }
-  }, [resolveDevices, audio.start]);
+  }, [resolveDevices, startAudio]);
 
   const startCamera = useCallback(async () => {
     if (startAttempt.current) return;
@@ -384,6 +401,30 @@ export function CapturePanel({
         </button>
       </div>
 
+      <button
+        type="button"
+        className={`capture-card__button capture-card__button--quiet ${styles.liveAudio}`}
+        data-on={sharingAudio ? "true" : undefined}
+        aria-pressed={sharingAudio}
+        aria-describedby={liveAudioDescriptionId}
+        disabled={!canShareAudio}
+        onClick={() => {
+          if (!stream || !audio.stream || !canShareAudio) return;
+          setSharedAudioSession(
+            sharingAudio ? null : { camera: stream, microphone: audio.stream, sourceId },
+          );
+        }}
+      >
+        Share live audio
+      </button>
+      <p id={liveAudioDescriptionId} className="capture-card__note" role="status">
+        {sharingAudio
+          ? "Live microphone audio is shared with connected viewers."
+          : canShareAudio
+            ? "Live audio off. AI listening continues."
+            : "Start the camera and AI listening to share live audio."}
+      </p>
+
       {!busy && selected && <p className="capture-card__note">Selected: {selected.label}</p>}
 
       {/* Name the camera that is actually open: a body camera running on the
@@ -397,6 +438,7 @@ export function CapturePanel({
           Streaming live to {watchers} {watchers === 1 ? "dashboard" : "dashboards"}
         </p>
       )}
+      {running && <LiveDiagnostics sourceId={sourceId} />}
 
       {
         <PhoneLocationPairing
@@ -479,7 +521,6 @@ function PhoneLocationPairing({
     url.searchParams.set("name", displayName);
     const next = url.toString();
     let cancelled = false;
-    setLink(next);
 
     void QRCode.toString(next, {
       type: "svg",
@@ -488,10 +529,16 @@ function PhoneLocationPairing({
       color: { dark: "#0d1216ff", light: "#ffffffff" },
     })
       .then((svg) => {
-        if (!cancelled) setQrSvg(svg);
+        if (!cancelled) {
+          setLink(next);
+          setQrSvg(svg);
+        }
       })
       .catch(() => {
-        if (!cancelled) setQrSvg(null);
+        if (!cancelled) {
+          setLink(next);
+          setQrSvg(null);
+        }
       });
 
     return () => {

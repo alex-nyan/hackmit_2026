@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { LiveTile } from "@/features/live-video";
+import { LiveDiagnostics } from "@/features/live-video/LiveDiagnostics";
 import type { WatchState } from "@/features/live-video/useLiveWatcher";
 
 import styles from "./BodyCamWall.module.css";
 import { FrameReview } from "./FrameReview";
-import { ageMs, type FrameSummary } from "./frames";
-import { useBodyCamWall } from "./useBodyCamWall";
+import { ageMs } from "./frames";
+import { useBodyCamWall, type WallSource } from "./useBodyCamWall";
 
 const TICK_MS = 1_000;
 const FRESH_MS = 4_000;
@@ -27,7 +28,7 @@ export function describeAge(age: number): string {
 }
 
 const STATUS_COPY = {
-  live: "LIVE",
+  live: "SYNCED",
   connecting: "CONNECTING",
   offline: "NOT SYNCED",
 } as const;
@@ -42,78 +43,99 @@ const STATUS_COPY = {
  * with its age as it always was.
  */
 function WallTile({
-  frame,
+  source,
   age,
   open,
   onOpen,
+  onMediaChange,
 }: {
-  frame: FrameSummary;
+  source: WallSource;
   age: number;
   open: boolean;
   onOpen: () => void;
+  onMediaChange: (sourceId: string, live: boolean) => void;
 }) {
+  const { sourceId, frame } = source;
   const [live, setLive] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
   const [streamState, setStreamState] = useState<WatchState>("idle");
+  const updateLive = useCallback(
+    (arriving: boolean) => {
+      setLive(arriving);
+      onMediaChange(sourceId, arriving);
+    },
+    [onMediaChange, sourceId],
+  );
+
+  useEffect(() => () => onMediaChange(sourceId, false), [onMediaChange, sourceId]);
 
   return (
-    <figure className={styles.tile} key={frame.sourceId}>
+    <figure className={styles.tile}>
       {/* A tile is a way into that officer's recent footage. */}
       <button
         type="button"
         className={styles.tileButton}
         onClick={onOpen}
         aria-expanded={open}
-        aria-label={`Review footage from ${frame.sourceId}`}
+        aria-label={`Review footage from ${sourceId}`}
       >
         <LiveTile
-          sourceId={frame.sourceId}
+          sourceId={sourceId}
           className={styles.shot}
-          onLiveChange={setLive}
+          onLiveChange={updateLive}
           onStateChange={setStreamState}
-          alt={
-            live
-              ? `Live camera from ${frame.sourceId}`
-              : `Latest frame published by ${frame.sourceId}`
-          }
+          audioEnabled={audioEnabled}
+          alt={live ? `Live camera from ${sourceId}` : `Latest frame published by ${sourceId}`}
           // The browser fetches each frame, so one officer's upload is not
           // multiplied by the number of people watching.
-          fallbackSrc={`/api/streams/${encodeURIComponent(frame.sourceId)}/frame?live=${Date.parse(frame.at)}`}
+          fallbackSrc={
+            frame
+              ? `/api/streams/${encodeURIComponent(sourceId)}/frame?live=${Date.parse(frame.at)}`
+              : undefined
+          }
         />
         <figcaption className={styles.caption}>
-          <span className={styles.unit}>{frame.sourceId}</span>
+          <span className={styles.unit}>{sourceId}</span>
           {/* Video has no age to report, and a still must never borrow the
               word that belongs to video. */}
           {live ? (
             <span className={styles.live}>LIVE</span>
-          ) : streamState === "connecting" ? (
-            <span className={styles.connecting}>CONNECTING</span>
-          ) : (
+          ) : frame ? (
             <span className={styles.age} data-freshness={freshness(age)}>
-              {describeAge(age)}
+              Still · {describeAge(age)}
+            </span>
+          ) : (
+            <span className={styles.connecting}>
+              {streamState === "connecting" ? "CONNECTING" : "NO LIVE VIDEO"}
             </span>
           )}
         </figcaption>
         {/* A machine transcript, and labelled as one: it mishears, and silence
             is indistinguishable from speech it failed to recognise. */}
-        {frame.heard && (
+        {frame?.heard && (
           <p className={styles.heard}>
             <span className={styles.heardLabel}>Heard</span>
             {frame.heard}
           </p>
         )}
       </button>
+      {live && (
+        <label className={styles.caption}>
+          <span>Listen to shared audio</span>
+          <input
+            type="checkbox"
+            checked={audioEnabled}
+            onChange={(event) => setAudioEnabled(event.target.checked)}
+          />
+        </label>
+      )}
     </figure>
   );
 }
 
 /**
- * Every officer currently publishing, as their latest frame.
- *
- * This is not video and is not presented as video. Each tile is the last
- * still that officer's capture page uploaded, roughly one every two seconds,
- * labelled with its own age — a dispatcher can see at a glance which feeds are
- * current and which have gone quiet. A source that stops publishing leaves the
- * wall instead of freezing on its final frame.
+ * Discovery joins independent camera leases with the latest available stills.
+ * Actual arriving media keeps its tile alive even if discovery is interrupted.
  */
 export interface BodyCamWallProps {
   /**
@@ -129,10 +151,10 @@ export interface BodyCamWallProps {
 }
 
 export function BodyCamWall({ excludeSourceId, className = "panel" }: BodyCamWallProps = {}) {
-  const { frames: published, status } = useBodyCamWall();
+  const { sources: published, status, setSourceLive } = useBodyCamWall();
   const [now, setNow] = useState(() => Date.now());
-  const frames = excludeSourceId
-    ? published.filter((frame) => frame.sourceId !== excludeSourceId)
+  const sources = excludeSourceId
+    ? published.filter((source) => source.sourceId !== excludeSourceId)
     : published;
   const watching = excludeSourceId !== undefined;
   const [reviewing, setReviewing] = useState<string | null>(null);
@@ -147,12 +169,12 @@ export function BodyCamWall({ excludeSourceId, className = "panel" }: BodyCamWal
     <section className={className} aria-label="Body camera wall">
       <div className="panel-heading">
         <h2>
-          {watching ? "Other units" : "Body cameras"} · {frames.length} publishing
+          {watching ? "Other units" : "Body cameras"} · {sources.length} sources
         </h2>
         <span className={`tag ${status === "live" ? "sky" : "sage"}`}>{STATUS_COPY[status]}</span>
       </div>
 
-      {frames.length === 0 ? (
+      {sources.length === 0 ? (
         <p className={styles.empty}>
           {watching ? (
             <>
@@ -162,20 +184,20 @@ export function BodyCamWall({ excludeSourceId, className = "panel" }: BodyCamWal
           ) : (
             <>
               No officer is publishing. Open <strong>/capture</strong> on a phone or a laptop with a
-              paired camera, name the unit, and start the camera — the frames it sends for triage
-              appear here.
+              paired camera, name the unit, and start the camera — their live view appears here.
             </>
           )}
         </p>
       ) : (
         <div className={styles.wall}>
-          {frames.map((frame) => (
+          {sources.map((source) => (
             <WallTile
-              key={frame.sourceId}
-              frame={frame}
-              age={ageMs(frame, now)}
-              open={frame.sourceId === reviewing}
-              onOpen={() => setReviewing(frame.sourceId === reviewing ? null : frame.sourceId)}
+              key={source.sourceId}
+              source={source}
+              age={source.frame ? ageMs(source.frame, now) : Number.POSITIVE_INFINITY}
+              open={source.sourceId === reviewing}
+              onOpen={() => setReviewing(source.sourceId === reviewing ? null : source.sourceId)}
+              onMediaChange={setSourceLive}
             />
           ))}
         </div>
@@ -187,11 +209,13 @@ export function BodyCamWall({ excludeSourceId, className = "panel" }: BodyCamWal
         <FrameReview key={reviewing} sourceId={reviewing} onClose={() => setReviewing(null)} />
       )}
 
+      <LiveDiagnostics />
+
       <p className={styles.caveat}>
-        A tile marked LIVE is a direct video link to that camera. Any other tile is that
-        officer&apos;s latest uploaded still, about one every two seconds, labelled with its own age
-        — a link that could not be made is not a camera that stopped. Select a tile to scrub the
-        last fifteen minutes of stills; nothing older is kept, and live video is never recorded.
+        LIVE means video frames are arriving from that camera. A still is labelled with its own age;
+        image analysis can delay still updates without interrupting live video. Select a tile to
+        scrub the last fifteen minutes of stills; nothing older is kept, and live video is never
+        recorded.
       </p>
     </section>
   );

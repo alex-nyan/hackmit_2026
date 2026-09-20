@@ -264,6 +264,10 @@ formats the browser can record, and it plays a short clip back locally.
 
 ### Camera access needs HTTPS
 
+For direct live viewing, microphone sharing, connection diagnostics and the
+Vercel deployment checklist, see [Live video and audio](docs/webrtc-latency.md).
+The live connection is independent of the AI snapshot cadence.
+
 Browsers expose `getUserMedia` only in a secure context. `localhost` is exempt,
 so development works over plain HTTP on the machine itself, but a phone on the
 LAN needs real HTTPS:

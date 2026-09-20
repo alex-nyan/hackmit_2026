@@ -10,8 +10,8 @@ import { postSignal, readSignals } from "@/features/live-video/signalStore";
  * the publisher and the watcher are rarely on the same one. A cursor gives
  * the same guarantee without either problem.
  *
- * This route only carries the handshake. Once it has crossed, the video goes
- * directly between the two browsers and nothing further arrives here.
+ * This route carries descriptions, bounded candidate batches and departures.
+ * Audio and video always travel through the peer connection.
  */
 
 export const dynamic = "force-dynamic";
@@ -37,9 +37,13 @@ export async function GET(
   // worth fetching, and an unnamed one would pay for everybody's.
   if (!isCursor(since) || !isPeerId(peer)) return badRequest("invalid-cursor");
 
-  return Response.json(await readSignals(sourceId, since, peer), {
-    headers: { "Cache-Control": "no-store" },
-  });
+  try {
+    return Response.json(await readSignals(sourceId, since, peer), {
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch {
+    return badRequest("signal-store-unavailable", 503);
+  }
 }
 
 export async function POST(

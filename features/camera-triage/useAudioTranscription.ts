@@ -66,6 +66,9 @@ export function useAudioTranscription(
   options?: { onSpike?: () => void; urgent?: boolean },
 ) {
   const [state, setState] = useState<AudioState>({ state: "off" });
+  // Consumers may publish this track, but this hook remains its sole owner.
+  // Sharing must never open a second microphone or stop the transcription track.
+  const [microphoneStream, setMicrophoneStream] = useState<MediaStream | null>(null);
   const sessionRef = useRef<AudioSession | null>(null);
   const sourceIdRef = useRef(sourceId);
   const onResultRef = useRef(onResult);
@@ -85,6 +88,7 @@ export function useAudioTranscription(
   const stop = useCallback(() => {
     const session = sessionRef.current;
     sessionRef.current = null;
+    setMicrophoneStream(null);
     if (session) releaseSession(session);
     setState({ state: "off" });
   }, []);
@@ -207,6 +211,7 @@ export function useAudioTranscription(
       const fail = (reason: string) => {
         if (sessionRef.current !== session) return;
         sessionRef.current = null;
+        setMicrophoneStream(null);
         releaseSession(session);
         setState({ state: "unsupported", reason });
       };
@@ -309,6 +314,7 @@ export function useAudioTranscription(
         }
 
         recordClip();
+        setMicrophoneStream(stream);
         setState({ state: "recording", lastResult: null, lastError: null });
       } catch {
         fail("Microphone permission was declined, or no microphone is available.");
@@ -328,5 +334,5 @@ export function useAudioTranscription(
     };
   }, [stop]);
 
-  return { state, start, stop };
+  return { state, start, stop, stream: microphoneStream };
 }

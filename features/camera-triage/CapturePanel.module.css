@@ -1,0 +1,8 @@
+.liveAudio {
+  margin-top: 9px;
+}
+
+.liveAudio:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
