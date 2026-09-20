@@ -22,9 +22,10 @@ import { describeBuilding, type BuildingFacts } from "../boston-map/buildingSele
 import { loadMapbox } from "../boston-map/mapboxClient";
 import { MAP_FOCUS, type MapFocus, type MapStatus, type MapTheme } from "../boston-map/types";
 import { addLiveLayers, updateLiveLayers, type LiveDevice } from "@/features/live-track";
-import { DESTINATION, INCIDENT, PEOPLE, personStatus } from "./scenario";
+import { PEOPLE, personStatus } from "./scenario";
 import type { DemoState } from "./useScenario";
 import { vehicleAt, vehicleRoute } from "./vehicles/vehicleMotion";
+import { patrolRouteColor, routeChevrons } from "./vehicles/routePresentation";
 import {
   createPatrolVehicleLayer,
   VEHICLE_LAYER_ID,
@@ -58,6 +59,7 @@ type Runtime = {
 };
 type UnitMarker = {
   marker: Marker;
+  direction: Marker;
   button: HTMLButtonElement;
   label: HTMLSpanElement;
   dispose: () => void;
@@ -65,25 +67,33 @@ type UnitMarker = {
 const ROUTE_SOURCE = "paw-scenario-route";
 const ROUTE_LINE = "paw-scenario-route-line";
 const ROUTE_CASING = "paw-scenario-route-casing";
+const ARROW_SOURCE = "paw-route-arrows";
+const ARROW_LINE = "paw-route-arrow-line";
 const LOAD_TIMEOUT_MS = 20000;
+
+function presentedRoutes(time: number, selectedId: string) {
+  const routes = PEOPLE.flatMap((person, index) => {
+    const route = vehicleRoute(person.id, time);
+    return route && route.coordinates.length >= 2
+      ? [{ route, color: patrolRouteColor(index), selected: person.id === selectedId }]
+      : [];
+  });
+  const unique = new Map(routes.map((item) => [item.route.coordinates, item]));
+  for (const item of routes) if (item.selected) unique.set(item.route.coordinates, item);
+  return [...unique.values()].sort((a, b) => Number(a.selected) - Number(b.selected));
+}
 
 function routeData(
   time: number,
-  unitId: string,
+  selectedId: string,
 ): Exclude<GeoJSONSourceSpecification["data"], string> {
-  const route = vehicleRoute(unitId, time);
   return {
     type: "FeatureCollection",
-    features:
-      route && route.coordinates.length >= 2
-        ? [
-            {
-              type: "Feature",
-              properties: { unit: unitId, kind: route.kind },
-              geometry: { type: "LineString", coordinates: route.coordinates.map((p) => [...p]) },
-            },
-          ]
-        : [],
+    features: presentedRoutes(time, selectedId).map(({ route, color, selected }) => ({
+      type: "Feature",
+      properties: { unit: route.unitId, kind: route.kind, color, selected },
+      geometry: { type: "LineString", coordinates: route.coordinates.map((p) => [...p]) },
+    })),
   };
 }
 
@@ -96,7 +106,7 @@ export function OperationsMap(props: OperationsMapProps) {
   const [attempt, setAttempt] = useState(0);
   const [feedback, setFeedback] = useState({
     status: "loading" as MapStatus,
-    message: "Bringing Cambridge into view…",
+    message: "Bringing Boston into view…",
   });
   const [fallback, setFallback] = useState(false);
   useEffect(() => {
@@ -138,10 +148,10 @@ export function OperationsMap(props: OperationsMapProps) {
       frameTime = latestRef.current.readClock().time;
     let currentTheme = latestRef.current.theme,
       routeKey = "",
+      arrowKey = "",
       lastLabelStamp = "";
     let selectedBuildingId: string | number | null = null;
     const markers: UnitMarker[] = [],
-      places: Marker[] = [],
       cleanups: Array<() => void> = [];
     const preference = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     let reducedMotion = preference?.matches ?? false;
@@ -175,7 +185,7 @@ export function OperationsMap(props: OperationsMapProps) {
     };
     const loading = () => {
       clearTimer();
-      report("loading", "Bringing Cambridge into view…");
+      report("loading", "Bringing Boston into view…");
       timer = setTimeout(() => {
         if (!disposed) {
           if (ready()) checkReady();
@@ -212,8 +222,8 @@ export function OperationsMap(props: OperationsMapProps) {
           container: containerRef.current,
           accessToken: token,
           style: basemapStyle(currentTheme),
-          center: latestRef.current.focus === "mit" ? INCIDENT : initial.center,
-          zoom: latestRef.current.focus === "mit" ? 17.2 : initial.zoom,
+          center: initial.center,
+          zoom: initial.zoom,
           pitch: latestRef.current.focus === "all" ? 35 : 45,
           bearing: -17.6,
           minZoom: 10.5,
@@ -224,13 +234,14 @@ export function OperationsMap(props: OperationsMapProps) {
         });
         ownMap = map;
         map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "bottom-right");
-        for (const person of PEOPLE) {
+        for (const [index, person] of PEOPLE.entries()) {
           const anchor = document.createElement("div");
           anchor.className = styles.markerAnchor;
           const button = document.createElement("button");
           button.type = "button";
           button.className = styles.officerMarker;
           button.dataset.color = person.color;
+          button.style.setProperty("--route-color", patrolRouteColor(index));
           const label = document.createElement("span");
           label.className = styles.officerLabel;
           label.textContent = person.id;
@@ -244,44 +255,47 @@ export function OperationsMap(props: OperationsMapProps) {
           const marker = new mapboxgl.Marker({ element: anchor, anchor: "bottom" })
             .setLngLat(vehicleAt(person.id, frameTime).point)
             .addTo(map);
+          const directionElement = document.createElement("div");
+          directionElement.className = styles.vehicleDirection;
+          directionElement.style.setProperty("--route-color", patrolRouteColor(index));
+          directionElement.setAttribute("aria-hidden", "true");
+          const direction = new mapboxgl.Marker({
+            element: directionElement,
+            anchor: "center",
+            rotationAlignment: "map",
+            pitchAlignment: "map",
+          })
+            .setLngLat(vehicleAt(person.id, frameTime).point)
+            .setRotation(vehicleAt(person.id, frameTime).heading)
+            .addTo(map);
           anchor.setAttribute("role", "presentation");
           anchor.removeAttribute("aria-label");
           markers.push({
             marker,
+            direction,
             button,
             label,
             dispose: () => button.removeEventListener("click", select),
           });
         }
-        const incidentElement = document.createElement("div");
-        incidentElement.className = styles.incidentMarker;
-        incidentElement.setAttribute("role", "img");
-        incidentElement.setAttribute("aria-label", "Simulated incident location");
-        places.push(
-          new mapboxgl.Marker({ element: incidentElement }).setLngLat(INCIDENT).addTo(map),
-        );
-        const receivingElement = document.createElement("div");
-        receivingElement.className = styles.destinationMarker;
-        receivingElement.textContent = "+ Demo receiving point";
-        places.push(
-          new mapboxgl.Marker({ element: receivingElement, anchor: "bottom", offset: [0, -12] })
-            .setLngLat(DESTINATION)
-            .addTo(map),
-        );
         const draw = () => {
           if (disposed) return;
           const current = latestRef.current;
           frameTime = current.readClock().time;
           const detailed = map.getZoom() >= VEHICLE_MIN_ZOOM && !carsUnavailable;
           const labelStamp = current.selectedId + ":" + Math.floor(frameTime * 4);
-          markers.forEach(({ marker, button, label }, i) => {
+          markers.forEach(({ marker, direction, button, label }, i) => {
             const person = PEOPLE[i],
               selected = person.id === current.selectedId,
               pose = vehicleAt(person.id, frameTime);
             const available = !!vehicleRoute(person.id, frameTime);
             marker.getElement().hidden = !available;
+            direction.getElement().hidden = !available;
             if (!available) return;
-            marker.setLngLat(pose.point).setOffset(detailed ? [0, -17] : [0, -4]);
+            marker.setLngLat(pose.point).setOffset(detailed ? [0, -24] : [0, -18]);
+            direction.setLngLat(pose.point).setRotation(pose.heading);
+            direction.getElement().dataset.selected = String(selected);
+            direction.getElement().dataset.detail = String(detailed);
             button.dataset.detail = String(detailed);
             button.dataset.selected = String(selected);
             button.dataset.emergency = String(pose.emergency);
@@ -298,14 +312,22 @@ export function OperationsMap(props: OperationsMapProps) {
             }
           });
           lastLabelStamp = labelStamp;
-          incidentElement.hidden = frameTime < 15;
-          receivingElement.hidden = frameTime < 60;
           const nextKey =
-            current.selectedId + ":" + (vehicleRoute(current.selectedId, frameTime)?.id ?? "none");
+            current.selectedId +
+            ":" +
+            PEOPLE.map((p) => vehicleRoute(p.id, frameTime)?.id ?? "none").join(":");
           const source = map.getSource(ROUTE_SOURCE) as GeoJSONSource | undefined;
           if (source && nextKey !== routeKey) {
             source.setData(routeData(frameTime, current.selectedId));
             routeKey = nextKey;
+          }
+          const nextArrowKey = nextKey + ":" + map.getZoom().toFixed(1);
+          const arrows = map.getSource(ARROW_SOURCE) as GeoJSONSource | undefined;
+          if (arrows && nextArrowKey !== arrowKey) {
+            arrows.setData(
+              routeChevrons(presentedRoutes(frameTime, current.selectedId), map.getZoom()),
+            );
+            arrowKey = nextArrowKey;
           }
           if (current.following && vehicleRoute(current.selectedId, frameTime) && !map.isMoving())
             map.jumpTo({ center: vehicleAt(current.selectedId, frameTime).point });
@@ -375,31 +397,68 @@ export function OperationsMap(props: OperationsMapProps) {
                 data: routeData(frameTime, latestRef.current.selectedId),
               });
             if (!map.getLayer(ROUTE_CASING))
-              map.addLayer(
-                {
-                  id: ROUTE_CASING,
-                  type: "line",
-                  source: ROUTE_SOURCE,
-                  layout: { "line-join": "round", "line-cap": "round" },
-                  paint: { "line-color": "#fcf7ed", "line-width": 5, "line-opacity": 0.7 },
+              map.addLayer({
+                id: ROUTE_CASING,
+                type: "line",
+                source: ROUTE_SOURCE,
+                layout: { "line-join": "round", "line-cap": "round" },
+                paint: {
+                  "line-color": latestRef.current.theme === "dark" ? "#172238" : "#ffffff",
+                  "line-width": [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    12,
+                    ["case", ["get", "selected"], 7, 5],
+                    18,
+                    ["case", ["get", "selected"], 11, 8],
+                  ],
+                  "line-opacity": 0.92,
                 },
-                "3d-buildings",
-              );
+              });
             if (!map.getLayer(ROUTE_LINE))
-              map.addLayer(
-                {
-                  id: ROUTE_LINE,
-                  type: "line",
-                  source: ROUTE_SOURCE,
-                  layout: { "line-join": "round", "line-cap": "round" },
-                  paint: {
-                    "line-color": latestRef.current.theme === "dark" ? "#efdb98" : "#343e8a",
-                    "line-width": 2,
-                    "line-opacity": 0.7,
-                  },
+              map.addLayer({
+                id: ROUTE_LINE,
+                type: "line",
+                source: ROUTE_SOURCE,
+                layout: { "line-join": "round", "line-cap": "round" },
+                paint: {
+                  "line-color": ["get", "color"],
+                  "line-width": [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    12,
+                    ["case", ["get", "selected"], 4.5, 3],
+                    18,
+                    ["case", ["get", "selected"], 7, 4.5],
+                  ],
+                  "line-opacity": ["case", ["get", "selected"], 1, 0.78],
                 },
-                "3d-buildings",
-              );
+              });
+            if (!map.getSource(ARROW_SOURCE)) {
+              map.addSource(ARROW_SOURCE, {
+                type: "geojson",
+                data: routeChevrons(
+                  presentedRoutes(frameTime, latestRef.current.selectedId),
+                  map.getZoom(),
+                ),
+              });
+            }
+            if (!map.getLayer(ARROW_LINE)) {
+              map.addLayer({
+                id: ARROW_LINE,
+                type: "line",
+                source: ARROW_SOURCE,
+                layout: { "line-cap": "round", "line-join": "round" },
+                paint: {
+                  "line-color": "#ffffff",
+                  "line-width": ["case", ["get", "selected"], 2.4, 1.8],
+                  "line-opacity": 0.95,
+                },
+              });
+            }
+            arrowKey = "";
             if (!map.getLayer(VEHICLE_LAYER_ID)) {
               carsUnavailable = false;
               if (!disposed) setFallback(false);
@@ -578,11 +637,11 @@ export function OperationsMap(props: OperationsMapProps) {
       resizeObserver?.disconnect();
       runtimeRef.current = null;
       cleanups.forEach((cleanup) => cleanup());
-      markers.forEach(({ marker, dispose }) => {
+      markers.forEach(({ marker, direction, dispose }) => {
         dispose();
         marker.remove();
+        direction.remove();
       });
-      places.forEach((marker) => marker.remove());
       ownMap?.remove(); // Mapbox calls custom-layer onRemove to release Three resources.
     };
   }, [attempt]);
@@ -609,7 +668,7 @@ export function OperationsMap(props: OperationsMapProps) {
             {hasError ? <TriangleAlert size={21} /> : <MapPin size={21} />}
           </span>
           <div>
-            <strong>{hasError ? "Map temporarily unavailable" : "Setting the scene"}</strong>
+            <strong>{hasError ? "Map temporarily unavailable" : "Loading map"}</strong>
             <p>{feedback.message}</p>
             {hasError && (
               <button

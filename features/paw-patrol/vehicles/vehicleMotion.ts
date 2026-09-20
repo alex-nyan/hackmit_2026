@@ -1,4 +1,4 @@
-import streetRoutes from "./street-routes.json";
+import patrolLoops from "./patrol-loops.json";
 
 export type VehiclePoint = [number, number];
 export type VehicleRouteKind = "patrol" | "response" | "transport";
@@ -185,58 +185,76 @@ export function parseVehicleRoutes(input: unknown): VehicleRoute[] {
   return result.sort((a, b) => a.startTime - b.startTime);
 }
 
-export const VEHICLE_ROUTES = parseVehicleRoutes(streetRoutes.routes);
-export const DEMO_INCIDENT: VehiclePoint = validPoint(streetRoutes.incident)
-  ? [...streetRoutes.incident]
-  : [...FALLBACK];
-export const DEMO_DESTINATION: VehiclePoint = validPoint(streetRoutes.receivingPoint)
-  ? [...streetRoutes.receivingPoint]
-  : [...DEMO_INCIDENT];
+const loops = patrolLoops.routes.map((loop) => ({
+  ...loop,
+  geometry: prepareRouteGeometry(loop.coordinates as VehiclePoint[]),
+}));
+
+/** Three evenly spaced cars per loop, all following the provider's driving direction. */
+export const PATROL_UNITS = Array.from({ length: 15 }, (_, index) => {
+  const loop = loops[index % loops.length];
+  const speedMps = 7 + (index % loops.length) * 0.65;
+  return {
+    id: `P-${String(index + 1).padStart(2, "0")}`,
+    area: loop.area,
+    loopId: loop.id,
+    geometry: loop.geometry,
+    speedMps,
+    offsetMeters: (loop.geometry.lengthMeters * Math.floor(index / loops.length)) / 3,
+  };
+});
+export const VEHICLE_ROUTES: VehicleRoute[] = PATROL_UNITS.map((unit, index) => ({
+  id: `${unit.id}-${unit.loopId}`,
+  unitId: unit.id,
+  kind: "patrol",
+  startTime: 0,
+  endTime: unit.geometry.lengthMeters / unit.speedMps,
+  coordinates: unit.geometry.coordinates,
+  roadNames: loops[index % loops.length].roadNames,
+}));
 export const ROUTE_SOURCE = {
-  source: streetRoutes.source,
-  sourceUrl: streetRoutes.sourceUrl,
-  attribution: streetRoutes.attribution,
-  attributionUrl: streetRoutes.attributionUrl,
-  retrievedAt: streetRoutes.retrievedAt,
-  receivingPointLabel: streetRoutes.receivingPointLabel,
+  source: patrolLoops.source,
+  sourceUrl: patrolLoops.sourceUrl,
+  attribution: patrolLoops.attribution,
+  attributionUrl: patrolLoops.attributionUrl,
+  retrievedAt: patrolLoops.retrievedAt,
   simulated: true,
 } as const;
-const geometries = new Map(
-  VEHICLE_ROUTES.map((route) => [route.id, prepareRouteGeometry(route.coordinates)]),
+const units = new Map(
+  PATROL_UNITS.map((unit, index) => [unit.id, { ...unit, route: VEHICLE_ROUTES[index] }]),
 );
 
-/** In a gap, hold the completed leg; before departure, hold the first road vertex. */
-export function vehicleRoute(id: string, time: number): VehicleRoute | null {
-  const routes = VEHICLE_ROUTES.filter((route) => route.unitId === id);
-  const t = Number.isFinite(time) ? Math.min(90, Math.max(0, time)) : 0;
-  return routes.findLast((route) => route.startTime <= t) ?? routes[0] ?? null;
+export function vehicleRoute(id: string, _time: number): VehicleRoute | null {
+  void _time; // Preserve the shared map sampler signature; patrol routes never change with time.
+  return units.get(id)?.route ?? null;
 }
 
 export function vehicleAt(id: string, time: number): VehiclePosition {
-  const t = Number.isFinite(time) ? Math.min(90, Math.max(0, time)) : 0;
-  const route = vehicleRoute(id, t);
-  if (!route)
+  const unit = units.get(id);
+  if (!unit)
     return {
-      point: [...DEMO_INCIDENT],
+      point: [...FALLBACK],
       heading: 0,
       speedMps: 0,
       roadName: "Route unavailable",
       routeId: "",
       emergency: false,
     };
-  const geometry = geometries.get(route.id)!;
-  const motion = motionAtElapsed(
-    geometry.lengthMeters,
-    route.endTime - route.startTime,
-    t - route.startTime,
-  );
+  const { geometry, route, speedMps, offsetMeters } = unit;
+  const t = Number.isFinite(time) ? Math.max(0, time) : 0;
+  const wrap = (distance: number) =>
+    ((distance % geometry.lengthMeters) + geometry.lengthMeters) % geometry.lengthMeters;
+  // Closed road loops keep position and heading continuous across each lap.
+  const distance = wrap(offsetMeters + (t % route.endTime) * speedMps);
   return {
-    point: pointAtDistance(geometry, motion.distance),
-    heading: headingAtDistance(geometry, motion.distance),
-    speedMps: motion.speedMps,
-    roadName: route.roadNames.join(" / ") || "Simulated street route",
+    point: pointAtDistance(geometry, distance),
+    heading: bearingDegrees(
+      pointAtDistance(geometry, wrap(distance - 3)),
+      pointAtDistance(geometry, wrap(distance + 3)),
+    ),
+    speedMps,
+    roadName: route.roadNames.join(" / ") || "Patrol route",
     routeId: route.id,
-    emergency:
-      t < 90 && ((id === "P-01" && t >= 15) || ((id === "P-02" || id === "P-03") && t >= 30)),
+    emergency: false,
   };
 }

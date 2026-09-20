@@ -32,7 +32,6 @@ export function SceneCoordination({
   command: boolean;
   dispatch: Dispatch<DemoAction>;
 }) {
-  const locked = time >= 60;
   return (
     <section
       className={`${styles.scene} ${scene.status === "unsafe" ? styles.unsafe : ""}`}
@@ -54,47 +53,29 @@ export function SceneCoordination({
       <div className={styles.actions}>
         {command && (
           <>
-            <button disabled={locked} onClick={() => dispatch({ type: "scene", status: "unsafe" })}>
+            <button onClick={() => dispatch({ type: "scene", status: "unsafe" })}>
               Mark unsafe
             </button>
-            <button
-              disabled={locked}
-              onClick={() => dispatch({ type: "scene", status: "unknown" })}
-            >
+            <button onClick={() => dispatch({ type: "scene", status: "unknown" })}>
               Status unknown
             </button>
-            <button
-              disabled={locked || time < 15}
-              onClick={() => dispatch({ type: "scene", status: "cleared" })}
-            >
+            <button onClick={() => dispatch({ type: "scene", status: "cleared" })}>
               Record demo clearance
             </button>
           </>
         )}
         <button
           className={styles.panic}
-          disabled={locked || panics.some((p) => p.personId === person.id)}
+          disabled={panics.some((p) => p.personId === person.id)}
           onClick={() => dispatch({ type: "panic", personId: person.id })}
         >
           <Siren size={16} /> Demo panic · {person.id}
         </button>
       </div>
-      {locked ? (
-        <p>
-          Transport has begun; the recorded scene clearance is retained. Reset to start a new
-          scenario.
-        </p>
-      ) : time >= 59 && scene.status !== "cleared" ? (
-        <p role="status">
-          EMS held outside the scene. Command must record clearance before playback can continue
-          into transport.
-        </p>
-      ) : (
-        <p>
-          Panic requests assistance and pauses this demo. It does not establish an injury or
-          diagnosis.
-        </p>
-      )}
+      <p>
+        Panic requests assistance and pauses this demo. It does not establish an injury or
+        diagnosis.
+      </p>
       {panics.map((p) => (
         <div key={p.personId} className={styles.alert} role="status">
           <strong>
@@ -119,7 +100,6 @@ export function SceneCoordination({
 export type TacticalReport = { clothing: string; items: string; location: string; notes: string };
 export const emptyTactical: TacticalReport = { clothing: "", items: "", location: "", notes: "" };
 export function TacticalBrief({
-  time,
   report,
   setReport,
 }: {
@@ -130,10 +110,7 @@ export function TacticalBrief({
   return (
     <section className={styles.tactical} aria-label="Tactical subject report">
       <h3>Subject description</h3>
-      <p>
-        Incident DEMO-001 · observed person, not the selected officer. Details are unverified demo
-        reports.
-      </p>
+      <p>Operator-entered observations.</p>
       <dl>
         <div>
           <dt>Clothing / appearance</dt>
@@ -141,17 +118,11 @@ export function TacticalBrief({
         </div>
         <div>
           <dt>Visible items</dt>
-          <dd>
-            {report.items ||
-              (time >= 15 ? "Possible firearm — scripted, unconfirmed" : "Not reported")}
-          </dd>
+          <dd>{report.items || "Not reported"}</dd>
         </div>
         <div>
           <dt>Last observed location</dt>
-          <dd>
-            {report.location ||
-              (time >= 15 ? "Kendall Square — scripted location" : "Not reported")}
-          </dd>
+          <dd>{report.location || "Not reported"}</dd>
         </div>
       </dl>
       <details>

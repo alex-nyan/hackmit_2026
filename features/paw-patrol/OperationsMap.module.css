@@ -31,10 +31,10 @@
   gap: 5px;
   min-height: 30px;
   padding: 6px 8px;
-  border: 1px solid rgb(52 62 138 / 18%);
+  border: 1px solid var(--route-color, #343e8a);
   border-radius: 7px;
   background: #fcf7ed;
-  color: #343e8a;
+  color: var(--route-color, #343e8a);
   box-shadow: 0 3px 12px rgb(40 46 78 / 20%);
   font:
     700 10px/1.1 Arial,
@@ -65,15 +65,15 @@
   outline-offset: 4px;
 }
 .officerMarker[data-selected="true"] {
-  background: #343e8a;
-  color: #fcf7ed;
-  border-color: #343e8a;
+  background: var(--route-color, #343e8a);
+  color: #fff;
+  border-color: var(--route-color, #343e8a);
   box-shadow:
-    0 0 0 3px #efdb98,
-    0 5px 16px rgb(40 46 78 / 25%);
+    0 0 0 2px #fff,
+    0 3px 8px rgb(24 39 65 / 25%);
 }
 .officerMarker[data-selected="true"]::after {
-  background: #343e8a;
+  background: var(--route-color, #343e8a);
 }
 .officerMarker[data-detail="false"]::before {
   content: "";
@@ -274,4 +274,36 @@
   .officerMarker {
     transition: none;
   }
+}
+
+/* Heading stays aligned to the map as the camera rotates and pitches. */
+.vehicleDirection {
+  width: 28px;
+  height: 34px;
+  z-index: 2;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgb(20 35 55 / 35%));
+}
+.vehicleDirection::before,
+.vehicleDirection::after {
+  content: "";
+  position: absolute;
+  clip-path: polygon(50% 0, 100% 100%, 50% 74%, 0 100%);
+}
+.vehicleDirection::before {
+  inset: 0;
+  background: #fff;
+}
+.vehicleDirection::after {
+  inset: 4px 5px 5px;
+  background: var(--route-color);
+}
+.vehicleDirection[data-selected="true"] {
+  width: 34px;
+  height: 40px;
+  z-index: 3;
+}
+.vehicleDirection[data-detail="true"] {
+  /* Outline the vehicle's nose without covering its 3D body. */
+  clip-path: polygon(0 0, 100% 0, 100% 52%, 0 52%);
 }

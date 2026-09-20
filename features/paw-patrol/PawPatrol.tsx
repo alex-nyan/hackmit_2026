@@ -10,7 +10,6 @@ import {
   Play,
   Pause,
   RotateCcw,
-  SkipForward,
   ArrowUpRight,
   MapPin,
   Camera,
@@ -37,7 +36,6 @@ import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-t
 import { OperationsMap } from "./OperationsMap";
 import officerStyles from "./OfficerWorkspace.module.css";
 import {
-  DURATION,
   EVENTS,
   PEOPLE,
   PHASES,
@@ -58,13 +56,7 @@ import { useIncidentBus } from "./useIncidentBus";
 import { hazardIncident, transcriptIncident } from "./hazardSignal";
 import { draftMist, hasDraft, type MistDraft } from "./draftMist";
 import type { IncidentDraft } from "./incidents";
-import {
-  BusIndicator,
-  MistDraftCard,
-  NotConcluded,
-  PreArrival,
-  SharedTimeline,
-} from "./Provenance";
+import { BusIndicator, MistDraftCard, NotConcluded, SharedTimeline } from "./Provenance";
 import type { TriageResult } from "../camera-triage/types";
 import type { TranscriptionResult } from "../camera-triage/audio";
 
@@ -126,7 +118,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
     if (!fixedView) setSelectedView(nextView);
   }
   const [selectedId, setSelectedId] = useState<string>("P-01");
-  const [focus, setFocus] = useState<MapFocus>("mit");
+  const [focus, setFocus] = useState<MapFocus>("all");
   const [theme, setTheme] = useState<MapTheme>("light");
   const [recenterKey, setRecenterKey] = useState(0);
   const [following, setFollowing] = useState(false);
@@ -157,7 +149,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
   const vehicle = vehicleAt(person.id, time);
   const phase = phaseAt(time),
     medical = phase >= 3,
-    complete = time === DURATION;
+    complete = false;
   const selectedCase = medical && person.id === "P-01";
   const scene = sceneAt(time, sceneOverride);
 
@@ -247,15 +239,12 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
   const modelDraft = draftMist(bus.events, person.id);
   const draftAvailable = hasDraft(modelDraft) && !draftDismissed && !records[person.id];
 
-  const events = [
-    ...EVENTS.filter((e) => e.at <= time && !(sceneOverride && e.at === 56)),
-    ...audit,
-  ].sort((a, b) => a.at - b.at);
+  const events = [...EVENTS, ...audit].sort((a, b) => a.at - b.at);
   function reset() {
     dispatch({ type: "reset" });
     setSelectedId("P-01");
     setFollowing(false);
-    setFocus("mit");
+    setFocus("all");
     setRecenterKey((k) => k + 1);
     setEvidence(null);
     setRecords({});
@@ -386,10 +375,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
         <>
           <div className="vehicle-telemetry" aria-label="Selected unit simulated position">
             <span>
-              <strong>{person.id}</strong>{" "}
-              {time >= 60 && person.id === "P-01"
-                ? "Transport proxy"
-                : personStatus(person.id, time)}
+              <strong>{person.id}</strong> {personStatus(person.id, time)}
             </span>
             <span>
               {vehicle.routeId ? `${Math.round(vehicle.speedMps * 3.6)} km/h` : "Route unavailable"}
@@ -500,15 +486,15 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
             </div>
             <div className="demo-notice">
               <span className="tag">SIMULATION</span>
-              <span>Synthetic people and signals. No live monitoring or real dispatch.</span>
+              <span>15 simulated patrol vehicles.</span>
               <span className="auto-label">
                 {complete
                   ? "Demo complete"
                   : running
-                    ? "Automatic sequence running"
+                    ? "Patrol running"
                     : time > 0
                       ? "Paused · press Resume to continue"
-                      : "90-second automatic scenario"}
+                      : "15 units · continuous patrol"}
               </span>
             </div>
             <BusIndicator status={bus.status} count={bus.events.length} />
@@ -597,7 +583,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
             <aside className="panel units-panel">
               <div className="panel-heading">
                 <h2>On the ground</h2>
-                <span>04</span>
+                <span>{PEOPLE.length}</span>
               </div>
               <p className="muted">Demo patrol units</p>
               {PEOPLE.map((p) => (
@@ -667,12 +653,14 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               </div>
               <dl className="details">
                 <div>
-                  <dt>Location</dt>
-                  <dd>Kendall Square</dd>
+                  <dt>Patrol area</dt>
+                  <dd>{person.area}</dd>
                 </div>
                 <div>
-                  <dt>Primary unit</dt>
-                  <dd>P-01 · Alex Morgan</dd>
+                  <dt>Selected unit</dt>
+                  <dd>
+                    {person.id} · {person.name}
+                  </dd>
                 </div>
                 <div>
                   <dt>Backup</dt>
@@ -680,13 +668,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
                 </div>
                 <div>
                   <dt>Medical</dt>
-                  <dd>
-                    {time >= 52
-                      ? "EMS-01 · simulated"
-                      : medical
-                        ? "Coordinating in demo"
-                        : "No injury reported"}
-                  </dd>
+                  <dd>No injury reported</dd>
                 </div>
               </dl>
               <div className="evidence-buttons">
@@ -809,24 +791,6 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               </p>
               {selectedCase ? (
                 <>
-                  <PreArrival
-                    time={time}
-                    duration={DURATION}
-                    arrived={complete}
-                    landed={[
-                      { label: "Scene status reported", present: scene.status !== "unknown" },
-                      {
-                        label: "Mechanism drafted from scene camera",
-                        present: Boolean(modelDraft.mechanism),
-                      },
-                      { label: "Scene audio reviewed", present: Boolean(modelDraft.symptoms) },
-                      { label: "Heart-rate series available", present: true },
-                      {
-                        label: "Clinician-entered handoff saved",
-                        present: Boolean(records[person.id]),
-                      },
-                    ]}
-                  />
                   <dl className="details">
                     <div>
                       <dt>Demo case</dt>
@@ -864,10 +828,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               ) : (
                 <div className="empty-handoff">
                   <HeartPulse size={48} />
-                  <p>
-                    When the demo reaches its explicit injury event, the handoff for Alex Morgan
-                    appears here automatically.
-                  </p>
+                  <p>No incoming transfer. Patrol playback does not generate medical events.</p>
                   <button className="secondary" onClick={() => setSelectedId("P-01")}>
                     Select primary officer
                   </button>
@@ -890,16 +851,14 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
                 ECG or diagnosis is available.
               </p>
               <h3 className="section-label">Handoff contents</h3>
-              {[
-                "Scenario event timeline",
-                "Sample heart-rate series",
-                "Scripted transport status",
-              ].map((s) => (
-                <div className="check-row" key={s}>
-                  <Check size={16} />
-                  {s}
-                </div>
-              ))}
+              {["Operator reports", "Sample heart-rate series", "Recorded transport status"].map(
+                (s) => (
+                  <div className="check-row" key={s}>
+                    <Check size={16} />
+                    {s}
+                  </div>
+                ),
+              )}
               <div className="feed-unavailable">
                 <Camera size={23} />
                 <strong>No body-camera footage</strong>
@@ -958,15 +917,9 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
             <div className="evidence-content">
               {evidence === "camera" ? <Camera size={34} /> : <Mic size={34} />}
               <div>
-                <h3>The {evidence === "camera" ? "weapon" : "concern"} signal is scripted</h3>
-                <p>
-                  That event came from the demo timeline, not from a sensor. Capture below is
-                  separate and real: this device&apos;s{" "}
-                  {evidence === "camera" ? "camera" : "microphone"} feeds the triage service, and
-                  what comes back is a model reading for a person to check.
-                </p>
+                <h3>{evidence === "camera" ? "Camera capture" : "Audio capture"}</h3>
+                <p>Start capture to review readings from this device.</p>
               </div>
-              <span className="tag">DEMO SIGNAL ONLY</span>
             </div>
             <div className="evidence-capture">
               <CapturePanel sourceId={`dispatch-${evidence}`} />
@@ -978,29 +931,8 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
           <>
             <section className="scenario-strip" aria-label="Demo playback">
               <div className="scenario-caption">
-                <span className="eyebrow">THE RESPONSE CHAIN</span>
-                <span className="clock">
-                  {stamp(time)} <small>/ 01:30</small>
-                </span>
-                <button
-                  className="next-button"
-                  disabled={complete}
-                  onClick={() => dispatch({ type: "next" })}
-                >
-                  Next stage <SkipForward size={15} />
-                </button>
-              </div>
-              <ol className="phases">
-                {PHASES.map((p, i) => (
-                  <li key={p.label} className={phase === i ? "current" : phase > i ? "done" : ""}>
-                    <span>{phase > i ? <Check size={14} /> : String(i + 1).padStart(2, "0")}</span>
-                    <strong>{p.label}</strong>
-                    <small>{stamp(p.at)}</small>
-                  </li>
-                ))}
-              </ol>
-              <div className="progress-track">
-                <div style={{ width: `${(time / DURATION) * 100}%` }} />
+                <span className="eyebrow">15 UNITS · CONTINUOUS PATROL</span>
+                <span className="clock">{stamp(time)}</span>
               </div>
             </section>
             <section className="activity-panel panel">
@@ -1013,9 +945,10 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
             <section className="activity-panel panel">
               <div className="panel-heading">
                 <h2>Event timeline</h2>
-                <span className="tag">SCRIPTED EVENTS</span>
+                <span className="tag">OPERATOR ACTIONS</span>
               </div>
               <div className="activity-list">
+                {events.length === 0 && <p>No operator actions recorded.</p>}
                 {[...events].reverse().map((e) => (
                   <article key={"id" in e ? String(e.id) : `${e.at}-${e.title}`}>
                     <time>{stamp(e.at)}</time>
