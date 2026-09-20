@@ -20,6 +20,8 @@ explicitly publishes video only and mutes its receiving video element.
 5. Strap the phone on with its rear camera facing outward and microphone clear.
    Keep Safari in the foreground and the phone unlocked and awake. This direct
    broadcasting mode does not use Continuity Camera or require a publishing Mac.
+6. On the receiving dashboard, set **Reporting source** (for example `officer-P-01`) and click **Analyze broadcast audio**. This receives the broadcast's audio track using the VDO.Ninja SDK and submits complete 5-second clips to the existing speech/AI pipeline. Keep the receiving dashboard tab visible. Confirm both incoming audio data and a recognized transcript; hearing the player alone does not prove analysis is running.
+7. Read and acknowledge alerts in the main dispatch **Audio intelligence** panel. `/audio` is an optional test page, not a required step. The processing server must have local Whisper and a configured AI provider (`pnpm dev:audio`); a hosted viewer without those services cannot analyze locally just because playback works.
 
 Pairing creates a random stream ID and password, embedded in both the sender
 and viewer links. The QR points directly to HTTPS VDO.Ninja, so even a dashboard
@@ -84,11 +86,13 @@ you connected. Keep viewing links within the team.
   resolution/frame rate in VDO.Ninja's source settings if capture/encoding struggles.
 - **Show stream statistics** reloads the viewer with VDO.Ninja's media diagnostics.
 
-This is a live viewing path only. It does not submit audio/video to the AI
-pipeline. Any simultaneous use of the existing analysis capture must be checked
-on the actual devices for camera contention and extra CPU/network load.
+Audio analysis is an explicit control in the same broadcast panel. It opens an additional audio-only WebRTC receiver for the same stream; it does not reopen the Mac microphone. The video remains viewing only. Stopping analysis leaves playback running; disconnecting/closing the panel or hiding the receiving tab stops analysis. Restart it when returning. Packet receipt, speech recognition and alert publication are distinct states. Buffering is bounded and a processing overload is shown as a coverage gap.
+
+Phrase rules publish bomb/explosion, shooting and other urgent-language alerts before waiting for the LLM, with no invented confidence score. Negation and training quotations intentionally still require review. A later reassuring model answer cannot clear a phrase alert; acknowledgment is explicit. This does not establish a real threat or dispatch services.
 
 ## Verification boundary
+
+Audio-to-AI integration was separately exercised using a generated speech publisher and the SDK receiver in the main dashboard. Eight received clips produced matching urgent phrase alerts and AI context across all three workspaces, and acknowledgment propagated. The decoder uses an inaudible HTML audio playback sink plus Web Audio because receiving packets alone initially yielded empty/silent recordings. No local microphone was captured in this check. Actual iPhone/Continuity hardware remains unverified by this synthetic source.
 
 The dashboard controls and embedded hosted player were exercised locally and on
 the deployed PR preview using VDO.Ninja's generated test media. The embedded
@@ -112,3 +116,4 @@ and audio/video mismatch. Do not infer latency from a successful connection alon
 - [Rear camera selection](https://docs.vdo.ninja/advanced-settings/mobile-parameters/and-facing)
 - [iPhone guidance](https://docs.vdo.ninja/platform-specific-issues/ios)
 - [Apple Continuity Camera and microphone](https://support.apple.com/en-us/102546)
+- [VDO.Ninja SDK receiver and track events](https://sdk.vdo.ninja/docs/api-reference.html)

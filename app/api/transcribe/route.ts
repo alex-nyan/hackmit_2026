@@ -5,7 +5,8 @@ import { forwardClip } from "@/features/camera-triage/transcribeProxy";
 import { MAX_BODY_BYTES, readTriageSettings } from "@/features/camera-triage/triageProxy";
 import { parseTranscriptionResult } from "@/shared/contracts";
 import { AudioAIError, assessTranscript, audioAISettings } from "@/features/audio-ai/provider";
-import { publishAudioAssessment } from "@/features/audio-ai/publish";
+import { publishAudioAssessment, publishAudioSafetySignal } from "@/features/audio-ai/publish";
+import { detectSafetyPhrase } from "@/features/audio-ai/safetySignal";
 
 /**
  * Server-side bridge to the transcription endpoint. The bearer token is read
@@ -55,7 +56,25 @@ export async function POST(request: Request) {
   }
 
   const outcome = await forwardClip(settings, clip.body);
-  await teeToWall(clip.body, outcome);
+  let safetyStatus = "none";
+  // This independent alert is visible while model inference is still running.
+  // It also operates when contextual AI is disabled or returns a reassuring answer.
+  if (outcome.status === 200) {
+    const transcript = parseTranscriptionResult(JSON.parse(outcome.body));
+    if (transcript.speech_detected && detectSafetyPhrase(transcript.text)) {
+      try {
+        const event = await publishAudioSafetySignal(
+          transcript.text.slice(0, 4000),
+          "microphone",
+          transcript.source_id,
+          transcript.captured_at,
+        );
+        safetyStatus = event?.audioSafetySignal?.level ?? "none";
+      } catch {
+        safetyStatus = "publication-failed";
+      }
+    }
+  }
 
   let parsed: unknown = null;
   try {
@@ -90,6 +109,7 @@ export async function POST(request: Request) {
       publication = await publishCapture("audio", parsed, outcome);
     }
   } else publication = await publishCapture("audio", parsed, outcome);
+  await teeToWall(clip.body, outcome);
   return new Response(outcome.body, {
     status: outcome.status,
     headers: {
@@ -97,6 +117,7 @@ export async function POST(request: Request) {
       "Cache-Control": "no-store",
       "X-Incident-Publication": publication,
       "X-Audio-Assessment": analysisStatus,
+      "X-Audio-Safety-Alert": safetyStatus,
     },
   });
 }

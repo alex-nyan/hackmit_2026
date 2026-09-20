@@ -1,6 +1,7 @@
 import { readFrameBody } from "@/features/camera-triage/readFrameBody";
 import { AudioAIError, assessTranscript, audioAISettings } from "@/features/audio-ai/provider";
-import { publishAudioAssessment } from "@/features/audio-ai/publish";
+import { publishAudioAssessment, publishAudioSafetySignal } from "@/features/audio-ai/publish";
+import type { IncidentEvent } from "@/features/paw-patrol/incidents";
 import { usesLocalIncidents } from "@/features/paw-patrol/localIncidentStore";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ export function GET() {
           ? "blob"
           : "not-configured",
       cloud: settings.provider === "openai" || settings.provider === "anthropic",
+      safety_policy: "high-sensitivity-v1",
     },
     { headers },
   );
@@ -53,6 +55,20 @@ export async function POST(request: Request) {
   const age = Date.now() - Date.parse(capturedAt);
   if (!Number.isFinite(age) || age < -10_000 || age > 120_000)
     return Response.json({ error: "stale-transcript" }, { status: 422, headers });
+  let safetyAlert: IncidentEvent | null = null;
+  let safetyPublication: "published" | "none" | "failed" = "none";
+  try {
+    safetyAlert = await publishAudioSafetySignal(
+      body.text.trim(),
+      "manual",
+      body.source_id,
+      capturedAt,
+    );
+    if (safetyAlert) safetyPublication = "published";
+  } catch {
+    safetyPublication = "failed";
+  }
+  const safety = { safety_alert: safetyAlert, safety_publication: safetyPublication };
   try {
     const assessment = await assessTranscript(body.text.trim(), "manual");
     try {
@@ -64,6 +80,7 @@ export async function POST(request: Request) {
           publication: "published",
           function: "report_audio_assessment",
           dispatch_executed: false,
+          ...safety,
         },
         { headers },
       );
@@ -74,13 +91,25 @@ export async function POST(request: Request) {
           publication: "failed",
           function: "report_audio_assessment",
           dispatch_executed: false,
+          ...safety,
         },
         { headers },
       );
     }
   } catch (error) {
+    if (safetyAlert)
+      return Response.json(
+        {
+          assessment: null,
+          publication: "published",
+          ...safety,
+          ai_error: error instanceof AudioAIError ? error.code : "audio-ai-unavailable",
+          dispatch_executed: false,
+        },
+        { headers },
+      );
     return Response.json(
-      { error: error instanceof AudioAIError ? error.code : "audio-ai-unavailable" },
+      { error: error instanceof AudioAIError ? error.code : "audio-ai-unavailable", ...safety },
       { status: error instanceof AudioAIError ? error.status : 503, headers },
     );
   }

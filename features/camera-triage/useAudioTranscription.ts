@@ -8,7 +8,8 @@ import { captureErrorMessage } from "./serviceErrors";
 import { AUDIO_STATUSES, STATUS_LABELS, type AudioThreatStatus } from "../audio-ai/types";
 
 /** Long enough for a sentence, short enough to stay useful while it is spoken. */
-const CLIP_MS = 10_000;
+export const AUDIO_CLIP_MS = 5_000;
+const MAX_PENDING_CLIPS = 8;
 
 export type AudioState =
   | { state: "off" }
@@ -19,6 +20,9 @@ export type AudioState =
       lastResult: TranscriptionResult | null;
       lastError: string | null;
       analysisMessage?: string;
+      deviceLabel?: string;
+      queuedClips?: number;
+      coverageGap?: string;
     };
 
 interface AudioSession {
@@ -28,6 +32,8 @@ interface AudioSession {
   request: AbortController | null;
   monitor?: ReturnType<typeof setInterval>;
   context?: AudioContext;
+  pending: { blob: Blob; mimeType: string; capturedAt: Date; sourceId: string }[];
+  dropped: number;
 }
 
 function detachRecorder(recorder: MediaRecorder) {
@@ -37,6 +43,7 @@ function detachRecorder(recorder: MediaRecorder) {
 }
 
 function releaseSession(session: AudioSession) {
+  session.pending.length = 0;
   if (session.timer !== null) clearTimeout(session.timer);
   session.request?.abort();
   if (session.monitor) clearInterval(session.monitor);
@@ -96,104 +103,151 @@ export function useAudioTranscription(
     setState({ state: "off" });
   }, []);
 
-  const send = useCallback(
-    async (
-      session: AudioSession,
-      blob: Blob,
-      mimeType: string,
-      capturedAt: Date,
-      clipSourceId: string,
-    ) => {
-      // Prefer the next fresh clip to queuing audio while the service is busy.
-      if (sessionRef.current !== session || session.request || blob.size === 0) return;
-      const request = new AbortController();
-      session.request = request;
-      const reportError = (lastError: string) => {
-        setState((current) =>
-          sessionRef.current === session && current.state === "recording"
-            ? { ...current, lastError }
-            : current,
-        );
-      };
-      try {
-        const dataUrl = await readAsDataUrl(blob);
-        if (sessionRef.current !== session) return;
-        const body = buildTranscriptionRequest({
-          dataUrl,
-          recorderMimeType: mimeType,
-          sourceId: clipSourceId,
-          capturedAt,
-        });
-        if (!body) {
-          reportError("This browser recorded a clip the service rejects.");
-          return;
-        }
+  const send = useCallback(async function sendClip(
+    session: AudioSession,
+    blob: Blob,
+    mimeType: string,
+    capturedAt: Date,
+    clipSourceId: string,
+  ) {
+    if (sessionRef.current !== session) return;
+    if (blob.size === 0) {
+      setState((current) =>
+        current.state === "recording"
+          ? {
+              ...current,
+              lastError:
+                "No audio data arrived in the recording. Check the selected microphone or broadcast.",
+            }
+          : current,
+      );
+      return;
+    }
+    if (session.request) {
+      if (session.pending.length >= MAX_PENDING_CLIPS) {
+        session.pending.shift();
+        session.dropped += 1;
+      }
+      session.pending.push({ blob, mimeType, capturedAt, sourceId: clipSourceId });
+      setState((current) =>
+        current.state === "recording"
+          ? {
+              ...current,
+              queuedClips: session.pending.length,
+              coverageGap: session.dropped
+                ? `Audio coverage gap: ${session.dropped} clips were not analyzed because processing could not keep up.`
+                : current.coverageGap,
+            }
+          : current,
+      );
+      return;
+    }
+    const request = new AbortController();
+    session.request = request;
+    const reportError = (lastError: string) => {
+      setState((current) =>
+        sessionRef.current === session && current.state === "recording"
+          ? {
+              ...current,
+              lastError,
+              coverageGap: "At least one clip could not be analyzed. Audio coverage is incomplete.",
+            }
+          : current,
+      );
+    };
+    try {
+      const dataUrl = await readAsDataUrl(blob);
+      if (sessionRef.current !== session) return;
+      const body = buildTranscriptionRequest({
+        dataUrl,
+        recorderMimeType: mimeType,
+        sourceId: clipSourceId,
+        capturedAt,
+      });
+      if (!body) {
+        reportError("This browser recorded a clip the service rejects.");
+        return;
+      }
 
-        const response = await fetch("/api/transcribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-          signal: request.signal,
-          cache: "no-store",
-        });
-        if (sessionRef.current !== session) return;
-        if (!response.ok) {
-          reportError(await captureErrorMessage(response, "Transcription"));
-          return;
-        }
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(90_000)]),
+        cache: "no-store",
+      });
+      if (sessionRef.current !== session) return;
+      if (!response.ok) {
+        reportError(await captureErrorMessage(response, "Transcription"));
+        return;
+      }
 
-        const result = parseTranscriptionResult(await response.json());
-        const analysis = response.headers.get("X-Audio-Assessment") ?? "disabled";
-        const current = sessionRef.current === session;
-        setState((previous) =>
-          current && previous.state === "recording"
-            ? {
-                state: "recording",
-                lastResult: result,
-                analysisMessage: AUDIO_STATUSES.includes(analysis as AudioThreatStatus)
-                  ? `${STATUS_LABELS[analysis as AudioThreatStatus]} · ${response.headers.get("X-Incident-Publication") === "published" ? "shared for dispatcher review" : "not shared; see connection error"}`
-                  : analysis === "no-speech"
-                    ? "No speech to assess."
-                    : analysis === "disabled"
-                      ? "Contextual AI is not configured; phrase matching only."
-                      : "Contextual AI is unavailable; transcript retained for review.",
-                lastError:
-                  response.headers.get("X-Incident-Publication") === "failed"
+      const result = parseTranscriptionResult(await response.json());
+      const analysis = response.headers.get("X-Audio-Assessment") ?? "disabled";
+      const safety = response.headers.get("X-Audio-Safety-Alert") ?? "none";
+      const current = sessionRef.current === session;
+      setState((previous) =>
+        current && previous.state === "recording"
+          ? {
+              ...previous,
+              state: "recording",
+              lastResult: result,
+              analysisMessage:
+                safety === "urgent" || safety === "review"
+                  ? `${safety === "urgent" ? "Urgent phrase alert" : "Safety phrase alert"} shared for dispatcher review. AI context does not clear it.`
+                  : AUDIO_STATUSES.includes(analysis as AudioThreatStatus)
+                    ? `${STATUS_LABELS[analysis as AudioThreatStatus]} · ${response.headers.get("X-Incident-Publication") === "published" ? "shared for dispatcher review" : "not shared; see connection error"}`
+                    : analysis === "no-speech"
+                      ? "No speech to assess."
+                      : analysis === "disabled"
+                        ? "Contextual AI is not configured; phrase matching only."
+                        : "Contextual AI is unavailable; transcript retained for review.",
+              lastError:
+                safety === "publication-failed"
+                  ? "Safety alert sharing failed. Contact dispatch directly."
+                  : response.headers.get("X-Incident-Publication") === "failed"
                     ? "Transcript received, but sharing to the incident log failed."
                     : null,
-              }
-            : previous,
-        );
-        // Only for the live session: a clip that finished after stop was
-        // pressed must not publish anything.
-        if (current) {
-          try {
-            onResultRef.current?.(result);
-          } catch {
-            // Reported by the subscriber, not here.
-          }
+            }
+          : previous,
+      );
+      // Only for the live session: a clip that finished after stop was
+      // pressed must not publish anything.
+      if (current) {
+        try {
+          onResultRef.current?.(result);
+        } catch {
+          // Reported by the subscriber, not here.
         }
-      } catch (error) {
-        reportError(
-          error instanceof ContractValidationError
-            ? "Invalid transcription response. Speech hypotheses are unavailable."
-            : "Could not reach the transcription route.",
-        );
-      } finally {
-        if (session.request === request) session.request = null;
       }
-    },
-    [],
-  );
+    } catch (error) {
+      reportError(
+        error instanceof ContractValidationError
+          ? "Invalid transcription response. Speech hypotheses are unavailable."
+          : "Could not reach the transcription route.",
+      );
+    } finally {
+      if (session.request === request) session.request = null;
+      if (sessionRef.current === session) {
+        const next = session.pending.shift();
+        setState((current) =>
+          current.state === "recording"
+            ? { ...current, queuedClips: session.pending.length }
+            : current,
+        );
+        if (next) void sendClip(session, next.blob, next.mimeType, next.capturedAt, next.sourceId);
+      }
+    }
+  }, []);
 
   const start = useCallback(
-    async (microphoneId: string | null = null) => {
+    async (microphoneId: string | null = null, receivedStream?: MediaStream) => {
       if (sessionRef.current) return;
 
       if (
         typeof MediaRecorder === "undefined" ||
         typeof navigator === "undefined" ||
-        !navigator.mediaDevices?.getUserMedia
+        (!receivedStream && !navigator.mediaDevices?.getUserMedia)
       ) {
         setState({
           state: "unsupported",
@@ -216,7 +270,14 @@ export function useAudioTranscription(
 
       // Reserve the session before awaiting permission. Stop and unmount also
       // invalidate pending permission grants and any callbacks from old sessions.
-      const session: AudioSession = { stream: null, recorder: null, timer: null, request: null };
+      const session: AudioSession = {
+        stream: null,
+        recorder: null,
+        timer: null,
+        request: null,
+        pending: [],
+        dropped: 0,
+      };
       sessionRef.current = session;
       setState({ state: "requesting-microphone" });
       const fail = (reason: string) => {
@@ -227,49 +288,62 @@ export function useAudioTranscription(
       };
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: microphoneId ? { deviceId: { exact: microphoneId } } : true,
-          video: false,
-        });
+        // Clone received tracks so stopping analysis does not stop the player.
+        const stream = receivedStream
+          ? new MediaStream(receivedStream.getAudioTracks().map((track) => track.clone()))
+          : await navigator.mediaDevices.getUserMedia({
+              audio: microphoneId ? { deviceId: { exact: microphoneId } } : true,
+              video: false,
+            });
         if (sessionRef.current !== session) {
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
         session.stream = stream;
-        // Local amplitude detection is a trigger for closer review, never a gunshot classifier.
-        try {
-          const context = new AudioContext();
-          session.context = context;
-          await context.resume();
-          if (sessionRef.current !== session) {
-            releaseSession(session);
-            return;
-          }
-          const analyser = context.createAnalyser();
-          analyser.fftSize = 1024;
-          context.createMediaStreamSource(stream).connect(analyser);
-          const samples = new Float32Array(analyser.fftSize);
-          let baseline = 0.02;
-          let lastSpike = 0;
-          let count = 0;
-          session.monitor = setInterval(() => {
-            if (sessionRef.current !== session) return;
-            analyser.getFloatTimeDomainData(samples);
-            const rms = Math.sqrt(
-              samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length,
-            );
-            count += 1;
-            if (count > 8 && rms > 0.12 && rms > baseline * 3 && Date.now() - lastSpike > 15_000) {
-              lastSpike = Date.now();
-              optionsRef.current?.onSpike?.();
-            }
-            baseline = baseline * 0.95 + rms * 0.05;
-          }, 100);
-        } catch {
-          // Transcription remains available if Web Audio cannot start.
-          void session.context?.close().catch(() => undefined);
-          session.context = undefined;
+        if (!stream.getAudioTracks().some((track) => track.readyState === "live")) {
+          fail("No live audio track was received. Check the publisher’s microphone.");
+          return;
         }
+        // Local amplitude detection is a trigger for closer review, never a gunshot classifier.
+        if (optionsRef.current?.onSpike)
+          try {
+            const context = new AudioContext();
+            session.context = context;
+            await context.resume();
+            if (sessionRef.current !== session) {
+              releaseSession(session);
+              return;
+            }
+            const analyser = context.createAnalyser();
+            analyser.fftSize = 1024;
+            context.createMediaStreamSource(stream).connect(analyser);
+            const samples = new Float32Array(analyser.fftSize);
+            let baseline = 0.02;
+            let lastSpike = 0;
+            let count = 0;
+            session.monitor = setInterval(() => {
+              if (sessionRef.current !== session) return;
+              analyser.getFloatTimeDomainData(samples);
+              const rms = Math.sqrt(
+                samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length,
+              );
+              count += 1;
+              if (
+                count > 8 &&
+                rms > 0.12 &&
+                rms > baseline * 3 &&
+                Date.now() - lastSpike > 15_000
+              ) {
+                lastSpike = Date.now();
+                optionsRef.current?.onSpike?.();
+              }
+              baseline = baseline * 0.95 + rms * 0.05;
+            }, 100);
+          } catch {
+            // Transcription remains available if Web Audio cannot start.
+            void session.context?.close().catch(() => undefined);
+            session.context = undefined;
+          }
         stream.getTracks().forEach((track) => {
           track.onended = () => fail("Microphone capture ended. Start listening to try again.");
         });
@@ -319,12 +393,20 @@ export function useAudioTranscription(
                 fail("Audio recording failed. Start listening to try again.");
               }
             },
-            optionsRef.current?.urgent ? 3_000 : CLIP_MS,
+            optionsRef.current?.urgent ? 3_000 : AUDIO_CLIP_MS,
           );
         }
 
         recordClip();
-        setState({ state: "recording", lastResult: null, lastError: null });
+        setState({
+          state: "recording",
+          lastResult: null,
+          lastError: null,
+          deviceLabel:
+            stream.getAudioTracks()[0]?.label ||
+            (receivedStream ? "Received broadcast audio" : "Browser microphone"),
+          queuedClips: 0,
+        });
       } catch {
         fail("Microphone permission was declined, or no microphone is available.");
       }

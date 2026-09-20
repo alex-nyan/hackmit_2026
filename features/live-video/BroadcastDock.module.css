@@ -265,3 +265,22 @@
   outline: 2px solid #fff;
   outline-offset: 3px;
 }
+.analysis {
+  border-top: 1px solid #64748b;
+  border-bottom: 1px solid #64748b;
+  padding: 12px 0;
+  margin: 12px 0;
+}
+.analysis label {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.analysis input {
+  min-width: 0;
+  padding: 8px;
+  background: transparent;
+  color: inherit;
+  border: 1px solid #64748b;
+  border-radius: 6px;
+}

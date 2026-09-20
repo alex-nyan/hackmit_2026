@@ -19,10 +19,10 @@ export const MAX_AUDIO_BASE64 = 11_200_000;
  * produce nothing on an iPhone.
  */
 export const RECORDER_MIME_CANDIDATES = [
-  "audio/mp4",
-  "audio/mp4;codecs=mp4a.40.2",
   "audio/webm;codecs=opus",
   "audio/webm",
+  "audio/mp4",
+  "audio/mp4;codecs=mp4a.40.2",
   "audio/ogg;codecs=opus",
 ] as const;
 
