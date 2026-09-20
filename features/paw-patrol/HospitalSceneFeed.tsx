@@ -155,10 +155,6 @@ function PublishedScene({ personId }: { personId: string }) {
           timestamp={timestamp}
         />
       )}
-      <footer className={styles.cameraFooter}>
-        <span>LIVE = direct video · otherwise a labelled still</span>
-        <span>Camera selection does not identify the patient.</span>
-      </footer>
     </section>
   );
 }

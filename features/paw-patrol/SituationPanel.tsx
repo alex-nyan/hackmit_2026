@@ -14,8 +14,10 @@ export function SituationPanel({
   personId,
   heartRate,
   inline = false,
+  hideEmptyObservation = false,
 }: {
   inline?: boolean;
+  hideEmptyObservation?: boolean;
   events: IncidentEvent[];
   status: BusStatus;
   publish: (draft: IncidentDraft) => Promise<boolean>;
@@ -90,42 +92,51 @@ export function SituationPanel({
   const concern = fresh && (latest?.kind === "hazard" || latest?.title.startsWith("Audio concern"));
   return (
     <>
-      <aside
-        className={styles.knowledge}
-        data-inline={inline}
-        data-concern={concern}
-        aria-label="Latest observation"
-      >
-        <small>Latest observation · {fresh ? "Recent" : "No current report"}</small>
-        <strong>
-          {status !== "live"
-            ? "Situation updates disconnected"
-            : !latest
-              ? "Waiting for a camera or audio report"
-              : !fresh
-                ? "Last report is out of date"
-                : latest.title}
-        </strong>
-        <p>{fresh ? latest?.detail : "No recent camera or audio reports. Scene status unknown."}</p>
-        {latest && (
-          <small>
-            Source {latest.personId} · {latest.observedAt ?? latest.at}
-          </small>
-        )}
-        <button
-          onClick={() => {
-            const nextSource = latest?.personId ?? personId;
-            if (nextSource !== source) {
-              setReport("");
-              setMessage("");
-            }
-            setSource(nextSource);
-            setOpen(true);
-          }}
+      {(!hideEmptyObservation || latest !== undefined) && (
+        <aside
+          className={styles.knowledge}
+          data-inline={inline}
+          data-concern={concern}
+          aria-label="Latest observation"
         >
-          Review report
-        </button>
-      </aside>
+          <small>
+            Latest observation
+            {!hideEmptyObservation && ` · ${fresh ? "Recent" : "No current report"}`}
+          </small>
+          <strong>
+            {status !== "live"
+              ? "Situation updates disconnected"
+              : !latest
+                ? "Waiting for a camera or audio report"
+                : !fresh
+                  ? "Last report is out of date"
+                  : latest.title}
+          </strong>
+          {(!hideEmptyObservation || fresh) && (
+            <p>
+              {fresh ? latest?.detail : "No recent camera or audio reports. Scene status unknown."}
+            </p>
+          )}
+          {latest && (
+            <small>
+              Source {latest.personId} · {latest.observedAt ?? latest.at}
+            </small>
+          )}
+          <button
+            onClick={() => {
+              const nextSource = latest?.personId ?? personId;
+              if (nextSource !== source) {
+                setReport("");
+                setMessage("");
+              }
+              setSource(nextSource);
+              setOpen(true);
+            }}
+          >
+            Review report
+          </button>
+        </aside>
+      )}
       {open && (
         <section className={styles.panel} role="dialog" aria-label="Situation and medic report">
           <header>

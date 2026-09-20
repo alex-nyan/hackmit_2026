@@ -1094,6 +1094,7 @@ export function PawPatrol({
           {PHASES[phase].label}: {PHASES[phase].detail}
         </p>
         <SituationPanel
+          hideEmptyObservation={view === "hospital"}
           events={bus.events}
           status={bus.status}
           publish={publish}

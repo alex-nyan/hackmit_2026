@@ -34,6 +34,22 @@
   font-size: 11px;
   color: var(--muted);
 }
+.reportPicker {
+  padding: 10px 14px 0;
+}
+.sourceDetails {
+  border-top: 1px solid var(--line);
+}
+.sourceDetails > summary {
+  padding: 11px 14px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+}
+.sourceDetails > summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -3px;
+}
 .profilePicker select,
 .cameraPicker select {
   border: 1px solid var(--line);

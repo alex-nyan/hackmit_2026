@@ -2,16 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
-import {
-  Activity,
-  ArrowUpRight,
-  CircleHelp,
-  Eye,
-  ScanLine,
-  ShieldAlert,
-  StickyNote,
-  X,
-} from "lucide-react";
+import { ArrowUpRight, Eye, ScanLine, StickyNote, X } from "lucide-react";
 import { BODY_REGIONS, type BodyRegionId } from "../anatomy/bodyRegions";
 import {
   getBodyObservations,
@@ -27,6 +18,8 @@ import type { BusStatus } from "./useIncidentBus";
 import type { OfficerMediaInput } from "./OfficerFeed";
 import { HospitalHeartMonitor } from "./HospitalHeartMonitor";
 import { HospitalSceneFeed } from "./HospitalSceneFeed";
+import { HospitalMistHandoff } from "./HospitalMistHandoff";
+import { buildMistHandoff } from "./mistHandoff";
 import styles from "./HospitalAssessment.module.css";
 import hospitalStyles from "./HospitalWorkspace.module.css";
 
@@ -90,7 +83,14 @@ function AssessmentSession({
   ];
   const received =
     now === null ? [] : getBodyObservations(events, reportSource ?? person.id, busStatus, now);
-  const observations = [...notes, ...demo, ...received];
+  const sameProfile = reportSource === null || reportSource === person.id;
+  const observations = sameProfile ? [...notes, ...demo, ...received] : received;
+  const mist = buildMistHandoff({
+    observations,
+    events,
+    heartRate: sameProfile ? heartRate : null,
+    now,
+  });
   const highlights = useMemo(
     () => [...new Set([...notes, ...demo].flatMap((item) => (item.region ? [item.region] : [])))],
     [notes, demo],
@@ -184,19 +184,13 @@ function AssessmentSession({
                 connection={heartRate}
                 previewTime={previewTime}
               />
-              <p>
-                <Activity size={13} />
-                {heartRate.mode === "demo" ? "Simulated vitals" : "Received sensor values"} · not an
-                ECG
-              </p>
-              <span>Heart rate does not locate an injury.</span>
             </div>
           </div>
-          <section className={styles.evidence} aria-label="Body region observations">
+          <section className={styles.evidence} aria-label="MIST handoff">
             <header className={styles.cardHeader}>
               <div>
-                <span className={styles.eyebrow}>OBSERVATIONS / HUMAN REVIEW</span>
-                <h2>{selectedLabel ?? "Reported concerns"}</h2>
+                <span className={styles.eyebrow}>MEDIC HANDOFF</span>
+                <h2>MIST summary</h2>
               </div>
               {region ? (
                 <button
@@ -204,7 +198,7 @@ function AssessmentSession({
                   className={styles.clearButton}
                   onClick={() => selectRegion(null)}
                 >
-                  <X size={14} /> All regions
+                  <X size={14} /> {selectedLabel}
                 </button>
               ) : (
                 <span>
@@ -216,7 +210,7 @@ function AssessmentSession({
                 </span>
               )}
             </header>
-            <div className={styles.profilePicker}>
+            <div className={`${styles.profilePicker} ${styles.reportPicker}`}>
               <label htmlFor={reportSourceId}>Report source</label>
               <select
                 id={reportSourceId}
@@ -238,48 +232,39 @@ function AssessmentSession({
                   ))}
               </select>
             </div>
-            {demo.length > 0 && (
+            {sameProfile && demo.length > 0 && (
               <div className={styles.demoNotice} role="status">
-                DEMO PREVIEW · fictional observations, not camera or sensor findings
+                DEMO PREVIEW
               </div>
             )}
-            <div className={styles.observationList}>
-              {matching.length ? (
-                matching.map((item) => (
-                  <Observation
-                    key={item.id}
-                    item={item}
-                    onSelect={selectRegion}
-                    onRemove={
-                      notes.includes(item)
-                        ? () =>
-                            setNotes((current) => current.filter((entry) => entry.id !== item.id))
-                        : undefined
-                    }
-                  />
-                ))
-              ) : (
-                <div className={styles.emptyEvidence}>
-                  <CircleHelp size={25} />
-                  <strong>
-                    {region ? "No localized observation" : "No received observations"}
-                  </strong>
-                  <p>
-                    {region
-                      ? `No information establishes the condition of this ${selectedLabel?.toLowerCase()}.`
-                      : "Select the body to inspect a region, or preview demo observations."}
-                  </p>
-                  <span>Not assessed · not an all-clear</span>
+            <HospitalMistHandoff sections={mist} />
+            {matching.length > 0 && (
+              <details className={styles.sourceDetails}>
+                <summary>Source reports · {matching.length}</summary>
+                <div className={styles.observationList}>
+                  {matching.map((item) => (
+                    <Observation
+                      key={item.id}
+                      item={item}
+                      onSelect={selectRegion}
+                      onRemove={
+                        notes.includes(item)
+                          ? () =>
+                              setNotes((current) => current.filter((entry) => entry.id !== item.id))
+                          : undefined
+                      }
+                    />
+                  ))}
                 </div>
-              )}
-            </div>
+              </details>
+            )}
             {region && unlocated.length > 0 && (
               <button type="button" className={styles.unlocated} onClick={() => selectRegion(null)}>
                 {unlocated.length} report{unlocated.length === 1 ? "" : "s"} without a body location{" "}
                 <ArrowUpRight size={14} />
               </button>
             )}
-            {region && (
+            {region && sameProfile && (
               <div className={styles.noteArea}>
                 {writing ? (
                   <form onSubmit={addNote}>
@@ -315,9 +300,6 @@ function AssessmentSession({
                 )}
               </div>
             )}
-            <footer className={styles.evidenceFooter}>
-              <ShieldAlert size={13} /> Observations are not diagnoses or scene-entry clearance.
-            </footer>
           </section>
         </div>
       </div>
