@@ -18,6 +18,17 @@
 .root[data-theme="dark"] {
   background: #282b35;
 }
+.root[data-theme="dark"] .legend {
+  border-color: rgb(252 247 237 / 14%);
+  background: rgb(32 38 63 / 92%);
+  color: #e7e9f5;
+}
+.root[data-theme="dark"] .legendTitle {
+  color: #a6adda;
+}
+.root[data-theme="dark"] .legendCar {
+  color: #c8cdee;
+}
 
 .markerAnchor {
   z-index: 3;
@@ -75,9 +86,8 @@
 .officerMarker[data-selected="true"]::after {
   background: #263342;
 }
-/* The chip repeats the beacon's hue so a unit reads as an officer at city
-   zoom, where the 3D car is not drawn. */
-.officerMarker[data-detail="false"]::before,
+/* A unit running an emergency repeats the beacon's hue on its chip, so the
+   label still reads as an officer where the car is too small to. */
 .officerMarker[data-emergency="true"]::before {
   content: "";
   width: 7px;
@@ -174,8 +184,7 @@
   --glow: #ef4444;
   --beat: 1.2s;
 }
-.beacon[data-emergency="true"],
-.beacon[data-moving="true"] {
+.beacon[data-emergency="true"] {
   --beat: 1s;
 }
 .beacon[hidden] {
@@ -216,76 +225,6 @@
     transform: scale(3.6);
     opacity: 0;
   }
-}
-
-/* A report, not a unit: no hover, no focus ring, nothing to click. */
-.suspectMarker {
-  position: relative;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
-  border: 1px solid #7a1c14;
-  border-radius: 7px;
-  background: #b42318;
-  color: #fff4f2;
-  box-shadow: 0 3px 12px rgb(122 28 20 / 35%);
-  font:
-    700 10px/1.1 Arial,
-    sans-serif;
-  white-space: nowrap;
-  pointer-events: none;
-}
-.suspectMarker::after {
-  content: "";
-  position: absolute;
-  top: -5px;
-  left: calc(50% - 4px);
-  width: 8px;
-  height: 8px;
-  background: #b42318;
-  transform: rotate(45deg);
-}
-.suspectMarker[hidden] {
-  display: none;
-}
-.suspectId {
-  letter-spacing: 0.035em;
-}
-.suspectNote {
-  padding: 2px 5px;
-  border-radius: 4px;
-  background: rgb(255 244 242 / 22%);
-  font-size: 8px;
-  letter-spacing: 0.08em;
-}
-
-.incidentMarker {
-  width: 27px;
-  height: 27px;
-  border: 2px solid #ba5460;
-  border-radius: 50%;
-  background: rgb(218 106 114 / 28%);
-  box-shadow: 0 0 0 12px rgb(218 106 114 / 12%);
-  pointer-events: none;
-}
-
-.destinationMarker {
-  padding: 7px 10px;
-  border: 1px solid #fcf7ed;
-  border-radius: 6px;
-  color: #343e8a;
-  background: #a8d1af;
-  box-shadow: 0 3px 12px rgb(40 46 78 / 15%);
-  font:
-    700 10px/1.2 Arial,
-    sans-serif;
-  pointer-events: none;
-}
-.incidentMarker[hidden],
-.destinationMarker[hidden] {
-  display: none;
 }
 
 .feedback {
@@ -349,8 +288,9 @@
 
 .legend {
   position: absolute;
-  left: 12px;
-  bottom: 35px;
+  right: 12px;
+  /* Clears the Mapbox navigation control and the attribution under it. */
+  bottom: 150px;
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -370,18 +310,25 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
-.unitDot {
-  width: 7px;
-  height: 7px;
-  background: #343e8a;
-  border-radius: 50%;
+.legendTitle {
+  color: #6a72a6;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.legendCar {
   flex-shrink: 0;
+  color: #343e8a;
 }
-.routeDash {
-  width: 13px;
-  height: 0;
-  border-top: 2px dashed #343e8a;
+/* Matches the live layer's dot: same fill, same white ring. */
+.legendDot {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgb(52 62 138 / 18%);
   flex-shrink: 0;
 }
 

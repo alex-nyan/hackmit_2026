@@ -229,7 +229,6 @@ export function PawPatrol({
   const heartRate = useHeartRate(person.id, session);
   const vehicle = vehicleAt(person.id, time);
   const phase = phaseAt(time);
-  const complete = false;
   const scene = sceneAt(time, sceneOverride);
 
   const { publish } = bus;
@@ -329,10 +328,6 @@ export function PawPatrol({
     void bus.clear();
   }
   function play() {
-    if (complete) {
-      setTactical(emptyTactical);
-      setSession((s) => s + 1);
-    }
     dispatch({ type: "play" });
   }
   useDemoTools({
@@ -547,13 +542,7 @@ export function PawPatrol({
                   onClick={() => (running ? dispatch({ type: "pause" }) : play())}
                 >
                   {running ? <Pause size={16} /> : <Play size={16} />}{" "}
-                  {running
-                    ? "Pause demo"
-                    : complete
-                      ? "Replay demo"
-                      : time > 0
-                        ? "Resume demo"
-                        : "Run demo"}
+                  {running ? "Pause demo" : time > 0 ? "Resume demo" : "Run demo"}
                   <ArrowUpRight size={16} />
                 </button>
                 <button
@@ -570,13 +559,11 @@ export function PawPatrol({
               <span className="tag">SIMULATION</span>
               <span>15 simulated patrol vehicles.</span>
               <span className="auto-label">
-                {complete
-                  ? "Demo complete"
-                  : running
-                    ? "Patrol running"
-                    : time > 0
-                      ? "Paused · press Resume to continue"
-                      : "15 units · continuous patrol"}
+                {running
+                  ? "Patrol running"
+                  : time > 0
+                    ? "Paused · press Resume to continue"
+                    : "15 units · continuous patrol"}
               </span>
             </div>
             <BusIndicator status={bus.status} count={bus.events.length} />
@@ -837,13 +824,7 @@ export function PawPatrol({
               </button>
               <button onClick={() => (running ? dispatch({ type: "pause" }) : play())}>
                 {running ? <Pause size={17} /> : <Play size={17} />}
-                {running
-                  ? "Pause demo"
-                  : complete
-                    ? "Replay demo"
-                    : time > 0
-                      ? "Resume demo"
-                      : "Run demo"}
+                {running ? "Pause demo" : time > 0 ? "Resume demo" : "Run demo"}
               </button>
               <button aria-label="Reset demo" title="Reset demo" onClick={reset}>
                 <RotateCcw size={17} />

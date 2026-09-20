@@ -2,7 +2,7 @@
 
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, RotateCw, TriangleAlert } from "lucide-react";
+import { Car, MapPin, RotateCw, TriangleAlert } from "lucide-react";
 import type { Map as MapboxMap, Marker, MapMouseEvent } from "mapbox-gl";
 import {
   add3DBuildings,
@@ -20,6 +20,9 @@ import {
   addLiveLayers,
   liveDeviceAt,
   updateLiveLayers,
+  FRESHNESS_COLOR,
+  LIVE_FIX_SECONDS,
+  STALE_FIX_SECONDS,
   type LiveDevice,
 } from "@/features/live-track";
 import { PEOPLE, personStatus } from "./scenario";
@@ -66,6 +69,61 @@ type UnitMarker = {
   dispose: () => void;
 };
 const LOAD_TIMEOUT_MS = 20000;
+
+/**
+ * The three ages a published fix can be, in the colours the map draws them in.
+ *
+ * Read from the same constants the classifier uses, so a threshold can never
+ * be changed in one place and go on being described in the other.
+ */
+const FIX_KEY = [
+  { freshness: "live", label: "Live fix", note: `under ${LIVE_FIX_SECONDS}s old` },
+  {
+    freshness: "stale",
+    label: "Stale fix",
+    note: `over ${LIVE_FIX_SECONDS}s · last seen here`,
+  },
+  {
+    freshness: "lost",
+    label: "No recent fix",
+    note: `over ${Math.round(STALE_FIX_SECONDS / 60)} min · not reporting`,
+  },
+] as const;
+
+/**
+ * What the shapes on the map mean.
+ *
+ * Without it the map has three separate vocabularies running at once — a car
+ * per simulated unit, a colour per patrol route, and a colour per fix age —
+ * and nothing on screen distinguishes a drawn demonstration from a phone that
+ * is really out there. The car glyph carries that distinction, because green
+ * is doing double duty: it is both the patrol beacon and a fresh fix.
+ *
+ * The fix rows appear only once something is publishing one. A key to colours
+ * that are nowhere on the map is noise.
+ */
+function MapKey({ tracked }: { tracked: boolean }) {
+  return (
+    <aside className={styles.legend} aria-label="Map key">
+      <span className={styles.legendTitle}>Map key</span>
+      <span>
+        <Car className={styles.legendCar} size={13} aria-hidden="true" />
+        Patrol unit · simulated
+      </span>
+      {tracked &&
+        FIX_KEY.map((row) => (
+          <span key={row.freshness}>
+            <i
+              className={styles.legendDot}
+              style={{ background: FRESHNESS_COLOR[row.freshness] }}
+              aria-hidden="true"
+            />
+            {row.label} · {row.note}
+          </span>
+        ))}
+    </aside>
+  );
+}
 
 export function OperationsMap(props: OperationsMapProps) {
   const { time, running, selectedId, focus, theme, recenterKey, following } = props;
@@ -580,6 +638,9 @@ export function OperationsMap(props: OperationsMapProps) {
             )}
           </div>
         </div>
+      )}
+      {feedback.status === "ready" && (
+        <MapKey tracked={props.liveDevices.some((device) => device.fix)} />
       )}
       <p className={styles.srOnly} aria-live="polite">
         {feedback.status === "ready"

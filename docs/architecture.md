@@ -100,16 +100,20 @@ to, so the building is still reported but not highlighted.
 
 On the dashboard map the same click handler also owns unit selection. A patrol
 vehicle wins any pixel it shares with the building behind it, because the vehicles
-are Three.js meshes that `queryRenderedFeatures` cannot see — they are picked by
+are DOM markers that `queryRenderedFeatures` cannot see — they are picked by
 projecting their current positions to screen space, so the building query only runs
-once no unit is within reach.
+once no unit is within reach. A live unit is drawn by a Mapbox circle layer and so
+is queryable; it is asked for first, ahead of both.
 
 ## Live GPS
 
-Both maps show every unit reporting to a shared [Traccar](https://www.traccar.org)
-server, so a team can see each other simultaneously. Tracking is **opt-in**:
-nothing is requested until the viewer presses the locate button, and turning it off
-aborts the in-flight request and drops the positions. On the dashboard the real
+Both maps show every unit this deployment can place — phones that published from
+the join page, and a shared [Traccar](https://www.traccar.org) server where one is
+configured — so a team can see each other simultaneously. Publishing a position is
+**opt-in on the phone**; the dashboard polls by default, because a join code on
+screen inviting people onto a map they then do not appear on is worse than a poll
+that finds nobody. Turning the dashboard's tracking off aborts the in-flight
+request and drops the positions. On the dashboard the real
 units are drawn over the simulated patrol vehicles and are never merged with them;
 the scenario clock and the Traccar poll stay separate sources.
 
