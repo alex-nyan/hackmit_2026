@@ -155,7 +155,10 @@
    reported person of interest. Emergency and movement change the rhythm, not
    the colour. */
 .beacon {
-  /* Mapbox translates this root from the canvas origin, outside document flow. */
+  /* Mapbox positions its own marker elements absolutely, translating this root
+     from the canvas origin and outside document flow. Overriding that with
+     `relative` drops every beacon back into normal flow, so each one drifts a
+     further 15px down the page than the last and lands nowhere near its car. */
   position: absolute;
   z-index: 2;
   display: block;
