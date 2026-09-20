@@ -3,12 +3,17 @@ import { parseTranscript, publishTranscript } from "@/features/body-cam/transcri
 import { readFrameBody } from "@/features/camera-triage/readFrameBody";
 import { forwardClip } from "@/features/camera-triage/transcribeProxy";
 import { MAX_BODY_BYTES, readTriageSettings } from "@/features/camera-triage/triageProxy";
+import { parseTranscriptionResult } from "@/shared/contracts";
+import { AudioAIError, assessTranscript, audioAISettings } from "@/features/audio-ai/provider";
+import { publishAudioAssessment } from "@/features/audio-ai/publish";
 
 /**
  * Server-side bridge to the transcription endpoint. The bearer token is read
  * from the environment and never reaches the browser.
  */
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 120;
 
 /**
  * Puts what was heard beside the officer's tile.
@@ -25,7 +30,8 @@ async function teeToWall(
   try {
     const sourceId = String(JSON.parse(requestBody)?.source_id ?? "");
     const text = parseTranscript(JSON.parse(outcome.body));
-    if (sourceId && text) await publishTranscript(sourceId, text);
+    if (sourceId && text && process.env.BLOB_READ_WRITE_TOKEN)
+      await publishTranscript(sourceId, text);
   } catch {
     // Unparseable either way; the caller still gets the service's own answer.
   }
@@ -57,13 +63,40 @@ export async function POST(request: Request) {
   } catch {
     /* Invalid request is already rejected upstream. */
   }
-  const publication = await publishCapture("audio", parsed, outcome);
+  let publication: "published" | "none" | "failed" = "none";
+  let analysisStatus = "disabled";
+  if (outcome.status === 200 && audioAISettings().provider !== "disabled") {
+    try {
+      const transcript = parseTranscriptionResult(JSON.parse(outcome.body));
+      if (transcript.speech_detected && transcript.text.trim()) {
+        // Retain the original transcription contract; structured assessment travels in the shared log.
+        const assessment = await assessTranscript(transcript.text.slice(0, 4000), "microphone");
+        analysisStatus =
+          assessment.status === "no_threat_detected" &&
+          assessment.recommended_action === "contact_officer"
+            ? "uncertain"
+            : assessment.status;
+        try {
+          await publishAudioAssessment(assessment, transcript.source_id, transcript.captured_at);
+          publication = "published";
+        } catch {
+          publication = "failed";
+        }
+      } else analysisStatus = "no-speech";
+    } catch (error) {
+      analysisStatus = error instanceof AudioAIError ? error.code : "audio-ai-unavailable";
+      // Keep the transcript visible when semantic analysis is unavailable.
+      // This fallback is explicitly a phrase match, never a successful AI assessment.
+      publication = await publishCapture("audio", parsed, outcome);
+    }
+  } else publication = await publishCapture("audio", parsed, outcome);
   return new Response(outcome.body, {
     status: outcome.status,
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
       "X-Incident-Publication": publication,
+      "X-Audio-Assessment": analysisStatus,
     },
   });
 }

@@ -8,6 +8,9 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "setup:audio": "node scripts/audio-demo.mjs --setup",
+    "dev:audio": "node scripts/audio-demo.mjs",
+    "dev:speech": "node scripts/audio-demo.mjs --speech-only",
     "setup": "node scripts/setup.mjs",
     "dev": "node scripts/dev.mjs",
     "dev:dispatch": "node scripts/dev.mjs dispatch",

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ContractValidationError, parseTranscriptionResult } from "../../shared/contracts";
 import { buildTranscriptionRequest, pickRecorderMimeType, type TranscriptionResult } from "./audio";
+import { captureErrorMessage } from "./serviceErrors";
+import { AUDIO_STATUSES, STATUS_LABELS, type AudioThreatStatus } from "../audio-ai/types";
 
 /** Long enough for a sentence, short enough to stay useful while it is spoken. */
 const CLIP_MS = 10_000;
@@ -12,7 +14,12 @@ export type AudioState =
   | { state: "off" }
   | { state: "requesting-microphone" }
   | { state: "unsupported"; reason: string }
-  | { state: "recording"; lastResult: TranscriptionResult | null; lastError: string | null };
+  | {
+      state: "recording";
+      lastResult: TranscriptionResult | null;
+      lastError: string | null;
+      analysisMessage?: string;
+    };
 
 interface AudioSession {
   stream: MediaStream | null;
@@ -131,17 +138,25 @@ export function useAudioTranscription(
         });
         if (sessionRef.current !== session) return;
         if (!response.ok) {
-          reportError(`Transcription returned ${response.status}.`);
+          reportError(await captureErrorMessage(response, "Transcription"));
           return;
         }
 
         const result = parseTranscriptionResult(await response.json());
+        const analysis = response.headers.get("X-Audio-Assessment") ?? "disabled";
         const current = sessionRef.current === session;
         setState((previous) =>
           current && previous.state === "recording"
             ? {
                 state: "recording",
                 lastResult: result,
+                analysisMessage: AUDIO_STATUSES.includes(analysis as AudioThreatStatus)
+                  ? `${STATUS_LABELS[analysis as AudioThreatStatus]} · ${response.headers.get("X-Incident-Publication") === "published" ? "shared for dispatcher review" : "not shared; see connection error"}`
+                  : analysis === "no-speech"
+                    ? "No speech to assess."
+                    : analysis === "disabled"
+                      ? "Contextual AI is not configured; phrase matching only."
+                      : "Contextual AI is unavailable; transcript retained for review.",
                 lastError:
                   response.headers.get("X-Incident-Publication") === "failed"
                     ? "Transcript received, but sharing to the incident log failed."

@@ -1,6 +1,12 @@
 import { BlobPreconditionFailedError, del, get, put } from "@vercel/blob";
 
 import type { IncidentDraft, IncidentEvent } from "./incidents";
+import {
+  appendLocalIncident,
+  clearLocalIncidents,
+  readLocalIncidents,
+  usesLocalIncidents,
+} from "./localIncidentStore";
 
 /**
  * Where the shared incident log actually lives.
@@ -86,6 +92,7 @@ export async function appendIncident(
   now: Date = new Date(),
   sleep: Sleep = realSleep,
 ): Promise<IncidentEvent> {
+  if (usesLocalIncidents()) return appendLocalIncident(draft, now);
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const { events, etag } = await readLog();
     const existing = events.find((event) => event.id === draft.id);
@@ -123,12 +130,15 @@ export async function appendIncident(
 
 /** Everything a workspace has not already seen, by sequence. */
 export async function readIncidents(since: number): Promise<IncidentEvent[]> {
+  if (usesLocalIncidents())
+    return (await readLocalIncidents()).filter((event) => event.seq > since);
   const { events } = await readLog();
   return events.filter((event) => event.seq > since);
 }
 
 /** Demo reset. Clears the log for every workspace at once. */
 export async function clearIncidents(): Promise<void> {
+  if (usesLocalIncidents()) return clearLocalIncidents();
   try {
     await del(LOG_PATH);
   } catch (error) {

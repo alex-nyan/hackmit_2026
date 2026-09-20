@@ -27,6 +27,7 @@ import type { BuildingFacts } from "../boston-map/buildingSelection";
 import type { Officer } from "@/features/access/roster";
 import { liveOfficer } from "./liveOfficer";
 import { AudioAlerts, useAudioAlerts } from "./AudioAlerts";
+import { AudioIntelligencePanel } from "../audio-ai/AudioIntelligencePanel";
 import type { IncidentEvent } from "./incidents";
 import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, UnitCard, useLiveTrack, type LiveDevice } from "@/features/live-track";
@@ -587,14 +588,17 @@ export function PawPatrol({
         }
         map={map}
         situationPanel={
-          <SituationPanel
-            inline
-            events={bus.events}
-            status={bus.status}
-            publish={publish}
-            personId={person.id}
-            heartRate={heartRate}
-          />
+          <>
+            <AudioIntelligencePanel events={bus.events} status={bus.status} publish={publish} />
+            <SituationPanel
+              inline
+              events={bus.events}
+              status={bus.status}
+              publish={publish}
+              personId={person.id}
+              heartRate={heartRate}
+            />
+          </>
         }
         liveTrack={liveTrack}
         trackingEnabled={tracking}

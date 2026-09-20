@@ -1,6 +1,7 @@
 import { parseTranscriptionResult } from "../../shared/contracts";
 
 import { MAX_BODY_BYTES, REQUEST_TIMEOUT_MS, type TriageSettings } from "./triageProxy";
+import { upstreamErrorBody } from "./serviceErrors";
 
 export interface ClipProxyOutcome {
   status: number;
@@ -37,7 +38,7 @@ export async function forwardClip(
     if (!upstream.ok) {
       return {
         status: upstream.status,
-        body: JSON.stringify({ error: "upstream", status: upstream.status }),
+        body: await upstreamErrorBody(upstream),
       };
     }
     const responseBody = await upstream.text();
