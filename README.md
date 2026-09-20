@@ -1,5 +1,10 @@
 # Paw Patrol · HackMIT 2026
 
+**Audio-first demo:** `pnpm setup:audio` then `pnpm dev:audio` runs local Whisper
+and Ollama with a shared incident feed. Open [Audio intelligence](http://localhost:5176/audio).
+See the [sensor connection map, API contract and demo runbook](docs/audio-ai-demo.md)
+for OpenAI/Claude configuration and the boundaries between this path and native v2.
+
 Start here for the Dispatch, Officer and Hospital workspaces. One Next.js app at
 the repository root serves all three, the standalone Boston map at `/map`, the
 phone camera pages under `/capture`, and the server routes that bridge to live

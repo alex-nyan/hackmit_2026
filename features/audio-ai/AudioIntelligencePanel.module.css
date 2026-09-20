@@ -1,0 +1,144 @@
+.panel {
+  color: var(--bento-text, #e9eef4);
+  background: var(--bento-card, #101923);
+  border: 1px solid #42556a;
+  border-radius: 14px;
+  padding: 20px;
+  font:
+    14px/1.5 Arial,
+    sans-serif;
+  min-width: 0;
+}
+.heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.heading h2 {
+  margin: 4px 0;
+  font-size: 22px;
+}
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: #8cbfe7;
+}
+.connection {
+  font-size: 11px;
+  color: #f3b4a9;
+}
+.connection[data-live="true"] {
+  color: #8cddb8;
+}
+.configuration,
+.footnote,
+.empty {
+  opacity: 0.75;
+}
+.configuration {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.controls {
+  border-top: 1px solid #42556a;
+  border-bottom: 1px solid #42556a;
+  padding: 12px 0;
+  margin: 12px 0;
+}
+.controls summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.controls label {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.controls input,
+.controls textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #677d93;
+  background: var(--bento-card, #162332);
+  color: inherit;
+  font: inherit;
+}
+.panel button {
+  border: 1px solid #6d869e;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.panel button:hover {
+  background: #43658233;
+}
+.panel button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.panel .primary {
+  background: #246b98;
+  color: #fff;
+}
+.examples {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+.results {
+  display: grid;
+  gap: 12px;
+  max-height: 680px;
+  overflow-y: auto;
+  margin: 16px 0;
+}
+.result {
+  border: 1px solid #52677b;
+  border-left: 4px solid #80a6bc;
+  border-radius: 8px;
+  padding: 14px;
+  min-width: 0;
+}
+.result[data-status="urgent_threat"] {
+  border-left-color: #fc7676;
+}
+.result[data-status="potential_threat"] {
+  border-left-color: #ecc276;
+}
+.result small {
+  display: block;
+  opacity: 0.8;
+  font-size: 11px;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.result blockquote {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: #71849c15;
+  border-left: 2px solid #71849c;
+  overflow-wrap: anywhere;
+}
+.result p {
+  margin: 8px 0;
+}
+.recommendation {
+  font-weight: 700;
+}
+.message {
+  color: #b5d9f0;
+}
+.footnote {
+  display: block;
+  font-size: 11px;
+}

@@ -11,9 +11,12 @@
  * indistinguishable once they are side by side in one timeline.
  */
 
+import { parseAudioAssessmentRecord, type AudioAssessmentRecord } from "../audio-ai/types";
+
 export const INCIDENT_KINDS = [
   "panic",
   "acknowledge",
+  "audio_review",
   "scene",
   "hazard",
   "transcript",
@@ -35,6 +38,7 @@ export interface IncidentProvenance {
 }
 
 export interface IncidentEvent {
+  audioAssessment?: AudioAssessmentRecord;
   /** Server-assigned. Monotonic within a run; used to resume and to dedupe. */
   seq: number;
   /** Capture/receipt time, distinct from log publication. */
@@ -84,6 +88,7 @@ function provenance(value: unknown): IncidentProvenance | null | undefined {
   if (value === null || value === undefined) return null;
   if (typeof value !== "object") return undefined;
   const raw = value as Record<string, unknown>;
+
   const provider = text(raw.provider, MAX_ID);
   const model = text(raw.model, MAX_ID);
   if (!provider || !model) return undefined;
@@ -101,6 +106,9 @@ function provenance(value: unknown): IncidentProvenance | null | undefined {
 export function parseIncidentDraft(value: unknown): IncidentDraft | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
+  const audioAssessment =
+    raw.audioAssessment === undefined ? undefined : parseAudioAssessmentRecord(raw.audioAssessment);
+  if (audioAssessment === null) return null;
 
   const observedAt = raw.observedAt;
   if (
@@ -166,6 +174,7 @@ export function parseIncidentDraft(value: unknown): IncidentDraft | null {
 
   return {
     id,
+    ...(audioAssessment ? { audioAssessment } : {}),
     ...(location ? { location } : {}),
     ...(typeof observedAt === "string" ? { observedAt } : {}),
     kind: raw.kind as IncidentKind,

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { IncidentEvent } from "./incidents";
 import type { BusStatus } from "./useIncidentBus";
 import styles from "./AudioAlerts.module.css";
+import { ACTION_LABELS, audioAssessmentLabel } from "../audio-ai/types";
 
 export function isAudioConcern(event: IncidentEvent) {
   return (
@@ -55,7 +56,19 @@ export function AudioAlerts({
       </strong>
       {alerts.map((event) => (
         <button key={event.id} onClick={() => onSelect(event)}>
-          <strong>Audio concern · {event.personId ?? event.source}</strong>
+          <strong>
+            {event.audioAssessment
+              ? audioAssessmentLabel(event.audioAssessment)
+              : "Audio phrase match"}{" "}
+            · {event.personId ?? event.source}
+          </strong>
+          {event.audioAssessment && (
+            <span>
+              {event.audioAssessment.input_kind === "manual" ? "Manual demo · " : "Audio clip · "}
+              {Math.round(event.audioAssessment.confidence * 100)}% model confidence ·{" "}
+              {ACTION_LABELS[event.audioAssessment.recommended_action]}
+            </span>
+          )}
           <span>
             {event.location
               ? "View reporting officer’s GPS location"

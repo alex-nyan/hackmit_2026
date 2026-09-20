@@ -61,7 +61,7 @@ export async function publishCapture(
           provenance: {
             provider: "faster_whisper",
             model: "whisper",
-            confidence: result.language_probability,
+            confidence: null,
           },
           requiresHumanReview: true,
         };

@@ -390,7 +390,7 @@ export function CapturePanel({
             } else void startListening();
           }}
         >
-          {listening ? "Mute" : "Listen"}
+          {listening ? "Stop audio" : "Start audio only"}
         </button>
       </div>
 
@@ -498,13 +498,13 @@ export function CapturePanel({
       {audio.state.state === "recording" && (
         <div className="capture-card__result">
           <span className="capture-card__eyebrow">Heard</span>
-          {audio.state.lastError ? (
-            <p className="capture-card__error">{audio.state.lastError}</p>
-          ) : (
-            <p>
-              {audio.state.lastResult ? describeTranscript(audio.state.lastResult) : "Listening…"}
-            </p>
+          <p>
+            {audio.state.lastResult ? describeTranscript(audio.state.lastResult) : "Listening…"}
+          </p>
+          {audio.state.analysisMessage && (
+            <p className="capture-card__note">{audio.state.analysisMessage}</p>
           )}
+          {audio.state.lastError && <p className="capture-card__error">{audio.state.lastError}</p>}
         </div>
       )}
 

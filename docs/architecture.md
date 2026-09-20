@@ -1,5 +1,13 @@
 # Map foundation
 
+## Audio-first sensor integration
+
+See [the current connection map and runnable audio demo](audio-ai-demo.md) for the
+sensor inventory, complete microphone → Whisper → LLM → shared incident path,
+OpenAI/Claude/Ollama configuration, and the separate native v2 backend boundary.
+The dashboard now shares real model assessments through `/api/incidents`; the
+local demo can use a file shared across all three Next processes without Blob.
+
 ## Visual hazard triage service
 
 `services/triage` adds authenticated visual evidence processing for incident

@@ -2,6 +2,12 @@
 
 This is frontend demonstration software, not an operational public-safety or medical system.
 
+**Current integration:** [Audio-first AI architecture and runbook](../audio-ai-demo.md)
+documents the implemented microphone → local Whisper → semantic LLM → shared
+incident → dispatcher review path. The scenario below remains simulated, but real
+capture observations and review events now cross browsers through `/api/incidents`.
+The native authenticated v2 backend is a separate mode, not automatically merged.
+
 ## One scenario across three views
 
 The [root development launcher](../../../docs/development.md) runs this shared
@@ -13,9 +19,10 @@ workspace tabs. These entry points select presentation, not an authorization rol
 `scenario.ts` owns fictional identities, fixed geographical coordinates, chronological
 events, pulse samples and derived status. `useScenario.ts` owns a single reducer and
 clock. Workspace switching preserves it; pause, reset, skip and completion are atomic.
-There is no network ingestion, database, authentication or synchronization across browsers.
-Each separate port/browser has its own scenario, panic state, notes and handoff
-entries. Shared operational state requires an explicit backend integration.
+Scenario clocks remain local to each browser. Capture observations and explicit
+incident actions are published to a shared log (Blob, or an explicit local demo
+file), and the dashboards poll that log. Some notes and animated demo state remain
+local. The app passphrase gate is distinct from the scoped native v2 authorization.
 
 The UI never derives an injury from a weapon flag or pulse. An explicit script event
 at 45 seconds introduces the injury. Only P-01 receives that annotation. Other selected
@@ -81,11 +88,13 @@ privacy behaviour remains unchanged.
 
 ## Future integration boundary
 
-Hardware and models are outside this implementation. Agree a timestamped, authenticated
+Browser audio, camera, GPS and Bluetooth have concrete integrations; the linked
+connection map shows which paths reach AI. Agree a timestamped, authenticated
 feed contract with hardware/model owners before replacing the scenario provider. Track
 source identity, freshness, uncertainty and disconnection separately. Keep media and
-health data private and access-controlled. A separate backend would be needed for shared
-incident state, recording, transport coordination and authorized external actions.
+health data private and access-controlled. The native v2 backend provides separate
+incident state and enrollment. Authorized external dispatch and transport
+coordination remain future integrations.
 
 ## Optional browser tools
 
