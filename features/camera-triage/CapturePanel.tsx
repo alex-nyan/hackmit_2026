@@ -229,7 +229,7 @@ export function CapturePanel({
     audioAttempt.current = attempt;
     setAudioDiscovering(true);
     try {
-      const chosen = await resolveDevices({ microphone: true });
+      const chosen = await resolveDevices({ microphone: true, camera: false });
       if (audioAttempt.current !== attempt) return;
       await startAudio(chosen.microphoneId);
     } finally {
@@ -498,6 +498,9 @@ export function CapturePanel({
       {audio.state.state === "recording" && (
         <div className="capture-card__result">
           <span className="capture-card__eyebrow">Heard</span>
+          <p className="capture-card__note">
+            AI audio input: {audio.state.deviceLabel} · {audio.state.queuedClips ?? 0} clips queued
+          </p>
           <p>
             {audio.state.lastResult ? describeTranscript(audio.state.lastResult) : "Listening…"}
           </p>
@@ -505,6 +508,11 @@ export function CapturePanel({
             <p className="capture-card__note">{audio.state.analysisMessage}</p>
           )}
           {audio.state.lastError && <p className="capture-card__error">{audio.state.lastError}</p>}
+          {audio.state.coverageGap && (
+            <p role="alert" className="capture-card__error">
+              {audio.state.coverageGap}
+            </p>
+          )}
         </div>
       )}
 

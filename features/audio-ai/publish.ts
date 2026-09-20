@@ -8,12 +8,47 @@ import {
   type IncidentEvent,
 } from "../paw-patrol/incidents";
 import { ACTION_LABELS, audioAssessmentLabel, type AudioAssessmentRecord } from "./types";
+import { detectSafetyPhrase, safetySignalLabel } from "./safetySignal";
 
 export function assessmentId(sourceId: string, capturedAt: string, transcript: string) {
   return `audio-ai-${createHash("sha256")
     .update(JSON.stringify([sourceId, capturedAt, transcript]))
     .digest("hex")
     .slice(0, 32)}`;
+}
+
+/** Publish before the slower LLM call, including when the provider is unavailable. */
+export async function publishAudioSafetySignal(
+  transcript: string,
+  inputKind: "microphone" | "manual",
+  sourceId: string,
+  capturedAt: string,
+): Promise<IncidentEvent | null> {
+  const detected = detectSafetyPhrase(transcript);
+  if (!detected) return null;
+  const signal = {
+    ...detected,
+    transcript,
+    input_kind: inputKind,
+    assessment_id: assessmentId(sourceId, capturedAt, transcript),
+  };
+  const personId = /^officer-P-\d{2}$/.test(sourceId) ? sourceId.slice(8) : sourceId;
+  const draft = parseIncidentDraft({
+    id: signal.assessment_id.replace("audio-ai-", "audio-safety-"),
+    kind: "transcript",
+    origin: "model",
+    scenarioAt: null,
+    personId,
+    source: sourceId,
+    observedAt: capturedAt,
+    title: `Audio concern · ${safetySignalLabel(signal)} · ${personId}`,
+    detail: `High-sensitivity phrase match: ${signal.matches.join(", ")}. Contact the officer and review ${signal.level === "urgent" ? "backup urgently" : "the need for backup"}. Negation, quotation and training context may cause false positives. No units dispatched.`,
+    provenance: { provider: "phrase-rules", model: "high-sensitivity-v1", confidence: null },
+    requiresHumanReview: true,
+    audioSafetySignal: signal,
+  });
+  if (!draft) throw new Error("Invalid audio safety signal");
+  return appendIncident(draft);
 }
 
 export async function publishAudioAssessment(
@@ -23,6 +58,7 @@ export async function publishAudioAssessment(
 ): Promise<IncidentEvent> {
   const personId = /^officer-P-\d{2}$/.test(sourceId) ? sourceId.slice(8) : sourceId;
   const concern = assessment.status === "urgent_threat" || assessment.status === "potential_threat";
+  const phraseReview = detectSafetyPhrase(assessment.transcript);
   const draft: IncidentDraft = {
     id: assessmentId(sourceId, capturedAt, assessment.transcript),
     kind: "transcript",
@@ -31,9 +67,11 @@ export async function publishAudioAssessment(
     personId,
     source: sourceId,
     observedAt: capturedAt,
-    title: `${concern ? "Audio concern" : "Audio assessment"} · ${audioAssessmentLabel(assessment)} · ${personId}`,
+    title: phraseReview
+      ? `AI context · independent phrase review required · ${personId}`
+      : `${concern ? "Audio concern" : "Audio assessment"} · ${audioAssessmentLabel(assessment)} · ${personId}`,
     detail:
-      `${assessment.summary} Recommendation: ${ACTION_LABELS[assessment.recommended_action]}. Uncertainty: ${assessment.uncertainty}`.slice(
+      `${phraseReview ? "Independent phrase alert requires human review. Model context: " : ""}${assessment.summary} Recommendation: ${ACTION_LABELS[assessment.recommended_action]}. Uncertainty: ${assessment.uncertainty}`.slice(
         0,
         600,
       ),

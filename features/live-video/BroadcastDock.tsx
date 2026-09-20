@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { usePathname } from "next/navigation";
 import { ExternalLink, Maximize2, Minimize2, Radio, RotateCw, X } from "lucide-react";
 import styles from "./BroadcastDock.module.css";
+import { BroadcastAudioAnalysis } from "./BroadcastAudioAnalysis";
 
 const STORAGE_KEY = "paw-patrol-broadcast-view";
 const PAIRING_KEY = "paw-patrol-broadcast-pairing";
@@ -264,6 +265,11 @@ function BroadcastControls() {
                     Open player <ExternalLink size={14} />
                   </a>
                 </div>
+                <BroadcastAudioAnalysis
+                  key={`${active}-${relay}-${attempt}`}
+                  viewUrl={active}
+                  relay={relay}
+                />
               </>
             )}
 
@@ -325,8 +331,9 @@ function BroadcastControls() {
               </p>
             </details>
             <p className={styles.note}>
-              Live viewing only; this feed does not submit media for AI analysis. Keep the QR code
-              and links within your team.
+              Start “Analyze broadcast audio” to send this feed’s sound through speech recognition
+              and dispatch review. Video remains viewing only. Keep the QR code and links within
+              your team.
             </p>
           </div>
         </section>

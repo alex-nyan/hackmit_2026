@@ -72,13 +72,13 @@ export function useCaptureDevices() {
    * when the iPhone is connected. Do not use the list length as evidence.
    */
   const resolveDevices = useCallback(
-    async ({ microphone = false } = {}) => {
+    async ({ microphone = false, camera = true } = {}) => {
       let found = (await refreshDevices()) ?? devices;
       // Only worth a prompt where the answer is still open: a kind the
       // operator has already chosen for themselves needs no names.
       const blind = (selection: Selection, available: CaptureDevice[]) =>
         selection === undefined && !hasLabels(available);
-      const blindCamera = blind(cameraSelection, found.cameras);
+      const blindCamera = camera && blind(cameraSelection, found.cameras);
       const blindMicrophone = microphone && blind(microphoneSelection, found.microphones);
 
       if ((blindCamera || blindMicrophone) && navigator.mediaDevices?.getUserMedia) {

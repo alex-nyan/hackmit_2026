@@ -5,6 +5,7 @@ import type { IncidentEvent } from "./incidents";
 import type { BusStatus } from "./useIncidentBus";
 import styles from "./AudioAlerts.module.css";
 import { ACTION_LABELS, audioAssessmentLabel } from "../audio-ai/types";
+import { safetySignalLabel } from "../audio-ai/safetySignal";
 
 export function isAudioConcern(event: IncidentEvent) {
   return (
@@ -25,11 +26,32 @@ export function useAudioAlerts(events: IncidentEvent[]) {
   }, []);
   return useMemo(() => {
     const sources = new Set<string>();
+    const reviewed = new Set(
+      events.filter((event) => event.kind === "audio_review").map((event) => event.id),
+    );
+    const urgency = (event: IncidentEvent) =>
+      event.audioSafetySignal?.level === "urgent" ||
+      event.audioAssessment?.status === "urgent_threat"
+        ? 2
+        : 1;
     return [...events]
-      .sort((a, b) => b.seq - a.seq)
+      .sort((a, b) => urgency(b) - urgency(a) || b.seq - a.seq)
       .filter((event) => {
+        if (
+          event.audioAssessment &&
+          events.some((item) => item.audioSafetySignal?.assessment_id === event.id)
+        )
+          return false;
         const age = now - Date.parse(event.observedAt ?? event.at);
-        if (!isAudioConcern(event) || age < 0 || age > 120_000 || sources.has(event.source))
+        const retained =
+          Boolean(event.audioSafetySignal) || event.audioAssessment?.status === "urgent_threat";
+        if (
+          !isAudioConcern(event) ||
+          age < 0 ||
+          (!retained && age > 120_000) ||
+          reviewed.has(`review-${event.id}`) ||
+          sources.has(event.source)
+        )
           return false;
         sources.add(event.source);
         return true;
@@ -57,11 +79,19 @@ export function AudioAlerts({
       {alerts.map((event) => (
         <button key={event.id} onClick={() => onSelect(event)}>
           <strong>
-            {event.audioAssessment
-              ? audioAssessmentLabel(event.audioAssessment)
-              : "Audio phrase match"}{" "}
+            {event.audioSafetySignal
+              ? safetySignalLabel(event.audioSafetySignal)
+              : event.audioAssessment
+                ? audioAssessmentLabel(event.audioAssessment)
+                : "Audio phrase match"}{" "}
             · {event.personId ?? event.source}
           </strong>
+          {event.audioSafetySignal && (
+            <span>
+              {event.audioSafetySignal.input_kind === "manual" ? "Manual demo" : "Audio clip"} ·
+              Phrase rule, not model confidence · Awaiting human review
+            </span>
+          )}
           {event.audioAssessment && (
             <span>
               {event.audioAssessment.input_kind === "manual" ? "Manual demo · " : "Audio clip · "}
@@ -79,7 +109,8 @@ export function AudioAlerts({
       ))}
       <small>
         Unverified speech; speaker unknown. Red pins mark reporting officers, not suspects. Alerts
-        leave the map after two minutes; reports remain in the log.
+        from phrase rules and urgent AI reports stay pending until acknowledged; old reports are not
+        live scene information.
       </small>
     </aside>
   );

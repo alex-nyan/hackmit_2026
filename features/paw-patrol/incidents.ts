@@ -12,6 +12,7 @@
  */
 
 import { parseAudioAssessmentRecord, type AudioAssessmentRecord } from "../audio-ai/types";
+import { parseAudioSafetySignal, type AudioSafetySignal } from "../audio-ai/safetySignal";
 
 export const INCIDENT_KINDS = [
   "panic",
@@ -39,6 +40,7 @@ export interface IncidentProvenance {
 
 export interface IncidentEvent {
   audioAssessment?: AudioAssessmentRecord;
+  audioSafetySignal?: AudioSafetySignal;
   /** Server-assigned. Monotonic within a run; used to resume and to dedupe. */
   seq: number;
   /** Capture/receipt time, distinct from log publication. */
@@ -109,6 +111,9 @@ export function parseIncidentDraft(value: unknown): IncidentDraft | null {
   const audioAssessment =
     raw.audioAssessment === undefined ? undefined : parseAudioAssessmentRecord(raw.audioAssessment);
   if (audioAssessment === null) return null;
+  const audioSafetySignal =
+    raw.audioSafetySignal === undefined ? undefined : parseAudioSafetySignal(raw.audioSafetySignal);
+  if (audioSafetySignal === null) return null;
 
   const observedAt = raw.observedAt;
   if (
@@ -175,6 +180,7 @@ export function parseIncidentDraft(value: unknown): IncidentDraft | null {
   return {
     id,
     ...(audioAssessment ? { audioAssessment } : {}),
+    ...(audioSafetySignal ? { audioSafetySignal } : {}),
     ...(location ? { location } : {}),
     ...(typeof observedAt === "string" ? { observedAt } : {}),
     kind: raw.kind as IncidentKind,
@@ -195,6 +201,7 @@ export function byNewest(a: IncidentEvent, b: IncidentEvent): number {
 }
 
 export function describeOrigin(event: IncidentEvent): string {
+  if (event.audioSafetySignal) return "Phrase rule · requires review";
   if (event.origin === "model") return "Model output · unreviewed";
   if (event.origin === "script") return "Scripted scenario";
   return "Reported by a person";

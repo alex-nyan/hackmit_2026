@@ -7,6 +7,7 @@ import type { IncidentDraft, IncidentEvent } from "../paw-patrol/incidents";
 import { useIncidentBus, type BusStatus } from "../paw-patrol/useIncidentBus";
 import { ACTION_LABELS, audioAssessmentLabel } from "./types";
 import styles from "./AudioIntelligencePanel.module.css";
+import { AudioSafetyAlerts } from "./AudioSafetyAlerts";
 
 interface Configuration {
   provider: string;
@@ -19,7 +20,8 @@ interface Configuration {
 
 const EXAMPLES = [
   ["Direct threat", "Officer, I have a gun and I will shoot you. Stay back."],
-  ["No threat", "There is no weapon. Nobody is hurt. We do not need backup."],
+  ["Bomb / explosion", "There is a bomb in my car. It is going to explode."],
+  ["Routine speech", "Officer, please confirm your location. I am at the station."],
   [
     "Quoted training",
     "In training yesterday, the instructor said, I will shoot you. This is only a training discussion.",
@@ -64,7 +66,11 @@ export function AudioIntelligencePanel({
     };
   }, []);
   const assessments = events
-    .filter((event) => event.audioAssessment)
+    .filter(
+      (event) =>
+        event.audioAssessment &&
+        !events.some((item) => item.audioSafetySignal?.assessment_id === event.id),
+    )
     .slice(-6)
     .reverse();
 
@@ -91,9 +97,13 @@ export function AudioIntelligencePanel({
         );
       } else
         setMessage(
-          result.publication === "published"
-            ? "Assessment shared. Review the result below."
-            : "AI answered, but the incident log could not save it. Check storage configuration.",
+          result.safety_publication === "failed"
+            ? "Phrase alert could not be saved. Check the incident feed connection."
+            : result.ai_error && result.safety_alert
+              ? "Phrase alert shared; contextual AI is unavailable. Review the alert below."
+              : result.publication === "published"
+                ? "Assessment shared. Review the result below."
+                : "AI answered, but the incident log could not save it. Check storage configuration.",
         );
     } catch {
       setMessage("Could not reach audio analysis. Check the server and try again.");
@@ -145,7 +155,7 @@ export function AudioIntelligencePanel({
       <details open={expanded} className={styles.controls}>
         <summary>Microphone & demo controls</summary>
         <p>
-          Record independent 10-second clips. Each transcript is analyzed and shared with all
+          Record independent 5-second clips. Each transcript is analyzed and shared with all
           workspaces.
         </p>
         {configuration?.cloud && (
@@ -180,10 +190,15 @@ export function AudioIntelligencePanel({
             <p>
               {audio.state.lastResult
                 ? describeTranscript(audio.state.lastResult)
-                : "Listening; first complete clip is sent after 10 seconds…"}
+                : "Listening; first complete clip is sent after 5 seconds…"}
             </p>
             <p>{audio.state.analysisMessage}</p>
+            <small>
+              AI audio input: {audio.state.deviceLabel} · {audio.state.queuedClips ?? 0} clips
+              queued
+            </small>
             {audio.state.lastError && <p role="alert">{audio.state.lastError}</p>}
+            {audio.state.coverageGap && <p role="alert">{audio.state.coverageGap}</p>}
           </div>
         )}
         <div className={styles.examples}>
@@ -215,7 +230,8 @@ export function AudioIntelligencePanel({
           {message}
         </p>
       )}
-      {!assessments.length && (
+      <AudioSafetyAlerts events={events} status={status} publish={publish} />
+      {!assessments.length && !events.some((event) => event.audioSafetySignal) && (
         <p className={styles.empty}>
           Waiting for an audio assessment. Start a microphone or analyze a demo transcript.
         </p>
@@ -258,7 +274,7 @@ export function AudioIntelligencePanel({
                   {(assessment.latency_ms / 1000).toFixed(1)}s
                 </small>
                 <button
-                  disabled={reviewed || reviewing !== null || stale}
+                  disabled={reviewed || reviewing !== null || status !== "live"}
                   onClick={() => void acknowledge(event)}
                 >
                   {reviewed
