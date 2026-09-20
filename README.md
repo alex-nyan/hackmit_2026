@@ -1,17 +1,18 @@
 # Paw Patrol · HackMIT 2026
 
-Start here for the Dispatch, Officer and Hospital workspaces. The repository also
-contains the original live fleet map and a separate visual hazard-triage service.
-The three workspaces share the dashboard implementation in `apps/paw-patrol`;
-each runs as its own local server with its own build output.
+Start here for the Dispatch, Officer and Hospital workspaces. One Next.js app at
+the repository root serves all three, the standalone Boston map at `/map`, the
+phone camera pages under `/capture`, and the server routes that bridge to live
+tracking and the hazard-triage service. A workspace is a role the same app is
+pinned to, not a separate codebase; each runs as its own local server with its
+own build output.
 
 ## Quick start
 
 Requirements:
 
-- Node.js **26.9.0** (`.nvmrc` selects Node) for the root launcher and map.
-- The dashboard lockfile uses **npm 11.6.2**; use the pinned command below.
-- **pnpm 12.4.2** only for installing/checking the optional original map.
+- Node.js **22.23.2** (`.nvmrc` selects Node).
+- **pnpm 12.4.2**.
 - Git.
 - Your own **Mapbox public access token**, beginning with `pk.`.
 - An internet connection and a browser with WebGL support.
@@ -22,14 +23,14 @@ cd hackmit_2026
 ```
 
 With nvm installed, run `nvm install` and `nvm use` inside the repository.
-Install the dashboard dependencies once and create local configuration:
+Install dependencies once and create local configuration:
 
 ```bash
-npx --yes npm@11.6.2 ci --prefix apps/paw-patrol
-npm run setup
+pnpm install --frozen-lockfile
+pnpm run setup
 ```
 
-Set your public Mapbox token in `apps/paw-patrol/.env.local`:
+Set your public Mapbox token in `.env.local`:
 
 ```dotenv
 NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_public_mapbox_token
@@ -37,45 +38,69 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_public_mapbox_token
 
 Create a public token at <https://account.mapbox.com/access-tokens/>. Do not use a
 secret `sk.` token. If URL restrictions are enabled, allow localhost and 127.0.0.1
-on ports **5176, 5177 and 5178**.
+on ports **5176, 5177, 5178** and **5173**.
 
 Then start all three from the **repository root** with one command:
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
-| Workspace          | Address                 | Source            |
-| ------------------ | ----------------------- | ----------------- |
-| Dispatch (Command) | <http://localhost:5176> | `apps/paw-patrol` |
-| Officer            | <http://localhost:5177> | `apps/paw-patrol` |
-| Hospital           | <http://localhost:5178> | `apps/paw-patrol` |
+| Workspace          | Address                 | `PAW_PATROL_WORKSPACE` |
+| ------------------ | ----------------------- | ---------------------- |
+| Dispatch (Command) | <http://localhost:5176> | `dispatch`             |
+| Officer            | <http://localhost:5177> | `officer`              |
+| Hospital           | <http://localhost:5178> | `hospital`             |
 
 Each server opens its assigned workspace. **Ctrl+C stops all servers started by
 the launcher.** An occupied port produces an error; it does not terminate an
 unrelated server. Stop an older dashboard on 5176 before starting the launcher.
-Run a subset with `npm run dev -- officer hospital`, or see `npm run dev -- --help`.
+Run a subset with `pnpm run dev -- officer hospital`, or see `pnpm run dev -- --help`.
 
 These are independent, synthetic browser demo sessions. Starting playback or
 entering a handoff in one browser does not update another. Port separation selects
-the UI; it is not authentication or role authorization. Live feeds and the triage
-backend are not automatically connected.
+the UI; it is not authentication or role authorization.
 
 See [the development guide](docs/development.md) for the directory map, individual
 commands and troubleshooting. Setup preserves existing local configuration.
 
-## Original map (optional, port 5173)
+## Every route (port 5173)
 
-The root Next.js app retains the interactive 3D building map and live fleet tracking.
-Install its dependencies with `pnpm install --frozen-lockfile`, set the public token
-in the root `.env.local`, then run `npm run dev:map`. Allow localhost/127.0.0.1 port
-5173 in your Mapbox token restrictions too. To run it alongside the workspaces:
+`pnpm run dev:map` starts the same app with no workspace pinned, so every route is
+reachable in one place:
+
+| Route            | What it is                                                       |
+| ---------------- | ---------------------------------------------------------------- |
+| `/`              | The dashboard with switchable Command, Officer and Hospital tabs |
+| `/map`           | The standalone 3D building map with live fleet tracking          |
+| `/capture`       | The phone-oriented camera page for hazard triage                 |
+| `/capture/check` | Whether this device will provide camera and microphone           |
+
+To run it alongside the pinned workspaces:
 
 ```bash
-npm run dev -- dispatch officer hospital map
+pnpm run dev -- dispatch officer hospital map
 ```
 
-The following fleet, map and production instructions refer to this original app.
+## Real signals on the dashboard map
+
+The scenario clock and its patrol vehicles are simulated throughout. Three
+controls bring real data onto the same map, and each is opt-in — nothing is
+requested until you turn it on:
+
+- **Live tracking** (the signal icon beside the map theme toggle) polls
+  `/api/live-position` and draws real tracked units over the scripted ones. The
+  unit list reports each fix's age and accuracy; clicking one flies the camera
+  to it. Colour follows freshness, so a stale position is never shown as current.
+- **Building selection**: clicking a building that no patrol vehicle covers
+  reports the height and footprint the map tile actually carries.
+- **Camera and audio evidence**: the Camera and Audio buttons in the Command view
+  open a live capture panel that sends frames to `/api/triage` and clips to
+  `/api/transcribe`. The scripted weapon and concern events in the timeline stay
+  what they always were — demo signals — and the panel says so.
+
+Live tracking and triage each need their own configuration, below. Without it the
+panels say what is missing rather than inventing a reading.
 
 ## Live fleet tracking (optional)
 
@@ -145,7 +170,7 @@ and no location history is kept by the dashboard.
 
 ## Camera hazard triage (optional)
 
-Start the original app with `npm run dev:map`, then open
+Start the app with `pnpm run dev:map`, then open
 <http://localhost:5173/capture> for the phone-oriented camera page. It sends frames
 to the hazard triage service in `services/triage`; it is separate from the three
 demo workspaces on ports 5176–5178. Add to the root `.env.local`:
@@ -162,9 +187,25 @@ attaches the token and forwards to `/v1/triage`.
 
 The timeout covers the service's default inference deadlines plus overhead.
 Increase it if the service uses a longer provider timeout (maximum 3600 seconds).
-The dashboard has no user login: anyone who can reach `/api/triage` can submit a
-frame using the configured service credential. Keep this demo on a trusted LAN,
+The dashboard has no user login: anyone who can reach `/api/triage` or
+`/api/transcribe` can submit media using the configured service credential.
+Keep this demo on a trusted LAN,
 or put authenticated access in front of the dashboard before exposing it publicly.
+
+### Using an iPhone as the camera
+
+macOS Continuity Camera exposes a nearby iPhone as an ordinary capture device,
+which sidesteps the HTTPS problem entirely: the browser runs on the Mac at
+`localhost`, and the phone is merely the lens. Both devices must be signed into
+the same Apple Account with two-factor, with Wi-Fi and Bluetooth on; a USB cable
+is the most reliable connection. The camera pickers preselect an iPhone or iPad
+when one appears, and the list refreshes on `devicechange` because a Continuity
+Camera comes and goes as the phone becomes eligible.
+
+`/capture/check` tests capture alone, with **no network calls at all**, so a
+device problem cannot be confused with a service problem. It reports the origin,
+whether the page is in a secure context, which devices were granted, what
+formats the browser can record, and it plays a short clip back locally.
 
 ### Camera access needs HTTPS
 
@@ -181,6 +222,42 @@ The first run downloads mkcert and installs a local certificate authority, which
 enable full trust under Settings → General → About → Certificate Trust Settings;
 without that second step Safari still refuses the camera.
 
+### Audio transcription
+
+The page can also record ten-second audio clips and send them to
+`/v1/transcribe`. It is **off by default on the service**; enable it and install
+the optional dependency:
+
+```bash
+cd services/triage
+uv sync --locked --extra yolo --extra whisper
+TRIAGE_TRANSCRIPTION_ENABLED=true uv run --no-sync uvicorn triage.app:create_app --factory \
+  --host 127.0.0.1 --port 8090 --workers 1 --no-access-log
+```
+
+`TRIAGE_WHISPER_MODEL` defaults to `base` on CPU with `int8`. The service starts
+and serves triage normally without the dependency, reporting transcription as
+unavailable rather than failing.
+
+Keep `--extra yolo` when adding Whisper to the existing camera service so syncing
+does not remove its detector dependencies. For a deployment with YOLO disabled,
+`--extra whisper` alone is sufficient. Whisper loads on first use and may download
+the configured model; set `TRIAGE_WHISPER_MODEL` to a provisioned local model
+directory to avoid that first-request download.
+
+The page prefers `audio/mp4` when the browser supports it, then falls back to
+WebM or Ogg. Each ten-second recording is finalized as a complete file before
+upload; clips are dropped while an earlier upload is in flight. Stop and
+backgrounding release the microphone and cancel pending uploads.
+
+`TRIAGE_TIMEOUT_SECONDS` in the dashboard environment also controls the
+transcription proxy's timeout; increase it for slower local models.
+
+A transcript is a model hypothesis, not a record of speech. Empty text means
+nothing was recognised, which is **not** the same as nothing having been said —
+the payload carries `transcript_semantics` and `requires_human_review` so a
+caller cannot quietly treat it as evidence.
+
 ### What it does and does not do
 
 Frames go out one at a time. The service admits a single frame concurrently and
@@ -192,9 +269,9 @@ or `insufficient_evidence`, and `requires_human_review` is always true. Treat th
 output as a prompt for a person, and the confidence values as uncalibrated model
 scores rather than probabilities.
 
-**iOS suspends camera capture when the tab is backgrounded or the screen locks.**
-A browser page cannot keep recording from a pocket; it needs to stay in the
-foreground.
+**iOS suspends camera and microphone capture when the tab is backgrounded or the
+screen locks.** A browser page cannot keep recording from a pocket; it needs to
+stay in the foreground. Only a native app can do otherwise.
 
 ## What is included
 
@@ -207,12 +284,14 @@ foreground.
 - Responsive layout, loading feedback, missing-token and failed-load states.
 - Optional live fleet tracking from a Traccar server: every unit on one map,
   opt-in and server-authenticated.
-- Optional camera hazard triage at `/capture`, proxied so the service token
-  stays on the server.
+- Optional camera hazard triage and audio transcription, on the dashboard and at
+  `/capture`, proxied so the service token stays on the server.
+- Works with an iPhone over Continuity Camera, or any built-in camera.
 - Isolated map feature modules, TypeScript, tests, and CI checks.
 
-The separate Paw Patrol workspaces use synthetic demonstration data; Traccar
-tracking is available in the original map only.
+The scenario the workspaces play back is synthetic. Traccar tracking, building
+facts and camera triage are the real signals, and each is opt-in on both the
+dashboard map and `/map`.
 
 ## Production build, locally
 
@@ -223,14 +302,15 @@ pnpm run build
 pnpm start
 ```
 
-Open http://localhost:5173. Stop the development server first because both use
+Open <http://localhost:5176>. Stop the development server first because both use
 that port. To use another port:
 
 ```bash
-pnpm run dev:map -- --port 5174
-# Or, after a build:
-pnpm start -- --port 5174
+pnpm start -- --port 5179
 ```
+
+`pnpm start` serves every route. Pin a role by setting `PAW_PATROL_WORKSPACE`
+before `pnpm run build` and `pnpm start`.
 
 `NEXT_PUBLIC_` values are embedded into the browser bundle at build time. Restart
 development after token changes; rebuild production after token changes.
@@ -240,10 +320,10 @@ development after token changes; rebuild production after token changes.
 | Command                          | Purpose                                                       |
 | -------------------------------- | ------------------------------------------------------------- |
 | `pnpm install --frozen-lockfile` | Reproduce the committed dependency lockfile                   |
-| `npm run setup`                  | Create map/dashboard local configuration without overwriting  |
-| `npm run dev`                    | Start Dispatch, Officer and Hospital on ports 5176–5178       |
-| `npm run dev:map`                | Start the original map at port 5173                           |
-| `npm run test:launcher`          | Check startup, port handling and process shutdown             |
+| `pnpm run setup`                 | Create local configuration without overwriting                |
+| `pnpm run dev`                   | Start Dispatch, Officer and Hospital on ports 5176–5178       |
+| `pnpm run dev:map`               | Start every route, unpinned, at port 5173                     |
+| `pnpm run test:launcher`         | Check startup, port handling and process shutdown             |
 | `pnpm run format`                | Format supported source and configuration files with Prettier |
 | `pnpm run format:check`          | Verify formatting without changing files                      |
 | `pnpm run check`                 | Check formatting, types, lint, and tests                      |
@@ -261,20 +341,24 @@ does **not** mean the live map has been verified.
 ## Project layout
 
 ```text
-app/                    Next.js routes, metadata, and shared map styling
-apps/paw-patrol/         Shared Dispatch, Officer and Hospital dashboard
-scripts/dev.mjs         One-command local server supervisor
+app/                     Next.js routes: dashboard, /map, /capture, and the API bridges
+app/api/live-position/   Server-only Traccar bridge; credentials never reach the browser
+app/api/triage/          Server-only bridge to the hazard-triage service
+app/api/transcribe/      Server-only bridge to audio transcription
+features/paw-patrol/     Workspace UI, scenario clock, and 3D patrol vehicles
+features/anatomy/        Officer anatomy viewer used by the hospital handoff
+features/boston-map/     Map lifecycle, camera settings, building layer, and selection
+features/live-track/     Position validation, freshness, live map layer, and panel
+features/camera-triage/  Camera and microphone capture, and the triage/transcribe clients
 services/triage/         Separate Python hazard-triage API
-app/api/live-position/  Server-only Traccar bridge; credentials never reach the browser
-features/boston-map/    Map lifecycle, camera settings, building layer, and UI
-features/live-track/    Position validation, freshness, live map layer, and panel
-public/favicon.svg     App icon
-scripts/setup.mjs      Cross-platform, non-destructive environment setup
-.env.example           Public environment variable names; no real credentials
-.editorconfig          Shared editor defaults
-.prettierrc.json       Repository formatting rules
-.github/workflows/     Reproducible checks for team changes
-docs/architecture.md   Extension boundaries and map behavior
+scripts/dev.mjs          One-command local server supervisor
+scripts/setup.mjs        Cross-platform, non-destructive environment setup
+public/models/           Officer body mesh for the anatomy viewer
+tsconfig.<workspace>.json  One TypeScript project per pinned role
+.env.example             Public environment variable names; no real credentials
+.github/workflows/       Reproducible checks for team changes
+docs/architecture.md     Extension boundaries and map behavior
+docs/paw-patrol/         Dashboard architecture, route provenance, and verification notes
 ```
 
 ## Troubleshooting
@@ -293,7 +377,7 @@ docs/architecture.md   Extension boundaries and map behavior
 - **WebGL unavailable:** enable hardware acceleration or use a WebGL-capable browser.
 - **Phone access:** `localhost` on a phone points to the phone, not your laptop.
   The default server binds to loopback. For a trusted LAN only, explicitly use
-  `pnpm run dev:map -- --hostname 0.0.0.0`, open the laptop's LAN address, and update
+  `pnpm exec next dev --hostname 0.0.0.0`, open the laptop's LAN address, and update
   token URL restrictions. Phone positions come from Traccar (see **Live fleet
   tracking**), not from the browser's geolocation API.
 
@@ -332,33 +416,30 @@ evidence contracts, durable retry handling, and mandatory human review. The map
 remains independently runnable. See the runbook for setup, the Mermaid architecture,
 testing, and the remaining production integration requirements.
 
-## Paw Patrol dashboard (consult update)
+## Paw Patrol dashboard
 
-The dashboard is in [`apps/paw-patrol`](apps/paw-patrol).
-It preserves the root tracking app and triage backend;
-its demonstration is not yet wired to their live feeds.
+The dashboard lives in [`features/paw-patrol`](features/paw-patrol) and is served
+at `/`. It is the same app as the tracking map and the triage bridges, so its map
+can show real tracked units, real building facts and real camera triage alongside
+the scripted scenario — see **Real signals on the dashboard map** above.
 
-The root quick start launches all three workspaces. For the original combined demo
-with workspace tabs, run only this app (also uses port 5176, so stop Dispatch first):
+The quick start launches all three pinned workspaces. For the combined demo with
+switchable workspace tabs, start the unpinned server instead:
 
 ```sh
-cd apps/paw-patrol
-npx --yes npm@11.6.2 ci
-npm run setup
-# Add your public Mapbox token to .env.local
-npm run dev
+pnpm run dev:map
 ```
 
-Open <http://localhost:5176>. Run `npm run verify` from that same app directory for
-its checks and production build. Do not replace either app's lockfile with the other.
+Open <http://localhost:5173>. `pnpm run verify` runs every check and a production
+build for the whole repository.
 
 Features include Command, Officer and Hospital views, the supplied interactive human
 model, tactical descriptions, panic/acknowledgement, scene-gated EMS staging and MIST
-handoff observations. People, readings and coordination are explicitly simulated.
+handoff observations. People, vital readings and coordination are explicitly simulated.
 ATAK is planned, not connected. No real dispatch or clinical decisions occur.
 
 Read the [updated team brief (PDF)](docs/paw-patrol/Paw_Patrol_Team_Brief_Updated.pdf)
 or [editable Word brief](docs/paw-patrol/Paw_Patrol_Team_Brief_Updated.docx).
-For a future Vercel project, select root directory `apps/paw-patrol` and Node 22;
-configure the Mapbox public environment variable before building. This branch does
-not itself create a hosted deployment.
+For a future Vercel project, select the repository root and Node 22; configure the
+Mapbox public environment variable before building. This branch does not itself
+create a hosted deployment.

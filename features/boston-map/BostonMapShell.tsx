@@ -1,8 +1,18 @@
 "use client";
 
-import { LoaderCircle, LocateFixed, LocateOff, Moon, PawPrint, Sun } from "lucide-react";
+import {
+  LoaderCircle,
+  LocateFixed,
+  LocateOff,
+  Moon,
+  PawPrint,
+  Sun,
+  Video,
+  VideoOff,
+} from "lucide-react";
 import { useCallback, useState } from "react";
 
+import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-track";
 import { BostonMap } from "./BostonMap";
 import { BuildingPanel } from "./BuildingPanel";
@@ -34,6 +44,8 @@ export function BostonMapShell() {
       nonce: (previous?.nonce ?? 0) + 1,
     }));
   }, []);
+  // Capture is opt-in too: no camera or microphone is touched until asked.
+  const [capturing, setCapturing] = useState(false);
   const [building, setBuilding] = useState<BuildingFacts | null>(null);
   const handleBuildingSelect = useCallback((next: BuildingFacts | null) => setBuilding(next), []);
   const handleStatusChange = useCallback((nextStatus: MapStatus) => setStatus(nextStatus), []);
@@ -61,6 +73,17 @@ export function BostonMapShell() {
         </nav>
 
         <div className="map-header__actions">
+          <button
+            type="button"
+            className={capturing ? "icon-button is-active" : "icon-button"}
+            onClick={() => setCapturing((current) => !current)}
+            aria-pressed={capturing}
+            aria-label={capturing ? "Hide the camera panel" : "Show the camera panel"}
+            title={capturing ? "Hide the camera panel" : "Show the camera panel"}
+          >
+            {capturing ? <Video size={17} /> : <VideoOff size={17} />}
+          </button>
+
           <button
             type="button"
             className={tracking ? "icon-button is-active" : "icon-button"}
@@ -117,18 +140,21 @@ export function BostonMapShell() {
           </div>
         )}
 
-        {status === "ready" && (
-          <div className="map-panels">
+        <div className="map-panels">
+          {status === "ready" && (
             <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+          )}
+          {capturing && <CapturePanel sourceId="console" />}
+          {status === "ready" && (
             <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
+          )}
 
-            {liveTrack.state === "idle" && !building && (
-              <aside className="map-hint">
-                <p>Click a building for its height and footprint. Right-drag to tilt and rotate.</p>
-              </aside>
-            )}
-          </div>
-        )}
+          {status === "ready" && liveTrack.state === "idle" && !building && (
+            <aside className="map-hint">
+              <p>Click a building for its height and footprint. Right-drag to tilt and rotate.</p>
+            </aside>
+          )}
+        </div>
       </section>
     </main>
   );

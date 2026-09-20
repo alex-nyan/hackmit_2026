@@ -1,6 +1,6 @@
 node_modules/
-apps/paw-patrol/
 .next/
+.next-*/
 out/
 dist/
 coverage/
@@ -17,3 +17,6 @@ services/triage/models/
 services/triage/.runtime/
 services/triage/uv.lock
 services/triage/contracts/
+docs/paw-patrol/anatomy-export-audit.json
+features/paw-patrol/vehicles/street-routes.json
+public/models/

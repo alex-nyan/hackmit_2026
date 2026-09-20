@@ -1,6 +1,7 @@
 node_modules/
 .pnpm-store/
 .next/
+.next-*/
 out/
 dist/
 coverage/
@@ -25,3 +26,6 @@ services/triage/.runtime/
 
 # next dev --experimental-https writes a TLS private key here.
 certificates/
+
+# Local development CA copy, served only for on-device install.
+public/paw-patrol-rootCA.crt

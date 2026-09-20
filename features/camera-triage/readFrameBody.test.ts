@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "@/app/api/triage/route";
+import { POST as transcribe } from "@/app/api/transcribe/route";
 
 import { readFrameBody } from "./readFrameBody";
 
@@ -87,20 +88,26 @@ describe("bounded frame body", () => {
     });
   });
 
-  it("rejects a declared oversized frame at the route before reading or forwarding", async () => {
-    vi.stubEnv("TRIAGE_URL", "http://127.0.0.1:8090");
-    vi.stubEnv("TRIAGE_API_TOKEN", "test-token");
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    const pull = vi.fn();
-    const stream = new ReadableStream<Uint8Array>({ pull }, { highWaterMark: 0 });
-    const response = await POST(
-      streamedRequest(stream, { "Content-Length": "11300001", "Idempotency-Key": "frame-1" }),
-    );
+  it.each([
+    { name: "triage", post: POST, error: "frame-too-large" },
+    { name: "transcribe", post: transcribe, error: "clip-too-large" },
+  ])(
+    "rejects a declared oversized body at $name before reading or forwarding",
+    async ({ post, error }) => {
+      vi.stubEnv("TRIAGE_URL", "http://127.0.0.1:8090");
+      vi.stubEnv("TRIAGE_API_TOKEN", "test-token");
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      const pull = vi.fn();
+      const stream = new ReadableStream<Uint8Array>({ pull }, { highWaterMark: 0 });
+      const response = await post(
+        streamedRequest(stream, { "Content-Length": "11300001", "Idempotency-Key": "frame-1" }),
+      );
 
-    expect(response.status).toBe(413);
-    expect(await response.json()).toEqual({ error: "frame-too-large" });
-    expect(pull).not.toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({ error });
+      expect(pull).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -54,7 +54,9 @@ ollama show gemma4:26b
 ```
 
 If another machine does not have the model, provision it explicitly with
-`ollama pull gemma4:26b`. Model downloads are never triggered by request handling.
+`ollama pull gemma4:26b`. Vision model downloads are never triggered by request
+handling. The optional audio transcription model loads on first use; see the root
+README to provision a local Whisper model directory ahead of requests.
 Native Ollama uses the Mac's GPU; Ollama in Docker Desktop on macOS does not have
 GPU passthrough. See [Ollama's FAQ](https://docs.ollama.com/faq).
 
