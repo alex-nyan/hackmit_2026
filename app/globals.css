@@ -1625,3 +1625,9 @@ footer {
   color: #e88a8a;
   font-size: 13px;
 }
+
+.unlock__label {
+  margin-bottom: -6px;
+  color: rgb(237 242 243 / 62%);
+  font-size: 12px;
+}

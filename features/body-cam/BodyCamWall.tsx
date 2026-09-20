@@ -117,6 +117,15 @@ export function BodyCamWall({ excludeSourceId, className = "panel" }: BodyCamWal
                       {describeAge(age)}
                     </span>
                   </figcaption>
+                  {/* A machine transcript, and labelled as one: it mishears,
+                      and silence is indistinguishable from speech it failed
+                      to recognise. */}
+                  {frame.heard && (
+                    <p className={styles.heard}>
+                      <span className={styles.heardLabel}>Heard</span>
+                      {frame.heard}
+                    </p>
+                  )}
                 </button>
               </figure>
             );

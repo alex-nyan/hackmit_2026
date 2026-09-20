@@ -15,9 +15,11 @@ describe("deciding whether the app is gated", () => {
 });
 
 describe("paths the gate must not close", () => {
-  it("leaves the form and its handler reachable", () => {
-    expect(isOpenPath("/unlock")).toBe(true);
-    expect(isOpenPath("/api/unlock")).toBe(true);
+  it("leaves the forms and their handlers reachable", () => {
+    // Both doors: the shared passphrase, and an officer proving who they are.
+    for (const path of ["/unlock", "/api/unlock", "/sign-in", "/api/sign-in"]) {
+      expect(isOpenPath(path)).toBe(true);
+    }
   });
 
   it("closes everything else", () => {

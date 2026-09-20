@@ -25,6 +25,8 @@ export interface BodyCamFrame {
 
 export interface FrameSummary {
   sourceId: string;
+  /** The latest thing this officer's microphone was heard to say, if recent. */
+  heard?: string;
   /**
    * When the store accepted the frame. This is also the image's cache key: a
    * new timestamp is a new URL, so a watcher refetches exactly when there is

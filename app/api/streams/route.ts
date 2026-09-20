@@ -1,4 +1,5 @@
 import { clearWall, listFrames, STALE_AFTER_MS } from "@/features/body-cam/store";
+import { readTranscript } from "@/features/body-cam/transcripts";
 
 /**
  * The body camera roster, polled.
@@ -14,8 +15,18 @@ export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
   const frames = await listFrames();
+  // Read alongside the roster rather than by the tile, so a wall of officers
+  // is still one round trip for the browser.
+  const heard = await Promise.all(frames.map((frame) => readTranscript(frame.sourceId)));
+
   return Response.json(
-    { frames, staleAfterMs: STALE_AFTER_MS },
+    {
+      frames: frames.map((frame, index) => ({
+        ...frame,
+        ...(heard[index] ? { heard: heard[index].text } : {}),
+      })),
+      staleAfterMs: STALE_AFTER_MS,
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

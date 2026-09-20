@@ -7,6 +7,7 @@ import {
   matches,
   requiredPassphrase,
 } from "@/features/access/passphrase";
+import { OFFICER_COOKIE, readSession } from "@/features/access/session";
 
 /**
  * Holds the shared passphrase in front of every page and route.
@@ -23,6 +24,13 @@ export async function proxy(request: NextRequest) {
 
   const presented = request.cookies.get(COOKIE_NAME)?.value ?? "";
   if (presented && matches(presented, await digest(expected))) return NextResponse.next();
+
+  // An officer who signed in has already proved more than the shared
+  // passphrase asks for; making them type both would be theatre.
+  const session = request.cookies.get(OFFICER_COOKIE)?.value;
+  if (await readSession(session, process.env.PAW_PATROL_OFFICERS ?? "")) {
+    return NextResponse.next();
+  }
 
   // An API caller gets an answer it can act on rather than a login page.
   if (pathname.startsWith("/api/")) {
