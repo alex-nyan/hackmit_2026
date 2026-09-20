@@ -1,0 +1,64 @@
+.wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(237 242 243 / 14%);
+  border-radius: 12px;
+  background: #0d1216;
+}
+
+.shot {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: #000;
+}
+
+.caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.unit {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Colour follows freshness, so a stale frame is never shown as current. */
+.age[data-freshness="fresh"] {
+  color: #6fe0a8;
+}
+
+.age[data-freshness="aging"] {
+  color: #e8c46a;
+}
+
+.age[data-freshness="stale"] {
+  color: #e88a8a;
+}
+
+.empty {
+  padding: 18px;
+  border: 1px dashed rgb(237 242 243 / 18%);
+  border-radius: 12px;
+  color: rgb(237 242 243 / 62%);
+  font-size: 13px;
+}
+
+.caveat {
+  margin-top: 10px;
+  color: rgb(237 242 243 / 55%);
+  font-size: 12px;
+}

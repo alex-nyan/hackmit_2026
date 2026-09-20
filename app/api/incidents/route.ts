@@ -1,4 +1,5 @@
 import { parseIncidentDraft, type IncidentEvent } from "@/features/paw-patrol/incidents";
+import { SSE_HEADERS, SSE_PRELUDE } from "@/features/streaming/sse";
 
 /**
  * The one piece of state the three workspaces share.
@@ -86,8 +87,8 @@ export async function GET(request: Request): Promise<Response> {
         },
       };
 
-      // Retry hint first, then everything the subscriber has not already seen.
-      send(`retry: 2000\n\n`);
+      // Prelude first, then everything the subscriber has not already seen.
+      send(SSE_PRELUDE);
       for (const event of backlogAfter(since)) send(frame(event));
 
       subscribers.add(subscriber);
@@ -105,15 +106,7 @@ export async function GET(request: Request): Promise<Response> {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-store, no-transform",
-      Connection: "keep-alive",
-      // Proxies that buffer would defeat the point of streaming these.
-      "X-Accel-Buffering": "no",
-    },
-  });
+  return new Response(stream, { headers: SSE_HEADERS });
 }
 
 export async function POST(request: Request): Promise<Response> {

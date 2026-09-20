@@ -25,6 +25,7 @@ import {
   Info,
   ChevronDown,
 } from "lucide-react";
+import { BodyCamWall } from "@/features/body-cam";
 import { CapturePanel } from "@/features/camera-triage";
 import { OperationsMapPanel } from "./OperationsMapPanel";
 import {
@@ -99,7 +100,9 @@ function HeartChart({ time, id }: { time: number; id: string }) {
 
 export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }) {
   const { time, running, readClock, dispatch, sceneOverride, panics, audit } = useScenario();
-  // The only state shared across workspaces. Everything else stays local.
+  // One of the two things that cross workspaces, the body camera wall being
+  // the other. Both live on the server, so both need the workspaces to be one
+  // process. Everything below this line is local to a browser.
   const bus = useIncidentBus();
   const [draftDismissed, setDraftDismissed] = useState(false);
   const [appliedDraft, setAppliedDraft] = useState<MistDraft | null>(null);
@@ -859,6 +862,9 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
             </div>
           </section>
         )}
+
+        {/* Command watches every officer publishing, not just this device. */}
+        {view === "command" && <BodyCamWall />}
 
         <section className="scenario-strip" aria-label="Demo playback">
           <div className="scenario-caption">
