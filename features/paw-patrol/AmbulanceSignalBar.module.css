@@ -32,9 +32,7 @@
 }
 
 .header,
-.footer,
-.eyebrow,
-.relay {
+.eyebrow {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -131,29 +129,6 @@
   color: var(--signal-muted);
 }
 
-.footer {
-  justify-content: space-between;
-  flex-wrap: wrap;
-  padding: 9px 18px;
-  border-top: 1px solid color-mix(in srgb, var(--signal-color) 20%, var(--signal-line));
-  color: var(--signal-muted);
-  font:
-    10px/1.4 ui-monospace,
-    SFMono-Regular,
-    Consolas,
-    monospace;
-}
-
-.assignment {
-  color: var(--signal-ink);
-  font-weight: 650;
-}
-
-.relay {
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
 .observations {
   min-width: 0;
   display: flex;
@@ -229,7 +204,6 @@
   .instructions p {
     font-size: 13px;
   }
-  .footer,
   .observations {
     padding: 10px 12px;
   }

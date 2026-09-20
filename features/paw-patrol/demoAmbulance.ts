@@ -1,7 +1,6 @@
 import { nearestRoadPoint, validHotspotPoint, wrapRouteDistance } from "./hotspots";
 import {
   PATROL_UNITS,
-  distanceMeters,
   headingAtDistance,
   motionAtElapsed,
   pointAtDistance,
@@ -59,23 +58,13 @@ type DemoAmbulancePlan = Pick<
   "stationName" | "stationPoint" | "stagingPoint" | "route" | "duration"
 >;
 
-function stagingDistance(geometry: RouteGeometry, hotspot: VehiclePoint): number | null {
-  const nearest = nearestRoadPoint(geometry, hotspot);
-  if (nearest.gap > 350) return null;
-  if (nearest.gap >= 150) return nearest.distance;
-  // Stop on the approach, approximately 150 m away. This is a visual demo rule,
-  // not an EMS safety distance, scene assessment, or authorization to enter.
-  for (let step = 10; step <= Math.min(geometry.lengthMeters, 1_000); step += 10) {
-    const at = wrapRouteDistance(nearest.distance - step, geometry.lengthMeters);
-    const gap = distanceMeters(pointAtDistance(geometry, at), hotspot);
-    if (gap >= 150 && gap <= 350) return at;
-  }
-  return null;
-}
-
 /** Preserve each original road vertex while slicing a forward arc around a closed loop. */
 function forwardRoadArc(geometry: RouteGeometry, start: number, end: number): VehiclePoint[] {
   const travel = wrapRouteDistance(end - start, geometry.lengthMeters);
+  // Projection roundoff at the station must not turn zero travel into a full lap.
+  if (Math.min(travel, geometry.lengthMeters - travel) < 0.001) {
+    return [pointAtDistance(geometry, end)];
+  }
   const coordinates: VehiclePoint[] = [pointAtDistance(geometry, start)];
   for (let lap = 0; lap < 2; lap++) {
     for (let index = 1; index < geometry.coordinates.length; index++) {
@@ -95,20 +84,20 @@ export function planDemoAmbulance(
 ): { plan: DemoAmbulancePlan | null; reason: string } {
   if (!validHotspotPoint(point)) return { plan: null, reason: "This hotspot location is invalid." };
   const candidates = DEMO_HEALTH_CENTRES.flatMap((station) => {
-    const end = stagingDistance(station.geometry, point);
-    if (end === null) return [];
-    const route = forwardRoadArc(station.geometry, station.stationDistance, end);
+    if (station.geometry.lengthMeters <= 0 || busyStationNames.includes(station.name)) return [];
+    const nearest = nearestRoadPoint(station.geometry, point);
+    if (!Number.isFinite(nearest.gap)) return [];
+    // Stay on this station's supplied roads. A flag can be off-road; its closest
+    // reachable road point is a demo stop, never an assertion of scene safety.
+    const route = forwardRoadArc(station.geometry, station.stationDistance, nearest.distance);
     const geometry = prepareRouteGeometry(route);
-    if (geometry.lengthMeters <= 2) return [];
-    return [{ station, route, geometry }];
-  }).sort((a, b) => a.geometry.lengthMeters - b.geometry.lengthMeters);
-  const candidate = candidates.find(({ station }) => !busyStationNames.includes(station.name));
+    return [{ station, route, geometry, gap: nearest.gap }];
+  }).sort((a, b) => a.gap - b.gap || a.geometry.lengthMeters - b.geometry.lengthMeters);
+  const candidate = candidates[0];
   if (!candidate) {
     return {
       plan: null,
-      reason: candidates.length
-        ? "All demo health centres with a supplied road route to this hotspot are busy. Resolve their active hotspots before requesting another ambulance."
-        : "No supplied demo road loop reaches a staging point 150–350 m from this hotspot. Choose a hotspot near the demo patrol roads.",
+      reason: "No ambulance is available. Resolve an active ambulance incident to free a unit.",
     };
   }
   return {

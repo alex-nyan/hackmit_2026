@@ -5,6 +5,7 @@ import { ArrowRight, Check, ShieldAlert, X } from "lucide-react";
 import type { DemoHotspot } from "./hotspots";
 import type { useDemoAmbulances } from "./useDemoAmbulances";
 import { PixelAmbulance } from "./PixelAmbulance";
+import { distanceMeters } from "./vehicles/vehicleMotion";
 import styles from "./DispatchAmbulanceTools.module.css";
 
 export function DispatchAmbulanceTools({
@@ -36,6 +37,9 @@ export function DispatchAmbulanceTools({
   );
   const remaining = mission
     ? Math.max(0, Math.ceil(mission.duration - (time - mission.startedAt)))
+    : 0;
+  const stopDistance = mission
+    ? Math.round(distanceMeters(mission.stagingPoint, mission.hotspotPoint))
     : 0;
 
   useEffect(() => {
@@ -134,18 +138,19 @@ export function DispatchAmbulanceTools({
                           {mission.id} → {mission.hotspotId}
                         </strong>
                         <span>{mission.stationName}</span>
+                        <span>Road stop · {stopDistance.toLocaleString()} m from flag</span>
                         <b>
                           {mission.status === "en-route"
                             ? `En route · ${remaining}s demo ETA`
                             : mission.status === "staged"
-                              ? "Arrived nearby · HOLD"
+                              ? "At road stop · HOLD"
                               : "Medics authorized · demo"}
                         </b>
                       </div>
                     </div>
                     {mission.status === "en-route" && (
                       <p>
-                        Accelerated demo route. On arrival, the crew will stage nearby and wait.
+                        Travelling to the nearest reachable road stop. Medics will remain on HOLD.
                       </p>
                     )}
                     {mission.status === "staged" && (
@@ -225,14 +230,15 @@ export function DispatchAmbulanceTools({
                         : "Choose the exact flag before dispatching."}
                     </p>
                     <p>
-                      It will leave an available fictional health centre, stage near this location,
-                      and await your separate engagement authorization.
+                      An available ambulance will use the nearest reachable road stop and wait for
+                      your authorization.
                     </p>
                     <button
                       className={styles.primary}
                       disabled={!target}
                       onClick={() => {
                         if (target) {
+                          pendingFocus.current = "action";
                           ambulance.dispatchAmbulance(target.id);
                         }
                       }}
@@ -245,7 +251,7 @@ export function DispatchAmbulanceTools({
             ) : (
               <p>Place a hotspot flag on the map first.</p>
             )}
-            <p role="status" className={styles.message}>
+            <p role={mission ? "status" : "alert"} className={styles.message}>
               {target &&
               ambulance.feedback?.hotspotId === target.id &&
               ambulance.feedback.missionId === (mission?.id ?? null)

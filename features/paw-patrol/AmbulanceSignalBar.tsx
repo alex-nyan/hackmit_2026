@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { ArrowUpRight, CirclePause, Radio, ShieldAlert, Sparkles } from "lucide-react";
+import { ArrowUpRight, CirclePause, ShieldAlert, Sparkles } from "lucide-react";
 import type { DemoAmbulanceMission } from "./demoAmbulance";
 import styles from "./AmbulanceSignalBar.module.css";
 
@@ -122,17 +122,6 @@ export function AmbulanceSignalBar({
             <span>{reason}</span>
           </div>
         </div>
-        <footer className={styles.footer}>
-          <span className={styles.assignment}>
-            {selected && mission ? `${mission.hotspotId} / ${mission.id}` : "No active selection"}
-          </span>
-          <span className={styles.relay} data-fresh={fresh}>
-            <Radio size={12} aria-hidden="true" />
-            {fresh ? "Command connected" : "Command not confirmed"}
-            <span aria-hidden="true">·</span>
-            <span>Updated {timeLabel(updatedAt)}</span>
-          </span>
-        </footer>
       </div>
       <aside className={styles.observations} aria-label="AI observations">
         <span className={styles.eyebrow}>

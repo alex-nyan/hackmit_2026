@@ -94,12 +94,12 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
           logs.push(
             makeLog(
               mission.hotspotId,
-              "Demo ambulance staged nearby",
+              "Demo ambulance reached road stop",
               `${mission.stationName}'s simulated ambulance reached its road staging point. It is holding for an explicit operator engagement decision. Arrival does not imply AI clearance or a safe scene.`,
             ),
           );
           feedback = {
-            message: "Demo ambulance staged nearby. Explicit operator engagement is required.",
+            message: "Ambulance at road stop · HOLD. Authorize medics separately.",
             hotspotId: mission.hotspotId,
             missionId: mission.id,
           };
@@ -156,13 +156,14 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
         return false;
       }
       const at = new Date().toISOString();
+      const alreadyAtStop = plan.route.length === 1;
       const mission: DemoAmbulanceMission = {
         id: `demo-ambulance-${Date.now().toString(36)}-${++sequence.current}`,
         hotspotId,
         hotspotPoint: [...hotspot.point],
         ...plan,
         startedAt: now,
-        status: "en-route",
+        status: alreadyAtStop ? "staged" : "en-route",
         createdAt: at,
         updatedAt: at,
         engagedAt: null,
@@ -174,11 +175,13 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
           makeLog(
             hotspotId,
             "Demo ambulance requested",
-            `Operator requested a simulated ambulance from ${plan.stationName} for the explicitly selected hotspot. It follows supplied road geometry on an accelerated ${Math.round(plan.duration)}-second demo journey, not a real ETA. It will hold nearby until the operator engages medics. No real ambulance was dispatched.`,
+            `Operator requested a simulated ambulance from ${plan.stationName} for the explicitly selected hotspot. ${alreadyAtStop ? "The ambulance is already at the closest reachable road stop." : `It follows supplied road geometry to the closest reachable road stop on an accelerated ${Math.round(plan.duration)}-second demo journey, not a real ETA.`} It will hold at that stop until the operator engages medics. No real ambulance was dispatched.`,
           ),
         ],
         feedback: {
-          message: `Demo ambulance responding from ${plan.stationName}. Accelerated journey; it will hold nearby.`,
+          message: alreadyAtStop
+            ? "Already at the nearest road stop · HOLD. Authorize medics separately."
+            : `Ambulance dispatched from ${plan.stationName}. It will wait at the nearest reachable road stop.`,
           hotspotId,
           missionId: mission.id,
         },

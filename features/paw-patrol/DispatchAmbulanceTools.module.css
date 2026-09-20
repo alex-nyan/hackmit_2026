@@ -177,6 +177,13 @@
   min-height: 1em;
   font-size: 11px !important;
 }
+.message[role="alert"]:not(:empty) {
+  padding: 10px 12px;
+  border: 1px solid #e36d6d;
+  border-radius: 7px;
+  color: var(--bento-text);
+  background: color-mix(in srgb, #e36d6d 12%, var(--bento-card));
+}
 .content footer {
   border-top: 1px solid var(--bento-border);
   padding-top: 12px;
