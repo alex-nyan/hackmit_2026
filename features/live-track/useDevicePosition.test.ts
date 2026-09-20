@@ -175,7 +175,7 @@ describe("sharing a position", () => {
 
     expect(result.current.state).toMatchObject({
       state: "publishing",
-      lastError: "The last position could not be published.",
+      lastError: "offline",
     });
   });
 
@@ -183,11 +183,21 @@ describe("sharing a position", () => {
     const { result } = renderHook(() => useDevicePosition("Unit 01"));
     act(() => result.current.start());
     act(() => watcher().onFix(fix()));
-    fetchMock.mockResolvedValue({ ok: false, status: 503 });
+    fetchMock.mockImplementation(async () =>
+      Response.json(
+        {
+          error: "not-configured",
+          reason:
+            "This deployment has nowhere to store positions, so it cannot put anyone on the map.",
+        },
+        { status: 503 },
+      ),
+    );
     await tick(4_000);
 
     expect(result.current.state).toMatchObject({
-      lastError: "This deployment has nowhere to store positions.",
+      lastError:
+        "This deployment has nowhere to store positions, so it cannot put anyone on the map.",
     });
   });
 });
