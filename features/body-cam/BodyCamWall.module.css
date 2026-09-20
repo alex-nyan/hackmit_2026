@@ -144,3 +144,21 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* A direct link has no age to report: the picture is either arriving or it
+   is not, and the tile says which rather than implying it. */
+.live {
+  color: #6fe0a8;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+/* A handshake can take a few seconds on conference Wi-Fi. Say what is
+   happening while the last verified frame remains visible underneath it. */
+.connecting {
+  color: #e8c46a;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}

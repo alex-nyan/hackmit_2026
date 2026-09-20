@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ContractValidationError, parseTriageResult } from "../../shared/contracts";
-import { trackConstraint } from "./devices";
 import { buildTriageRequest, nextDelayMs, type FrameOutcome } from "./frame";
 import {
   CAPTURE_REQUEST_WIDTH,
@@ -18,6 +17,19 @@ import { useWakeLock } from "./useWakeLock";
 const BASE_INTERVAL_MS = 2000;
 /** A phone that has just been asked for itself needs a moment to wake. */
 const WAKE_MS = 600;
+/**
+ * The frame-analysis pipeline scales its own JPEGs down, but the direct
+ * officer-to-officer stream shares this source track. Ask Continuity Camera
+ * for enough detail for a person to read a plate, doorway, or hand signal;
+ * the 30 fps ceiling leaves the encoder bandwidth for those details instead
+ * of spending it on frames a wall cannot use.
+ */
+const LIVE_CAMERA_CONSTRAINTS: MediaTrackConstraints = {
+  width: { ideal: 1920 },
+  height: { ideal: 1080 },
+  aspectRatio: { ideal: 16 / 9 },
+  frameRate: { ideal: 30, max: 30 },
+};
 
 /**
  * getUserMedia rejects with a DOMException, whose relationship to Error
@@ -43,8 +55,14 @@ function errorName(error: unknown): string {
 async function openCamera(deviceId: string | null): Promise<MediaStream> {
   const wanted: MediaStreamConstraints = {
     video: deviceId
-      ? trackConstraint(deviceId)
-      : { facingMode: "environment", width: { ideal: CAPTURE_REQUEST_WIDTH } },
+      ? { deviceId: { exact: deviceId }, ...LIVE_CAMERA_CONSTRAINTS }
+      : {
+          facingMode: "environment",
+          ...LIVE_CAMERA_CONSTRAINTS,
+          // Keep this explicit because the triage ladder relies on the
+          // source being at least as large as its top rung.
+          width: { ideal: Math.max(1920, CAPTURE_REQUEST_WIDTH) },
+        },
     audio: false,
   };
 
@@ -63,6 +81,7 @@ async function openCamera(deviceId: string | null): Promise<MediaStream> {
 
 interface Options {
   sourceId: string;
+  intervalMs?: number;
   incidentId?: string | null;
   /**
    * Called once per accepted result. Held in a ref so a caller that rebuilds
@@ -77,14 +96,32 @@ interface Options {
  * only after the previous request settles; a fixed interval would queue frames
  * until they aged past the service's staleness limit.
  */
-export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
+export function useCameraTriage({
+  sourceId,
+  incidentId,
+  onResult,
+  intervalMs = BASE_INTERVAL_MS,
+}: Options) {
   const [state, setState] = useState<CaptureState>({ state: "idle" });
+  /**
+   * The open track, as state as well as a ref.
+   *
+   * The ref is what this hook's own loop reads; the state is what anything
+   * outside it can react to. A live link to a watching dashboard is built
+   * from this track, and the hook that builds it has to re-render when the
+   * camera opens and closes rather than reading a ref that silently changed.
+   */
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<symbol | null>(null);
   const ladderRef = useRef(INITIAL_LADDER);
   const optionsRef = useRef({ sourceId, incidentId });
   const onResultRef = useRef(onResult);
+  const intervalRef = useRef(intervalMs);
+  useEffect(() => {
+    intervalRef.current = intervalMs;
+  }, [intervalMs]);
 
   useEffect(() => {
     optionsRef.current = { sourceId, incidentId };
@@ -101,6 +138,7 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
       track.stop();
     });
     streamRef.current = null;
+    setCameraStream(null);
     if (videoRef.current) videoRef.current.srcObject = null;
     setState({ state: "idle" });
   }, []);
@@ -141,6 +179,14 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
           return;
         }
         streamRef.current = stream;
+        // The same camera track feeds both triage snapshots and the direct
+        // officer link. For the latter, detail matters more than a silky frame
+        // rate: browsers that honour this hint select an encoder mode suited
+        // to readable scenes rather than a video-call preview.
+        stream.getVideoTracks().forEach((track) => {
+          track.contentHint = "detail";
+        });
+        setCameraStream(stream);
         stream.getTracks().forEach((track) => {
           track.onended = () => {
             if (sessionRef.current !== session) return;
@@ -174,6 +220,7 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
           track.stop();
         });
         streamRef.current = null;
+        setCameraStream(null);
         if (videoRef.current) videoRef.current.srcObject = null;
         const name = errorName(error);
         setState({
@@ -295,7 +342,14 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
       if (!cancelled) {
         setState((current) =>
           current.state === "running"
-            ? { ...current, lastResult: result, lastError: null }
+            ? {
+                ...current,
+                lastResult: result,
+                lastError:
+                  response.headers.get("X-Incident-Publication") === "failed"
+                    ? "Analysis received, but sharing to the incident log failed."
+                    : null,
+              }
             : current,
         );
         // A subscriber's own failure must not abort the capture loop.
@@ -327,7 +381,7 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
           );
         }
       } finally {
-        if (!cancelled) timer = setTimeout(loop, nextDelayMs(outcome, BASE_INTERVAL_MS));
+        if (!cancelled) timer = setTimeout(loop, nextDelayMs(outcome, intervalRef.current));
       }
     }
 
@@ -355,5 +409,5 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
     };
   }, [stop]);
 
-  return { state, videoRef, start, stop };
+  return { state, videoRef, start, stop, stream: cameraStream };
 }

@@ -32,7 +32,13 @@ from triage.live_media_schemas import (
 )
 from triage.live_schemas import LivePrincipal
 from triage.live_store import LiveError, require_incident, source_visible
-from triage.providers import OllamaProvider, ProviderError, YoloDetector
+from triage.providers import (
+    OllamaProvider,
+    OpenAICompatibleProvider,
+    ProviderError,
+    VisionProvider,
+    YoloDetector,
+)
 from triage.schemas import (
     Detection,
     ModelProvenance,
@@ -41,6 +47,18 @@ from triage.schemas import (
     TriageRequest,
 )
 from triage.transcription import FasterWhisperTranscriber, TranscriptionError
+
+
+def _context_provider(settings: Settings) -> VisionProvider:
+    """Live scene context follows the deployment's selected vision provider.
+
+    A live session has no per-frame consent to carry, so the deployment's own
+    TRIAGE_VISION_PROVIDER is the whole decision: choosing the cloud provider
+    here means every enrolled camera's frames leave the host.
+    """
+    if settings.vision_provider == "openai_compatible":
+        return OpenAICompatibleProvider(settings)
+    return OllamaProvider(settings)
 
 
 class WorkerFailure(Exception):
@@ -304,7 +322,7 @@ class LiveMedia:
         self.audio = audio_worker or NativeWorker(
             settings, "audio", settings.live_asr_timeout_seconds
         )
-        self.context = context_provider or OllamaProvider(settings)
+        self.context = context_provider or _context_provider(settings)
         self.evidence_buffer = EvidenceBuffer(settings)
         self.frames: OrderedDict[str, QueuedMedia] = OrderedDict()
         self.clips: deque[QueuedMedia] = deque()

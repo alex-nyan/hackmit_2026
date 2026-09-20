@@ -54,7 +54,9 @@ export function WorkspaceMapShell({
           pinnedLabel={workspace ? label : null}
           onSelect={onViewChange}
         />
-        <span aria-hidden="true" />
+        <Link href="/sign-in" className="hardware-toggle">
+          Officer sign-in
+        </Link>
       </header>
       <main id="workspace">
         <h1 className="sr-only">{label} workspace</h1>

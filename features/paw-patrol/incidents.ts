@@ -18,6 +18,8 @@ export const INCIDENT_KINDS = [
   "hazard",
   "transcript",
   "mist",
+  "vitals",
+  "observation",
 ] as const;
 export type IncidentKind = (typeof INCIDENT_KINDS)[number];
 
@@ -35,6 +37,8 @@ export interface IncidentProvenance {
 export interface IncidentEvent {
   /** Server-assigned. Monotonic within a run; used to resume and to dedupe. */
   seq: number;
+  /** Capture/receipt time, distinct from log publication. */
+  observedAt?: string;
   id: string;
   kind: IncidentKind;
   origin: IncidentOrigin;
@@ -91,6 +95,12 @@ export function parseIncidentDraft(value: unknown): IncidentDraft | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
 
+  const observedAt = raw.observedAt;
+  if (
+    observedAt !== undefined &&
+    (typeof observedAt !== "string" || !Number.isFinite(Date.parse(observedAt)))
+  )
+    return null;
   const id = text(raw.id, MAX_ID);
   const title = text(raw.title);
   const detail = text(raw.detail);
@@ -121,6 +131,7 @@ export function parseIncidentDraft(value: unknown): IncidentDraft | null {
 
   return {
     id,
+    ...(typeof observedAt === "string" ? { observedAt } : {}),
     kind: raw.kind as IncidentKind,
     origin: raw.origin as IncidentOrigin,
     scenarioAt,

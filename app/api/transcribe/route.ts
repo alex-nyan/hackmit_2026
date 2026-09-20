@@ -1,3 +1,4 @@
+import { publishCapture } from "@/features/paw-patrol/publishCapture";
 import { parseTranscript, publishTranscript } from "@/features/body-cam/transcripts";
 import { readFrameBody } from "@/features/camera-triage/readFrameBody";
 import { forwardClip } from "@/features/camera-triage/transcribeProxy";
@@ -50,8 +51,19 @@ export async function POST(request: Request) {
   const outcome = await forwardClip(settings, clip.body);
   await teeToWall(clip.body, outcome);
 
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(clip.body);
+  } catch {
+    /* Invalid request is already rejected upstream. */
+  }
+  const publication = await publishCapture("audio", parsed, outcome);
   return new Response(outcome.body, {
     status: outcome.status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+      "X-Incident-Publication": publication,
+    },
   });
 }

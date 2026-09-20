@@ -8,6 +8,7 @@ const SETTINGS: TriageSettings = {
   baseUrl: "http://127.0.0.1:8090",
   token: "a".repeat(32),
   timeoutMs: 240_000,
+  allowCloud: false,
 };
 const BODY = JSON.stringify({ audio_base64: "AAA", media_type: "audio/mp4" });
 

@@ -40,7 +40,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const response = new Response(null, {
     status: 303,
-    headers: { Location: new URL("/capture", request.url).toString() },
+    headers: { Location: new URL("/officer", request.url).toString() },
   });
   response.headers.append("Set-Cookie", sessionCookie(await issueSession(officer.id, rosterRaw)));
   return response;

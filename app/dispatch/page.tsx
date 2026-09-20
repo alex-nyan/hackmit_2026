@@ -1,9 +1,7 @@
 import { connection } from "next/server";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
-import { buildJoinLink } from "@/features/join/joinLink";
 import { PawPatrol } from "@/features/paw-patrol/PawPatrol";
 import { pinnedElsewhere, WORKSPACE_LABELS } from "@/features/paw-patrol/workspace";
 
@@ -23,6 +21,5 @@ export default async function DispatchWorkspace() {
   // Read at request time: a server dedicated to another role serves nothing here.
   await connection();
   if (pinnedElsewhere("dispatch", process.env.PAW_PATROL_WORKSPACE)) notFound();
-  const join = await buildJoinLink(await headers());
-  return <PawPatrol workspace="dispatch" join={join} />;
+  return <PawPatrol workspace="dispatch" />;
 }

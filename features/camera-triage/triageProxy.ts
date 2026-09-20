@@ -4,6 +4,8 @@ export interface TriageSettings {
   baseUrl: string;
   token: string;
   timeoutMs?: number;
+  /** Deployment-side half of cloud consent; the phone never asks for it. */
+  allowCloud: boolean;
 }
 
 // Matches submit_frame.py's default: two 90-second provider calls plus overhead.
@@ -20,7 +22,27 @@ export function readTriageSettings(env: Record<string, string | undefined>): Tri
     ? Number(env.TRIAGE_TIMEOUT_SECONDS) * 1000
     : REQUEST_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 3_600_000) return null;
-  return { baseUrl: baseUrl.replace(/\/+$/, ""), token, timeoutMs };
+  return {
+    baseUrl: baseUrl.replace(/\/+$/, ""),
+    token,
+    timeoutMs,
+    allowCloud: env.TRIAGE_ALLOW_CLOUD?.trim() === "true",
+  };
+}
+
+/**
+ * Raises the request's cloud consent flag when the deployment has opted in.
+ *
+ * Consent belongs here rather than in the browser: a phone cannot know whether
+ * frames are allowed to leave the host, and the service still refuses unless
+ * its own TRIAGE_CLOUD_ENABLED agrees. A body that will not parse is forwarded
+ * untouched, because rejecting it is the triage service's job, not this one's.
+ */
+export function withCloudConsent(parsed: unknown, body: string, allowCloud: boolean): string {
+  if (!allowCloud || parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return body;
+  }
+  return JSON.stringify({ ...(parsed as Record<string, unknown>), allow_cloud: true });
 }
 
 export interface ProxyOutcome {

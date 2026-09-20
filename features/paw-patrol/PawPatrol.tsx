@@ -24,9 +24,10 @@ import {
 import { type MapFocus, type MapTheme, MAP_FOCUS } from "../boston-map/types";
 import { BuildingPanel } from "../boston-map/BuildingPanel";
 import type { BuildingFacts } from "../boston-map/buildingSelection";
+import type { Officer } from "@/features/access/roster";
+import { BodyCamWall } from "@/features/body-cam";
 import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, UnitCard, useLiveTrack, type LiveDevice } from "@/features/live-track";
-import { JoinCard, type JoinLink } from "@/features/join";
 import { OperationsMap } from "./OperationsMap";
 import { DispatchDashboard } from "./DispatchDashboard";
 import { useDemoHotspots } from "./useDemoHotspots";
@@ -59,11 +60,9 @@ import { sceneAt } from "./consult";
 import { SceneCoordination, TacticalBrief, emptyTactical } from "./ConsultPanels";
 import { WORKSPACE_LABELS, WORKSPACE_VIEWS, type Workspace } from "./workspace";
 import { useIncidentBus } from "./useIncidentBus";
-import { hazardIncident, transcriptIncident } from "./hazardSignal";
+import { SituationPanel } from "./SituationPanel";
 import type { IncidentDraft } from "./incidents";
 import { BusIndicator, SharedTimeline } from "./Provenance";
-import type { TriageResult } from "../camera-triage/types";
-import type { TranscriptionResult } from "../camera-triage/audio";
 import { HeartRatePanel } from "../heart-rate/HeartRatePanel";
 import {
   useHeartRate,
@@ -166,15 +165,14 @@ function HeartRateReadout({
 export function PawPatrol({
   workspace = null,
   officerMedia,
+  officer,
   presentation = "map",
-  join = null,
 }: {
   workspace?: Workspace | null;
   officerMedia?: OfficerMediaInput | null;
+  officer?: Officer | null;
   /** Dispatch defaults to the map-first dashboard; retain its detailed workflows. */
   presentation?: "map" | "detailed";
-  /** Resolved on the server from the request's own origin. */
-  join?: JoinLink | null;
 }) {
   const { time, running, readClock, dispatch, sceneOverride, panics, audit } = useScenario();
   // The only state shared across workspaces. Everything else stays local.
@@ -237,7 +235,7 @@ export function PawPatrol({
   // The camera and microphone stay opt-in. Tracking does not: it was opt-in
   // when it meant reaching out to a Traccar server holding credentials
   // somewhere else, and the positions now come from this deployment's own
-  // store — with a join code on screen inviting people to publish into it.
+  // store, where phones paired from Officer publish their positions.
   // Left off, a phone could scan, join and publish and still appear nowhere.
   const [tracking, setTracking] = useState(true);
   const liveTrack = useLiveTrack(tracking);
@@ -269,7 +267,7 @@ export function PawPatrol({
     }));
   }, []);
   const person = PEOPLE.find((p) => p.id === selectedId) ?? PEOPLE[0];
-  // Local-only: never pass device readings to the incident bus or MIST records.
+  // Device readings stay local until an operator shares a snapshot.
   const heartRate = useHeartRate(person.id, session);
   const [phonePreview, setPhonePreview] = useState({ sourceId: "", connected: false });
   const onPhoneConnectionChange = useCallback((sourceId: string, connected: boolean) => {
@@ -343,28 +341,6 @@ export function PawPatrol({
       dispatch(action);
     },
     [dispatch, publish, time],
-  );
-
-  const captureContext = useCallback(
-    () => ({ personId: selectedId, scenarioAt: time, sourceLabel: "Officer body camera" }),
-    [selectedId, time],
-  );
-
-  const onHazard = useCallback(
-    (result: TriageResult) => {
-      const incident = hazardIncident(result, captureContext());
-      // Most frames carry nothing worth interrupting anyone for.
-      if (incident) void publish(incident);
-    },
-    [captureContext, publish],
-  );
-
-  const onTranscript = useCallback(
-    (result: TranscriptionResult) => {
-      const incident = transcriptIncident(result, captureContext());
-      if (incident) void publish(incident);
-    },
-    [captureContext, publish],
   );
 
   const events = [...EVENTS, ...audit].sort((a, b) => a.at - b.at);
@@ -519,7 +495,6 @@ export function PawPatrol({
                 onDismiss={() => setOpenDeviceId(null)}
               />
             )}
-            {view === "command" && !dispatchDashboard && <JoinCard join={join} />}
             <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
           </div>
         )}
@@ -572,7 +547,7 @@ export function PawPatrol({
   // Keep the shared state/subscription above mounted, but do not mount legacy
   // panels (especially capture) in the new Dispatch presentation.
   // Hospital keeps its dedicated camera and heart-rate overlay.
-  // Officer capture callbacks and all backend/live-mode paths remain unchanged.
+  // Capture observations are published centrally by the API routes.
   if (dispatchDashboard) {
     return (
       <DispatchDashboard
@@ -587,12 +562,18 @@ export function PawPatrol({
         onToggleTheme={() =>
           setDispatchTheme((current) => (current === "light" ? "dark" : "light"))
         }
-        map={map}
+        map={
+          <>
+            {map}
+            <SituationPanel events={bus.events} status={bus.status} publish={publish}
+              personId={person.id} heartRate={heartRate} />
+          </>
+        }
         liveTrack={liveTrack}
         trackingEnabled={tracking}
         onToggleTracking={() => setTracking((value) => !value)}
         trackingPanel={<LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />}
-        joinPanel={<JoinCard join={join} />}
+        joinPanel={null}
         events={bus.events}
         busStatus={bus.status}
         localHeartRate={{ personId: person.id, connection: heartRate }}
@@ -648,7 +629,7 @@ export function PawPatrol({
           map={map}
           heartRate={heartRate}
           phoneConnected={
-            phonePreview.sourceId === `officer-${person.id}` && phonePreview.connected
+            phonePreview.sourceId === (officer?.id ?? `officer-${person.id}`) && phonePreview.connected
           }
           heartRatePanel={
             <>
@@ -670,10 +651,9 @@ export function PawPatrol({
           }
           capturePanel={
             <CapturePanel
-              key={person.id}
-              sourceId={`officer-${person.id}`}
-              onResult={onHazard}
-              onTranscript={onTranscript}
+              key={officer?.id ?? person.id}
+              sourceId={officer?.id ?? `officer-${person.id}`}
+              displayName={officer?.name ?? person.name}
               onPhoneConnectionChange={onPhoneConnectionChange}
             />
           }
@@ -714,7 +694,6 @@ export function PawPatrol({
                   onDismiss={() => setOpenDeviceId(null)}
                 />
               )}
-              <JoinCard join={join} />
               <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
             </>
           }
@@ -739,6 +718,20 @@ export function PawPatrol({
           pinnedLabel={workspace ? WORKSPACE_LABELS[workspace] : null}
           onSelect={setView}
         />
+        {officer ? (
+          <form action="/api/sign-in" method="post">
+            <span>
+              {officer.name} · {officer.badge}{" "}
+            </span>
+            <button name="action" value="sign-out" className="hardware-toggle">
+              Sign out
+            </button>
+          </form>
+        ) : (
+          <Link href="/sign-in" className="hardware-toggle">
+            Officer sign-in
+          </Link>
+        )}
         {view !== "hospital" && (
           <button
             className="hardware-toggle"
@@ -1076,6 +1069,13 @@ export function PawPatrol({
         <p className="sr-only" role="status">
           {PHASES[phase].label}: {PHASES[phase].detail}
         </p>
+        <SituationPanel
+          events={bus.events}
+          status={bus.status}
+          publish={publish}
+          personId={officer?.id ?? person.id}
+          heartRate={heartRate}
+        />
       </main>
       {view === "command" && (
         <footer>

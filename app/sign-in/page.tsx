@@ -29,8 +29,8 @@ export default async function SignIn({
       <form className="unlock__card" method="post" action="/api/sign-in">
         <h1>Officer sign-in</h1>
         <p>
-          Your camera, microphone and position all publish under the officer you sign in as. Nobody
-          else can publish as you while you are signed in.
+          Sign in to your Officer workspace to share your camera and position and watch your team’s
+          footage. Use the passcode assigned with your roster entry.
         </p>
 
         <label className="unlock__label" htmlFor="officer">
@@ -59,14 +59,20 @@ export default async function SignIn({
           type="password"
           name="passcode"
           inputMode="numeric"
-          autoComplete="off"
+          autoComplete="current-password"
           aria-label="Passcode"
           required
         />
 
         {problem ? <p className="unlock__error">{PROBLEMS[problem] ?? "Sign-in failed."}</p> : null}
 
-        <button className="unlock__button" type="submit">
+        {roster.length === 0 && (
+          <p className="unlock__error">
+            No officer accounts configured. Ask the deployment administrator to add your name, badge
+            and passcode to the officer roster.
+          </p>
+        )}
+        <button className="unlock__button" type="submit" disabled={roster.length === 0}>
           Sign in
         </button>
       </form>

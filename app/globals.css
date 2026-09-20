@@ -1705,6 +1705,52 @@ footer {
   color: var(--muted);
 }
 
+.capture-card__location {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 9px;
+  border: 1px solid rgb(34 197 94 / 34%);
+  border-radius: 10px;
+  background: rgb(34 197 94 / 6%);
+}
+
+.capture-card__location-code {
+  flex: 0 0 72px;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.capture-card__location-code svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.capture-card__location-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.capture-card__location-title[data-publishing="true"] {
+  color: #15803d;
+}
+
+.capture-card__location-link {
+  display: block;
+  max-width: 220px;
+  margin-top: 5px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .capture-card__caveat {
   padding-top: 8px;
   border-top: 1px solid rgb(128 138 145 / 22%);

@@ -1,8 +1,10 @@
 "use client";
 
 import { HeartPulse, VideoOff, X } from "lucide-react";
+import { useState } from "react";
 
 import { useBodyCamWall } from "@/features/body-cam";
+import { LiveTile } from "@/features/live-video";
 import type { HeartRateConnection } from "@/features/heart-rate/useHeartRate";
 
 import {
@@ -46,6 +48,7 @@ interface UnitCardProps {
 
 export function UnitCard({ device, heartRate, onDismiss }: UnitCardProps) {
   const { frames, status } = useBodyCamWall();
+  const [live, setLive] = useState(false);
   const frame = frames.find((published) => published.sourceId === device.id) ?? null;
   const { fix } = device;
 
@@ -74,16 +77,23 @@ export function UnitCard({ device, heartRate, onDismiss }: UnitCardProps) {
 
       <div className={styles.stage}>
         {frame ? (
-          // `live` rather than `at`: `at` names a moment in the archive and
-          // would send this looking for a frame nobody kept. This one is only
-          // a cache key — a new publish is a new URL, so the browser refetches
-          // exactly when there is something new and never twice for the same
-          // still. The route always answers with the latest.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          // A direct video link where the two browsers could make one, and
+          // this unit's latest still where they could not.
+          //
+          // The fallback query is `live` rather than `at`: `at` names a moment
+          // in the archive and would send this looking for a frame nobody
+          // kept. This one is only a cache key — a new publish is a new URL,
+          // so the browser refetches exactly when there is something new and
+          // never twice for the same still. The route always answers with the
+          // latest.
+          <LiveTile
+            sourceId={device.id}
             className={styles.frame}
-            src={`/api/streams/${encodeURIComponent(device.id)}/frame?live=${Date.parse(frame.at)}`}
-            alt={`Latest frame published by ${device.name}`}
+            onLiveChange={setLive}
+            alt={
+              live ? `Live camera from ${device.name}` : `Latest frame published by ${device.name}`
+            }
+            fallbackSrc={`/api/streams/${encodeURIComponent(device.id)}/frame?live=${Date.parse(frame.at)}`}
           />
         ) : (
           <p className={styles.stageHint}>
@@ -95,9 +105,17 @@ export function UnitCard({ device, heartRate, onDismiss }: UnitCardProps) {
         )}
       </div>
 
-      {/* Stills at roughly one every two seconds, which is not video and is
-          never presented as though it were. */}
-      {frame && <p className={styles.frameNote}>Latest frame · about one every two seconds</p>}
+      {/* Video and stills are never given the same words. A direct link is
+          what this unit's camera is seeing now; the fallback is a picture at
+          roughly one every two seconds, and is never presented as though it
+          were video. */}
+      {frame && (
+        <p className={styles.frameNote}>
+          {live
+            ? "Live · direct from this unit's camera"
+            : "Latest frame · about one every two seconds"}
+        </p>
+      )}
 
       <HeartRate connection={heartRate ?? null} />
 

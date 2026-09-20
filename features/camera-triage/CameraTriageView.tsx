@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Officer } from "@/features/access/roster";
 import { BodyCamWall } from "@/features/body-cam";
 import { useDevicePosition } from "@/features/live-track";
+import { useLivePublisher } from "@/features/live-video";
 
 import { describeTranscript } from "./audio";
 import styles from "./CameraTriageView.module.css";
@@ -26,7 +27,11 @@ export function CameraTriageView({ officer }: { officer?: Officer } = {}) {
   const [typedId, setTypedId] = useState("unit-01");
   const sourceId = officer?.id ?? typedId;
   const { devices, cameraId, setCameraId, resolveDevices } = useCaptureDevices();
-  const { state, videoRef, start, stop } = useCameraTriage({ sourceId });
+  const { state, videoRef, start, stop, stream } = useCameraTriage({ sourceId });
+  // The same track the triage loop is screenshotting, offered directly to any
+  // dashboard watching this unit. Frames keep going to the model and to the
+  // archive; the live picture stops being made out of them.
+  const { watchers } = useLivePublisher(sourceId, stream);
   const audio = useAudioTranscription(sourceId);
   // Location is its own switch: a unit that turns the camera off to save
   // battery should still be findable, and somebody who will share a camera has
@@ -186,6 +191,14 @@ export function CameraTriageView({ officer }: { officer?: Officer } = {}) {
 
         {running && state.deviceLabel && (
           <p className={styles.notice}>Live on {state.deviceLabel}</p>
+        )}
+
+        {/* Each watcher is a direct link out of this machine, so the count is
+            worth showing: it is what the camera is actually being asked to do. */}
+        {running && watchers > 0 && (
+          <p className={styles.notice}>
+            Streaming live to {watchers} {watchers === 1 ? "dashboard" : "dashboards"}
+          </p>
         )}
 
         {/* No triage service behind this deployment. Worth saying once,

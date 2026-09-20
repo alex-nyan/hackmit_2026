@@ -188,6 +188,42 @@ local provider failure. **Each request must also set `allow_cloud=true`**, using
 the CLI's `--allow-cloud` option. Fallback use is reported in the result. Requests
 without permission never send images to the external API.
 
+The `/capture` page cannot ask for that permission: a phone does not know whether
+frames may leave the host. Set `TRIAGE_ALLOW_CLOUD=true` in the **repository root**
+`.env` instead, and the `/api/triage` route raises the flag on every frame it
+forwards. Both halves must agree, so leaving the service's `TRIAGE_CLOUD_ENABLED`
+off still keeps every frame local.
+
+### Gemini
+
+Gemini serves this contract at its OpenAI-compatible endpoint:
+
+```dotenv
+TRIAGE_VISION_PROVIDER=openai_compatible
+TRIAGE_CLOUD_ENABLED=true
+TRIAGE_CLOUD_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+TRIAGE_CLOUD_API_KEY=your-ai-studio-key
+TRIAGE_CLOUD_MODEL=models/gemini-3.5-flash
+```
+
+Two details decide whether it works at all:
+
+- The model identifier needs the `models/` prefix, because that is what the API
+  answers with in both `GET /models/{id}` and the completion it returns. Without
+  it, readiness reports vision down and every frame fails `provider_model_mismatch`.
+- The endpoint rejects an entire request whose response schema carries `minItems`
+  or `maxItems`, answering `400` with no indication of which keyword offended.
+  `_portable_schema` in `triage/providers.py` drops exactly those two before the
+  request goes out. Nothing is lost: the reply is still validated against the full
+  model, so the bound is enforced where it is authoritative rather than as a
+  generation hint.
+
+Free-tier quota is counted per model per day and is small — `gemini-3.5-flash`
+allows 20 generate-content requests in a day, which one demo will exhaust. A
+flash-lite model has considerably more headroom, and billing lifts the cap. The
+live scene-context worker asks for a frame every `TRIAGE_LIVE_CONTEXT_INTERVAL_SECONDS`,
+so it needs a paid key rather than a free one.
+
 External providers receive the normalized image and object detections. Credentials
 and URLs come only from deployment configuration; redirects and ambient HTTP proxy
 settings are disabled. Use an exact model identifier matching the provider's

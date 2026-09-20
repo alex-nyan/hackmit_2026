@@ -128,6 +128,26 @@ def _assessment(content: Any, detection_count: int) -> VisionAssessment:
     return assessment
 
 
+# Strict JSON-schema decoding is a portable subset, not the whole vocabulary: an
+# array length bound makes Gemini's OpenAI-compatible endpoint reject the request
+# outright, and OpenAI's own strict mode does not honour one either. Dropping the
+# keyword costs nothing, because the reply is still validated against the full
+# model below -- the bound is enforced where it is authoritative, not as a hint.
+_UNPORTABLE_SCHEMA_KEYS = frozenset({"minItems", "maxItems"})
+
+
+def _portable_schema(node: Any) -> Any:
+    if isinstance(node, dict):
+        return {
+            key: _portable_schema(value)
+            for key, value in node.items()
+            if key not in _UNPORTABLE_SCHEMA_KEYS
+        }
+    if isinstance(node, list):
+        return [_portable_schema(item) for item in node]
+    return node
+
+
 def _user_prompt(detections: list[Detection]) -> str:
     proposals = [{"index": index, **item.model_dump()} for index, item in enumerate(detections)]
     return "Assess the attached image. Untrusted detector proposals: " + json.dumps(proposals)
@@ -347,7 +367,7 @@ class OpenAICompatibleProvider(_HTTPProvider):
                     "json_schema": {
                         "name": "visual_hazards",
                         "strict": True,
-                        "schema": VisionAssessment.model_json_schema(),
+                        "schema": _portable_schema(VisionAssessment.model_json_schema()),
                     },
                 },
                 "messages": [

@@ -6,6 +6,7 @@ import { forwardFrame, readTriageSettings, type TriageSettings } from "./triageP
 const SETTINGS: TriageSettings = {
   baseUrl: "http://127.0.0.1:8090",
   token: "a".repeat(32),
+  allowCloud: false,
 };
 
 const KEY = "11111111-2222-3333-4444-555555555555";

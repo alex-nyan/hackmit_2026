@@ -100,6 +100,12 @@ export function hazardIncident(result: TriageResult, context: SignalContext): In
  * finding that anybody said anything, and the event says so.
  */
 const DISTRESS_TERMS = [
+  "chase",
+  "pursuit",
+  "suspect",
+  "shots",
+  "gunshot",
+  "guns",
   "help",
   "help me",
   "shots fired",

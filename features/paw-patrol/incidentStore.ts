@@ -88,6 +88,8 @@ export async function appendIncident(
 ): Promise<IncidentEvent> {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const { events, etag } = await readLog();
+    const existing = events.find((event) => event.id === draft.id);
+    if (existing) return existing;
     const event: IncidentEvent = {
       ...draft,
       seq: (events.at(-1)?.seq ?? 0) + 1,

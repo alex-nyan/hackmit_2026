@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 
+import { LiveTile } from "@/features/live-video";
+import type { WatchState } from "@/features/live-video/useLiveWatcher";
+
 import styles from "./BodyCamWall.module.css";
 import { FrameReview } from "./FrameReview";
-import { ageMs } from "./frames";
+import { ageMs, type FrameSummary } from "./frames";
 import { useBodyCamWall } from "./useBodyCamWall";
 
 const TICK_MS = 1_000;
@@ -28,6 +31,80 @@ const STATUS_COPY = {
   connecting: "CONNECTING",
   offline: "NOT SYNCED",
 } as const;
+
+/**
+ * One officer's tile.
+ *
+ * Its own component because each tile holds its own connection to that
+ * officer's camera, and a connection is a hook. What it shows is whichever of
+ * the two is real: a direct video link where the browsers managed to find
+ * each other, and otherwise the last frame that officer uploaded, labelled
+ * with its age as it always was.
+ */
+function WallTile({
+  frame,
+  age,
+  open,
+  onOpen,
+}: {
+  frame: FrameSummary;
+  age: number;
+  open: boolean;
+  onOpen: () => void;
+}) {
+  const [live, setLive] = useState(false);
+  const [streamState, setStreamState] = useState<WatchState>("idle");
+
+  return (
+    <figure className={styles.tile} key={frame.sourceId}>
+      {/* A tile is a way into that officer's recent footage. */}
+      <button
+        type="button"
+        className={styles.tileButton}
+        onClick={onOpen}
+        aria-expanded={open}
+        aria-label={`Review footage from ${frame.sourceId}`}
+      >
+        <LiveTile
+          sourceId={frame.sourceId}
+          className={styles.shot}
+          onLiveChange={setLive}
+          onStateChange={setStreamState}
+          alt={
+            live
+              ? `Live camera from ${frame.sourceId}`
+              : `Latest frame published by ${frame.sourceId}`
+          }
+          // The browser fetches each frame, so one officer's upload is not
+          // multiplied by the number of people watching.
+          fallbackSrc={`/api/streams/${encodeURIComponent(frame.sourceId)}/frame?live=${Date.parse(frame.at)}`}
+        />
+        <figcaption className={styles.caption}>
+          <span className={styles.unit}>{frame.sourceId}</span>
+          {/* Video has no age to report, and a still must never borrow the
+              word that belongs to video. */}
+          {live ? (
+            <span className={styles.live}>LIVE</span>
+          ) : streamState === "connecting" ? (
+            <span className={styles.connecting}>CONNECTING</span>
+          ) : (
+            <span className={styles.age} data-freshness={freshness(age)}>
+              {describeAge(age)}
+            </span>
+          )}
+        </figcaption>
+        {/* A machine transcript, and labelled as one: it mishears, and silence
+            is indistinguishable from speech it failed to recognise. */}
+        {frame.heard && (
+          <p className={styles.heard}>
+            <span className={styles.heardLabel}>Heard</span>
+            {frame.heard}
+          </p>
+        )}
+      </button>
+    </figure>
+  );
+}
 
 /**
  * Every officer currently publishing, as their latest frame.
@@ -92,44 +169,15 @@ export function BodyCamWall({ excludeSourceId, className = "panel" }: BodyCamWal
         </p>
       ) : (
         <div className={styles.wall}>
-          {frames.map((frame) => {
-            const age = ageMs(frame, now);
-            return (
-              <figure className={styles.tile} key={frame.sourceId}>
-                {/* A tile is a way into that officer's recent footage. */}
-                <button
-                  type="button"
-                  className={styles.tileButton}
-                  onClick={() => setReviewing(frame.sourceId === reviewing ? null : frame.sourceId)}
-                  aria-label={`Review footage from ${frame.sourceId}`}
-                >
-                  {/* The browser fetches each frame, so one officer's upload is
-                      not multiplied by the number of people watching. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    className={styles.shot}
-                    src={`/api/streams/${encodeURIComponent(frame.sourceId)}/frame?live=${Date.parse(frame.at)}`}
-                    alt={`Latest frame published by ${frame.sourceId}`}
-                  />
-                  <figcaption className={styles.caption}>
-                    <span className={styles.unit}>{frame.sourceId}</span>
-                    <span className={styles.age} data-freshness={freshness(age)}>
-                      {describeAge(age)}
-                    </span>
-                  </figcaption>
-                  {/* A machine transcript, and labelled as one: it mishears,
-                      and silence is indistinguishable from speech it failed
-                      to recognise. */}
-                  {frame.heard && (
-                    <p className={styles.heard}>
-                      <span className={styles.heardLabel}>Heard</span>
-                      {frame.heard}
-                    </p>
-                  )}
-                </button>
-              </figure>
-            );
-          })}
+          {frames.map((frame) => (
+            <WallTile
+              key={frame.sourceId}
+              frame={frame}
+              age={ageMs(frame, now)}
+              open={frame.sourceId === reviewing}
+              onOpen={() => setReviewing(frame.sourceId === reviewing ? null : frame.sourceId)}
+            />
+          ))}
         </div>
       )}
 
@@ -140,9 +188,10 @@ export function BodyCamWall({ excludeSourceId, className = "panel" }: BodyCamWal
       )}
 
       <p className={styles.caveat}>
-        Latest frame per officer, about one every two seconds. These are stills, not a live video
-        feed, and each is labelled with its own age. Select a tile to scrub the last fifteen
-        minutes; nothing older is kept.
+        A tile marked LIVE is a direct video link to that camera. Any other tile is that
+        officer&apos;s latest uploaded still, about one every two seconds, labelled with its own age
+        — a link that could not be made is not a camera that stopped. Select a tile to scrub the
+        last fifteen minutes of stills; nothing older is kept, and live video is never recorded.
       </p>
     </section>
   );

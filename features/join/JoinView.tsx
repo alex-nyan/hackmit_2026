@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { isValidToken } from "@/features/camera-triage/frame";
 
 import { useCameraTriage, type CaptureState } from "@/features/camera-triage";
 import { useDevicePosition, type DevicePositionState } from "@/features/live-track";
+import { useLivePublisher } from "@/features/live-video";
 
 import styles from "./JoinView.module.css";
 import { guestLabel, isGuestId, newGuestId } from "./guestId";
@@ -21,6 +23,11 @@ import { guestLabel, isGuestId, newGuestId } from "./guestId";
  */
 
 const STORAGE_KEY = "paw-patrol.guest-id";
+
+interface LinkedUnit {
+  sourceId: string;
+  name: string;
+}
 
 /**
  * The same phone keeps the same id across a reload.
@@ -56,6 +63,8 @@ function loadGuestId(): string {
  * on the client, and no render where it is briefly the wrong one.
  */
 let memoizedGuestId: string | null = null;
+let linkedUnitSearch: string | null = null;
+let memoizedLinkedUnit: LinkedUnit | null = null;
 
 function guestIdSnapshot(): string {
   memoizedGuestId ??= loadGuestId();
@@ -68,9 +77,37 @@ const noGuestIdOnServer = () => null;
 const secureSnapshot = () => window.isSecureContext;
 const assumeSecureOnServer = () => true;
 
+/**
+ * A camera panel can pair the phone holding its Continuity Camera with the
+ * camera source it is already broadcasting. The phone still grants GPS itself;
+ * this query only makes its green marker and video tile refer to the same unit.
+ */
+function linkedUnitSnapshot(): LinkedUnit | null {
+  const search = window.location.search;
+  // useSyncExternalStore compares snapshots by reference. Keep the parsed
+  // object for this immutable URL rather than returning a fresh object every
+  // render, which made a newly scanned pairing link unstable until reload.
+  if (search === linkedUnitSearch) return memoizedLinkedUnit;
+
+  linkedUnitSearch = search;
+  const query = new URLSearchParams(search);
+  const sourceId = query.get("sourceId") ?? "";
+  if (!isValidToken(sourceId)) {
+    memoizedLinkedUnit = null;
+    return memoizedLinkedUnit;
+  }
+
+  const requestedName = query.get("name")?.trim() ?? "";
+  memoizedLinkedUnit = { sourceId, name: requestedName.slice(0, 80) || sourceId };
+  return memoizedLinkedUnit;
+}
+
+const noLinkedUnitOnServer = () => null;
+
 export function JoinView() {
   const unitId = useSyncExternalStore(neverChanges, guestIdSnapshot, noGuestIdOnServer);
   const secure = useSyncExternalStore(neverChanges, secureSnapshot, assumeSecureOnServer);
+  const linkedUnit = useSyncExternalStore(neverChanges, linkedUnitSnapshot, noLinkedUnitOnServer);
 
   if (unitId === null) {
     return (
@@ -82,7 +119,13 @@ export function JoinView() {
     );
   }
 
-  return <JoinSession unitId={unitId} secure={secure} />;
+  return (
+    <JoinSession
+      unitId={linkedUnit?.sourceId ?? unitId}
+      displayName={linkedUnit?.name}
+      secure={secure}
+    />
+  );
 }
 
 /**
@@ -90,7 +133,15 @@ export function JoinView() {
  * then renaming the unit it publishes under would leave the first id on the map
  * with nobody behind it.
  */
-function JoinSession({ unitId, secure }: { unitId: string; secure: boolean }) {
+function JoinSession({
+  unitId,
+  displayName,
+  secure,
+}: {
+  unitId: string;
+  displayName?: string;
+  secure: boolean;
+}) {
   const {
     state: positionState,
     start: startPosition,
@@ -98,13 +149,18 @@ function JoinSession({ unitId, secure }: { unitId: string; secure: boolean }) {
     // The id is what everything publishes under; the label is what a
     // dispatcher reads. Passing only the id put `guest-q4qd` in the roster,
     // which is the storage key rather than a name for a person.
-  } = useDevicePosition(unitId, guestLabel(unitId));
+  } = useDevicePosition(unitId, displayName ?? guestLabel(unitId));
   const {
     state: cameraState,
     videoRef,
     start: startCamera,
     stop: stopCamera,
+    stream,
   } = useCameraTriage({ sourceId: unitId });
+  // A guest's camera reaches the dashboards the same way an officer's does.
+  // Nothing extra is asked of the person holding the phone: this is the track
+  // they already agreed to share, taking a faster road to the same screens.
+  useLivePublisher(unitId, stream);
 
   const live = positionState.state === "publishing";
   const asking = positionState.state === "requesting";
@@ -141,9 +197,10 @@ function JoinSession({ unitId, secure }: { unitId: string; secure: boolean }) {
     <main className={styles.root}>
       <header className={styles.header}>
         <p className={styles.eyebrow}>Paw Patrol · live map</p>
+        <a href="/sign-in">Officer sign-in →</a>
         <h1 className={styles.title}>{live ? "You are on the map" : "Join the map"}</h1>
         <p className={styles.unit}>
-          Publishing as <strong>{guestLabel(unitId)}</strong>
+          Publishing as <strong>{displayName ?? guestLabel(unitId)}</strong>
         </p>
       </header>
 

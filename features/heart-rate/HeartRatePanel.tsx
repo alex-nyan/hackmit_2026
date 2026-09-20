@@ -115,8 +115,9 @@ export function HeartRatePanel({
         </p>
       )}
       <p id={descriptionId} className={styles.disclosure}>
-        Connect your own device for testing a fictional profile. Readings stay in this tab: no
-        upload, saving, cross-port sharing, or automatic alerts.
+        Connect your own device for testing a fictional profile. Readings stay in this tab unless
+        you choose “Share current heart rate” in Situation &amp; medic report. Shared snapshots are
+        saved to the workspace log. No automatic alerts.
       </p>
       <details className={styles.setup}>
         <summary>HeartCast setup &amp; privacy</summary>
@@ -144,8 +145,9 @@ export function HeartRatePanel({
           decisions remain separate.
         </p>
         <p>
-          Only this tab receives these readings; the other dashboard ports do not. Close this tab to
-          end its local session. HeartCast is a separate app with its own data handling.
+          Only this tab receives the continuous readings; explicitly shared snapshots appear in
+          other workspaces. Close this tab to end its local session. HeartCast is a separate app
+          with its own data handling.
         </p>
       </details>
     </section>
