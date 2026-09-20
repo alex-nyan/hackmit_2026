@@ -101,7 +101,7 @@ export default async function SignIn({
               </div>
             )}
             <button className={styles.submit} type="submit" disabled={!hasOfficers}>
-              Continue <ArrowRight size={17} aria-hidden="true" />
+              Log in <ArrowRight size={17} aria-hidden="true" />
             </button>
           </form>
         </section>
