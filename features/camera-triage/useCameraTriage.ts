@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { trackConstraint } from "./devices";
 import { buildTriageRequest, nextDelayMs } from "./frame";
 import type { CaptureState, TriageResult } from "./types";
 
@@ -12,6 +13,8 @@ const JPEG_QUALITY = 0.72;
 interface Options {
   sourceId: string;
   incidentId?: string | null;
+  /** Explicit capture device, so a Continuity Camera can be chosen over the webcam. */
+  cameraId?: string | null;
 }
 
 /**
@@ -20,7 +23,7 @@ interface Options {
  * only after the previous request settles; a fixed interval would queue frames
  * until they aged past the service's staleness limit.
  */
-export function useCameraTriage({ sourceId, incidentId }: Options) {
+export function useCameraTriage({ sourceId, incidentId, cameraId }: Options) {
   const [state, setState] = useState<CaptureState>({ state: "idle" });
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -33,7 +36,10 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
 
   const stop = useCallback(() => {
     sessionRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current?.getTracks().forEach((track) => {
+      track.onended = null;
+      track.stop();
+    });
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setState({ state: "idle" });
@@ -59,7 +65,9 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
     setState({ state: "requesting-camera" });
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: CAPTURE_WIDTH } },
+        video: cameraId
+          ? trackConstraint(cameraId)
+          : { facingMode: "environment", width: { ideal: CAPTURE_WIDTH } },
         audio: false,
       });
       if (sessionRef.current !== session) {
@@ -67,6 +75,16 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
         return;
       }
       streamRef.current = stream;
+      stream.getTracks().forEach((track) => {
+        track.onended = () => {
+          if (sessionRef.current !== session) return;
+          stop();
+          setState({
+            state: "denied",
+            reason: "Camera capture ended. Start the camera to try again.",
+          });
+        };
+      });
       const video = videoRef.current;
       if (video) {
         video.srcObject = stream;
@@ -77,7 +95,10 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
     } catch (error) {
       if (sessionRef.current !== session) return;
       sessionRef.current = null;
-      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current?.getTracks().forEach((track) => {
+        track.onended = null;
+        track.stop();
+      });
       streamRef.current = null;
       if (videoRef.current) videoRef.current.srcObject = null;
       const name = error instanceof Error ? error.name : "";
@@ -89,7 +110,7 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
             : "No usable camera was found.",
       });
     }
-  }, []);
+  }, [cameraId, stop]);
 
   useEffect(() => {
     if (state.state !== "running") return;

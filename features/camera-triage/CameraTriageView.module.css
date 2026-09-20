@@ -147,3 +147,14 @@
   text-transform: uppercase;
   color: #8a97a0;
 }
+
+.picker {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 11px;
+  border: 1px solid rgb(237 242 243 / 18%);
+  border-radius: 11px;
+  background: #0d1216;
+  color: #edf2f3;
+  font: inherit;
+}

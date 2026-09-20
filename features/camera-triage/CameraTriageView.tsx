@@ -6,15 +6,23 @@ import { describeTranscript } from "./audio";
 import styles from "./CameraTriageView.module.css";
 import { useAudioTranscription } from "./useAudioTranscription";
 import { useCameraTriage } from "./useCameraTriage";
+import { useCaptureDevices } from "./useCaptureDevices";
 
 export function CameraTriageView() {
   const [sourceId, setSourceId] = useState("unit-01");
-  const { state, videoRef, start, stop } = useCameraTriage({ sourceId });
+  const { devices, cameraId, setCameraId, refreshDevices } = useCaptureDevices();
+  const { state, videoRef, start, stop } = useCameraTriage({ sourceId, cameraId });
   const audio = useAudioTranscription(sourceId);
   const running = state.state === "running";
   const listening =
     audio.state.state === "recording" || audio.state.state === "requesting-microphone";
   const active = running || state.state === "requesting-camera";
+
+  async function startCamera() {
+    setCameraId(cameraId);
+    await start();
+    await refreshDevices();
+  }
 
   return (
     <main className={styles.root}>
@@ -36,11 +44,28 @@ export function CameraTriageView() {
             type="button"
             className={styles.button}
             data-stop={active ? "true" : undefined}
-            onClick={() => (active ? stop() : void start())}
+            onClick={() => (active ? stop() : void startCamera())}
           >
             {active ? "Stop" : "Start"}
           </button>
         </div>
+
+        {devices.cameras.length > 1 && (
+          <select
+            className={styles.picker}
+            value={cameraId ?? ""}
+            onChange={(event) => setCameraId(event.target.value || null)}
+            disabled={active}
+            aria-label="Camera"
+          >
+            <option value="">Default camera</option>
+            {devices.cameras.map((device) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label || "Camera"}
+              </option>
+            ))}
+          </select>
+        )}
 
         <div className={styles.row}>
           <button

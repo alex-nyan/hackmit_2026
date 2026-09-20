@@ -7,8 +7,9 @@ const getUserMedia = vi.fn<() => Promise<MediaStream>>();
 
 function cameraStream() {
   const stop = vi.fn();
-  const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
-  return { stream, stop };
+  const track = { stop, onended: null as (() => void) | null };
+  const stream = { getTracks: () => [track] } as unknown as MediaStream;
+  return { stream, stop, track };
 }
 
 beforeEach(() => {
@@ -24,6 +25,37 @@ afterEach(() => {
 });
 
 describe("camera acquisition lifecycle", () => {
+  it("releases a disconnected camera and allows another device to start", async () => {
+    const phone = cameraStream();
+    const webcam = cameraStream();
+    getUserMedia.mockResolvedValueOnce(phone.stream).mockResolvedValueOnce(webcam.stream);
+    const { result, rerender } = renderHook(
+      ({ cameraId }: { cameraId: string | null }) =>
+        useCameraTriage({ sourceId: "unit-01", cameraId }),
+      { initialProps: { cameraId: "iphone" as string | null } },
+    );
+    await act(async () => result.current.start());
+    expect(getUserMedia).toHaveBeenLastCalledWith({
+      video: { deviceId: { exact: "iphone" } },
+      audio: false,
+    });
+    const disconnected = phone.track.onended!;
+    act(() => disconnected());
+    expect(result.current.state.state).toBe("denied");
+    expect(phone.stop).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+
+    rerender({ cameraId: null });
+    await act(async () => result.current.start());
+    expect(getUserMedia).toHaveBeenLastCalledWith({
+      video: { facingMode: "environment", width: { ideal: 1280 } },
+      audio: false,
+    });
+    act(() => disconnected());
+    expect(result.current.state.state).toBe("running");
+    expect(webcam.stop).not.toHaveBeenCalled();
+  });
+
   it.each(["stop", "unmount"] as const)("releases a camera granted after %s", async (action) => {
     const acquisition = Promise.withResolvers<MediaStream>();
     const camera = cameraStream();

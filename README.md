@@ -167,6 +167,21 @@ The dashboard has no user login: anyone who can reach `/api/triage` or
 Keep this demo on a trusted LAN,
 or put authenticated access in front of the dashboard before exposing it publicly.
 
+### Using an iPhone as the camera
+
+macOS Continuity Camera exposes a nearby iPhone as an ordinary capture device,
+which sidesteps the HTTPS problem entirely: the browser runs on the Mac at
+`localhost`, and the phone is merely the lens. Both devices must be signed into
+the same Apple Account with two-factor, with Wi-Fi and Bluetooth on; a USB cable
+is the most reliable connection. The camera pickers preselect an iPhone or iPad
+when one appears, and the list refreshes on `devicechange` because a Continuity
+Camera comes and goes as the phone becomes eligible.
+
+`/capture/check` tests capture alone, with **no network calls at all**, so a
+device problem cannot be confused with a service problem. It reports the origin,
+whether the page is in a secure context, which devices were granted, what
+formats the browser can record, and it plays a short clip back locally.
+
 ### Camera access needs HTTPS
 
 Browsers expose `getUserMedia` only in a secure context. `localhost` is exempt,
@@ -244,8 +259,9 @@ stay in the foreground. Only a native app can do otherwise.
 - Responsive layout, loading feedback, missing-token and failed-load states.
 - Optional live fleet tracking from a Traccar server: every unit on one map,
   opt-in and server-authenticated.
-- Optional camera hazard triage and audio transcription at `/capture`, proxied so
-  the service token stays on the server.
+- Optional camera hazard triage and audio transcription, on the dashboard and at
+  `/capture`, proxied so the service token stays on the server.
+- Works with an iPhone over Continuity Camera, or any built-in camera.
 - Isolated map feature modules, TypeScript, tests, and CI checks.
 
 The separate Paw Patrol workspaces use synthetic demonstration data; Traccar
