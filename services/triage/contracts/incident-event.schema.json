@@ -29,7 +29,8 @@
         "visual_observed",
         "transcript_observed",
         "context_updated",
-        "source_reset"
+        "source_reset",
+        "handoff_recorded"
       ],
       "title": "Kind",
       "type": "string"

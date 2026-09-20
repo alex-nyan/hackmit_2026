@@ -45,4 +45,14 @@ Review corrected stop/start races and stale callbacks, audio continuity across d
 
 This host has Command Line Tools, without iOS/watchOS SDKs or XCTest. Full native SDK compilation, signing, installation, permission behavior, mirroring, and paired-device endurance remain unverified. The native README supplies the build and device acceptance steps; the checks above are not a device-build claim.
 
-Remaining phases: live workspace presentation and handoff; integrated fault/replay verification. Hardware latency/endurance, domain-trained weapon performance, and field/clinical qualification require separate evidence and are not established by software unit tests.
+**Phase 4 — live workspace and human patient handoff: implemented.**
+
+The dashboard has an explicit live mode with authenticated roles, SSE snapshot recovery, actual source readings, phone locations, camera/audio observations, exact-capture evidence previews, optional unverified context, assistance/review commands and expiring human scene reports. Freshness deadlines advance between server polls. Credentials remain in an encrypted HttpOnly session; HTTPS deployments can declare their canonical browser origin.
+
+Explicit patient enrollments and patient grants protect manual MIST records. Unknown fields remain null, attribution comes from the authenticated human, and records are labeled local rather than externally delivered. Officer/source roles cannot access patient clinical records. Concurrent handoff changes block stale drafts. Uncertain command retries preserve the original body and idempotency key even when the incident revision advances.
+
+Review corrected authorization after grant/roster removal, cached-receipt authorization, restricted dispatch patient scope, bootstrap sign-in races, stale handoff replacement, freshness between polls, and Next's normalized loopback hostname. SQLite databases and sidecars use private file permissions; an encrypted host volume remains necessary for encryption at rest.
+
+Validation: 234 backend tests passed, one optional real-model smoke skipped; 124 dashboard tests and four lockfile tests passed; 241 root app tests and 13 launcher tests passed. Both apps passed TypeScript, lint and production builds. Browser verification exercised sign-in, assistance, acknowledgment, manual handoff, measured readings, interrupted coverage, backend outage and sign-out. The outage retained explicitly stale readings and disabled authoritative report updates; it never substituted demo data.
+
+Remaining phase: integrated fault/replay verification and runbook/CI wiring. Hardware latency/endurance, domain-trained weapon performance, native SDK/device qualification and field/clinical qualification require separate evidence and are not established by software unit tests.

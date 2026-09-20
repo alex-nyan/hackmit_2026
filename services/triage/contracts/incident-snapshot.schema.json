@@ -86,6 +86,19 @@
           "title": "Freshness",
           "type": "string"
         },
+        "freshness_expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Freshness Expires At"
+        },
         "kind": {
           "enum": [
             "assistance_request",
@@ -179,6 +192,7 @@
         "attention",
         "disposition",
         "freshness",
+        "freshness_expires_at",
         "requires_human_review",
         "created_by",
         "acknowledged_by",
@@ -487,6 +501,124 @@
       "title": "HeartRateValue",
       "type": "object"
     },
+    "HumanHandoff": {
+      "additionalProperties": false,
+      "properties": {
+        "delivery_status": {
+          "const": "recorded_locally_not_transmitted",
+          "default": "recorded_locally_not_transmitted",
+          "title": "Delivery Status",
+          "type": "string"
+        },
+        "handoff_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Handoff Id",
+          "type": "string"
+        },
+        "handoff_revision": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Handoff Revision",
+          "type": "integer"
+        },
+        "incident_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "injuries": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Injuries"
+        },
+        "mechanism": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mechanism"
+        },
+        "patient_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Patient Id",
+          "type": "string"
+        },
+        "provenance": {
+          "const": "human_reported",
+          "default": "human_reported",
+          "title": "Provenance",
+          "type": "string"
+        },
+        "recorded_by": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "signs": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Signs"
+        },
+        "treatments": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Treatments"
+        }
+      },
+      "required": [
+        "handoff_id",
+        "incident_id",
+        "patient_id",
+        "handoff_revision",
+        "mechanism",
+        "injuries",
+        "signs",
+        "treatments",
+        "recorded_by",
+        "provenance",
+        "delivery_status"
+      ],
+      "title": "HumanHandoff",
+      "type": "object"
+    },
     "LocationValue": {
       "additionalProperties": false,
       "properties": {
@@ -762,6 +894,19 @@
           "title": "Freshness",
           "type": "string"
         },
+        "freshness_expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Freshness Expires At"
+        },
         "kind": {
           "enum": [
             "heart_rate",
@@ -868,6 +1013,7 @@
         "value",
         "provenance",
         "freshness",
+        "freshness_expires_at",
         "age_seconds",
         "warnings"
       ],
@@ -886,6 +1032,38 @@
         "visual": "MediaResult"
       },
       "x-subject-kind": "heart_rate"
+    },
+    "PatientEnrollment": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Display Name",
+          "type": "string"
+        },
+        "incident_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "patient_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Patient Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "patient_id",
+        "incident_id",
+        "display_name"
+      ],
+      "title": "PatientEnrollment",
+      "type": "object"
     },
     "SceneReport": {
       "additionalProperties": false,
@@ -1054,6 +1232,19 @@
           "title": "Display Name",
           "type": "string"
         },
+        "freshness_expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Freshness Expires At"
+        },
         "incident_id": {
           "maxLength": 128,
           "minLength": 1,
@@ -1165,7 +1356,8 @@
         "age_seconds",
         "sequence_gaps",
         "boot_id",
-        "reason"
+        "reason",
+        "freshness_expires_at"
       ],
       "title": "SourceState",
       "type": "object"
@@ -1392,6 +1584,13 @@
       "title": "Generated At",
       "type": "string"
     },
+    "handoffs": {
+      "items": {
+        "$ref": "#/$defs/HumanHandoff"
+      },
+      "title": "Handoffs",
+      "type": "array"
+    },
     "incident_id": {
       "maxLength": 128,
       "minLength": 1,
@@ -1404,6 +1603,13 @@
         "$ref": "#/$defs/Observation"
       },
       "title": "Observations",
+      "type": "array"
+    },
+    "patients": {
+      "items": {
+        "$ref": "#/$defs/PatientEnrollment"
+      },
+      "title": "Patients",
       "type": "array"
     },
     "revision": {
@@ -1441,7 +1647,9 @@
     "sources",
     "observations",
     "alerts",
-    "scene_reports"
+    "scene_reports",
+    "patients",
+    "handoffs"
   ],
   "title": "IncidentSnapshot",
   "type": "object"

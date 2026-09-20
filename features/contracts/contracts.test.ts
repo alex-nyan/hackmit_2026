@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ContractValidationError,
   parseIncidentEvent,
+  parseIncidentCommand,
   parseIncidentSnapshot,
   parseTelemetryRequest,
   parseTranscriptionResult,
@@ -93,6 +94,8 @@ describe("generated incident contracts", () => {
         observations: [],
         alerts: [],
         scene_reports: [],
+        patients: [],
+        handoffs: [],
       }),
     ).toThrow(ContractValidationError);
   });
@@ -124,6 +127,8 @@ describe("observation kind and identity boundaries", () => {
       sources: [],
       alerts: [],
       scene_reports: [],
+      patients: [],
+      handoffs: [],
       observations: [
         {
           observation_id: "media-1",
@@ -136,6 +141,7 @@ describe("observation kind and identity boundaries", () => {
           sequence: 1,
           provenance: "machine_observed",
           freshness: "fresh",
+          freshness_expires_at: "2026-09-20T01:00:03Z",
           age_seconds: 0,
           warnings: [],
           value: {
@@ -178,5 +184,28 @@ describe("observation kind and identity boundaries", () => {
     const observation: Record<string, unknown> = value.observations[0];
     observation.subject_id = "person-1";
     expect(() => parseIncidentSnapshot(value)).toThrow(ContractValidationError);
+  });
+
+  it("requires the explicit freshness deadline field even when its value is unavailable", () => {
+    const value = snapshot();
+    const observation: Record<string, unknown> = value.observations[0];
+    delete observation.freshness_expires_at;
+    expect(() => parseIncidentSnapshot(value)).toThrow(ContractValidationError);
+    observation.freshness_expires_at = null;
+    expect(() => parseIncidentSnapshot(value)).not.toThrow();
+  });
+});
+
+describe("human handoff boundary", () => {
+  it("requires at least one human-reported field without fabricating the others", () => {
+    const command = { kind: "submit_handoff", expected_revision: 1, patient_id: "patient-1" };
+    expect(() => parseIncidentCommand(command)).toThrow(ContractValidationError);
+    expect(() => parseIncidentCommand({ ...command, signs: null })).toThrow(
+      ContractValidationError,
+    );
+    expect(parseIncidentCommand({ ...command, signs: "Patient reports dizziness" })).toEqual({
+      ...command,
+      signs: "Patient reports dizziness",
+    });
   });
 });

@@ -2,7 +2,9 @@
 
 import hashlib
 import json
+import os
 import sqlite3
+import stat
 import threading
 import uuid
 from contextlib import contextmanager
@@ -17,6 +19,7 @@ from triage.live_schemas import (
     AssistanceCommand,
     Attribution,
     CommandReceipt,
+    HumanHandoff,
     IncidentCommand,
     IncidentEvent,
     IncidentSnapshot,
@@ -27,6 +30,7 @@ from triage.live_schemas import (
     SceneReport,
     SceneReportCommand,
     SourceState,
+    SubmitHandoffCommand,
     TelemetryReceipt,
     TelemetryRequest,
 )
@@ -56,16 +60,32 @@ def require_incident(principal: LivePrincipal, incident_id: str) -> None:
 
 
 def source_visible(principal: LivePrincipal, source: dict) -> bool:
-    """Hospital wearable access requires an explicit patient-source grant."""
+    """Patient permissions do not depend on the size of the enrollment roster."""
     if principal.role in {"source", "hospital"}:
         if source["source_id"] not in principal.source_ids:
             return False
     elif principal.source_ids and source["source_id"] not in principal.source_ids:
         return False
+    if source["wearer_role"] == "patient":
+        if principal.role == "officer":
+            return False
+        if principal.role == "hospital" or (principal.role == "dispatch" and principal.patient_ids):
+            if source["wearer_id"] not in principal.patient_ids:
+                return False
     return not (
         principal.role == "hospital"
         and source["kind"] == "watch"
         and source["wearer_role"] != "patient"
+    )
+
+
+def patient_visible(principal: LivePrincipal, patient: dict) -> bool:
+    if patient["incident_id"] not in principal.incident_ids:
+        return False
+    if principal.role == "hospital":
+        return patient["patient_id"] in principal.patient_ids
+    return principal.role == "dispatch" and (
+        not principal.patient_ids or patient["patient_id"] in principal.patient_ids
     )
 
 
@@ -74,7 +94,8 @@ class LiveStore:
         self.settings = settings
         self.lock = threading.RLock()
         self.publication_failures: set[tuple[str, str]] = set()
-        settings.live_database_path.parent.mkdir(parents=True, exist_ok=True)
+        settings.live_database_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self._protect_database_files(settings.live_database_path)
         self.connection = sqlite3.connect(settings.live_database_path, check_same_thread=False)
         self.connection.row_factory = sqlite3.Row
         self.connection.execute("PRAGMA journal_mode=WAL")
@@ -87,6 +108,9 @@ class LiveStore:
             );
             CREATE TABLE IF NOT EXISTS live_enrollments (
                 source_id TEXT PRIMARY KEY, enrollment TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS live_patient_enrollments (
+                patient_id TEXT PRIMARY KEY, enrollment TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS live_events (
                 incident_id TEXT NOT NULL, revision INTEGER NOT NULL, event TEXT NOT NULL,
@@ -119,6 +143,26 @@ class LiveStore:
         with self.lock:
             self.connection.close()
 
+    @staticmethod
+    def _protect_database_files(path) -> None:
+        """Restrict the dedicated database and existing SQLite sidecars, not their parent."""
+        for suffix in ("", "-wal", "-shm"):
+            flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+            if not suffix:
+                flags |= os.O_CREAT
+            try:
+                descriptor = os.open(str(path) + suffix, flags, 0o600)
+            except FileNotFoundError:
+                if suffix:
+                    continue
+                raise
+            try:
+                if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                    raise LiveError(503, "invalid_database_file")
+                os.fchmod(descriptor, 0o600)
+            finally:
+                os.close(descriptor)
+
     @contextmanager
     def _transaction(self):
         with self.lock:
@@ -146,6 +190,8 @@ class LiveStore:
                     "observations": [],
                     "alerts": [],
                     "scene_reports": [],
+                    "handoffs": [],
+                    "handoff_revisions": {},
                     "runtime": {},
                 }
                 connection.execute(
@@ -181,6 +227,18 @@ class LiveStore:
                     )
                     state["runtime"][source.source_id] = {"boots": {}, "latest": {}}
                     self._save(connection, state)
+            for patient in self.settings.live_patients:
+                encoded = canonical(patient.model_dump(mode="json"))
+                previous = connection.execute(
+                    "SELECT enrollment FROM live_patient_enrollments WHERE patient_id=?",
+                    (patient.patient_id,),
+                ).fetchone()
+                if previous and previous["enrollment"] != encoded:
+                    raise LiveError(503, "patient_enrollment_changed_requires_new_id")
+                connection.execute(
+                    "INSERT OR IGNORE INTO live_patient_enrollments VALUES (?, ?)",
+                    (patient.patient_id, encoded),
+                )
             # A process restart is a monitoring gap, even when the last sample is recent.
             for incident_id in self.settings.live_incident_ids:
                 state = self._load(connection, incident_id)
@@ -195,6 +253,9 @@ class LiveStore:
                         observation["freshness"] = "stale"
                         if "monitoring_gap" not in observation["warnings"]:
                             observation["warnings"].append("monitoring_gap")
+                for alert in state["alerts"]:
+                    alert["_monitoring_gap"] = True
+                    changed = True
                 if changed:
                     self._append_event(connection, state, "source_reset", now)
 
@@ -249,15 +310,36 @@ class LiveStore:
         except sqlite3.Error:
             raise LiveError(503, "live_store_unavailable") from None
         runtime = state.pop("runtime")
+        state.pop("handoff_revisions", None)
+        state["patients"] = [
+            patient.model_dump(mode="json")
+            for patient in self.settings.live_patients
+            if patient.incident_id == incident_id
+            and (principal is None or patient_visible(principal, patient.model_dump()))
+        ]
+        visible_patients = {patient["patient_id"] for patient in state["patients"]}
+        state["handoffs"] = [
+            handoff
+            for handoff in state.get("handoffs", [])
+            if handoff["patient_id"] in visible_patients
+        ]
         configured = {source.source_id for source in self.settings.live_sources}
+        enrolled_patients = {
+            (patient.patient_id, patient.incident_id) for patient in self.settings.live_patients
+        }
         state["sources"] = [
             source
             for source in state["sources"]
             if source["source_id"] in configured
+            and (
+                source["wearer_role"] != "patient"
+                or (source["wearer_id"], incident_id) in enrolled_patients
+            )
             and (principal is None or source_visible(principal, source))
         ]
         visible = {source["source_id"] for source in state["sources"]}
         for source in state["sources"]:
+            source["freshness_expires_at"] = None
             measured = source["last_measured_at"]
             source["age_seconds"] = (
                 max(0, (now - timestamp(measured)).total_seconds()) if measured else None
@@ -268,6 +350,7 @@ class LiveStore:
                     "microphone": "transcript",
                 }.get(source["kind"], "source_health")
             )
+            expiry = timestamp(measured) + timedelta(seconds=source_limit) if measured else None
             if (
                 measured
                 and source["age_seconds"] > source_limit
@@ -286,6 +369,10 @@ class LiveStore:
                     ),
                     None,
                 )
+                if machine is not None and expiry is not None:
+                    expiry = min(
+                        expiry, timestamp(machine["measured_at"]) + timedelta(seconds=source_limit)
+                    )
                 if (incident_id, source["source_id"]) in self.publication_failures:
                     source["availability"] = "unavailable"
                     source["reason"] = "inference_publication_unavailable"
@@ -302,10 +389,14 @@ class LiveStore:
                     elif "monitoring_gap" in machine["warnings"]:
                         source["availability"] = "unknown"
                         source["reason"] = "service_restarted"
+            if expiry and source["availability"] in {"available", "stale"}:
+                if source["availability"] == "available" or expiry <= now:
+                    source["freshness_expires_at"] = expiry.isoformat()
         state["observations"] = [
             item for item in state["observations"] if item["source_id"] in visible
         ]
         for observation in state["observations"]:
+            observation["freshness_expires_at"] = None
             age = max(0, (now - timestamp(observation["measured_at"])).total_seconds())
             observation["age_seconds"] = age
             if observation["freshness"] != "historical":
@@ -321,12 +412,20 @@ class LiveStore:
                 state["revision"] > observation["value"]["snapshot_revision"] + 1
             ):
                 observation["freshness"] = "stale"
+            expiry = timestamp(observation["measured_at"]) + timedelta(
+                seconds=self._freshness_limit(observation["kind"])
+            )
+            if observation["freshness"] == "fresh" or (
+                observation["freshness"] == "stale" and expiry <= now
+            ):
+                observation["freshness_expires_at"] = expiry.isoformat()
         state["alerts"] = [
             item
             for item in state["alerts"]
             if item["source_id"] is None or item["source_id"] in visible
         ]
         for alert in state["alerts"]:
+            monitoring_gap = alert.pop("_monitoring_gap", False)
             age = (now - timestamp(alert["observed_at"])).total_seconds()
             alert_limit = (
                 self._freshness_limit("visual")
@@ -338,6 +437,12 @@ class LiveStore:
                 else self.settings.live_freshness_seconds
             )
             alert["freshness"] = "stale" if age > alert_limit else "fresh"
+            alert["freshness_expires_at"] = (
+                timestamp(alert["observed_at"]) + timedelta(seconds=alert_limit)
+            ).isoformat()
+            if monitoring_gap:
+                alert["freshness"] = "stale"
+                alert["freshness_expires_at"] = None
         for report in state["scene_reports"]:
             report["effective"] = (
                 report["revoked_by"] is None
@@ -517,10 +622,39 @@ class LiveStore:
         if principal.role == "source" and command.kind != "assistance":
             raise LiveError(403, "command_forbidden")
         if principal.role == "hospital" and command.kind not in {"assistance", "acknowledge"}:
+            if command.kind != "submit_handoff":
+                raise LiveError(403, "command_forbidden")
+        if command.kind == "submit_handoff" and principal.role not in {"dispatch", "hospital"}:
             raise LiveError(403, "command_forbidden")
+        if isinstance(command, SubmitHandoffCommand):
+            patient = next(
+                (
+                    item
+                    for item in self.settings.live_patients
+                    if item.patient_id == command.patient_id and item.incident_id == incident_id
+                ),
+                None,
+            )
+            if patient is None or not patient_visible(principal, patient.model_dump()):
+                raise LiveError(403, "patient_forbidden")
         digest = fingerprint(command.model_dump(mode="json"))
         with self._transaction() as connection:
             state = self._load(connection, incident_id)
+            # Retried writes are authenticated against today's grants before returning
+            # a cached receipt. Idempotency records never preserve revoked authority.
+            if isinstance(command, AssistanceCommand):
+                if command.source_id is not None:
+                    self._authorize_command_source(state, principal, command.source_id)
+                elif principal.role == "source":
+                    raise LiveError(422, "assistance_source_required")
+            elif isinstance(command, AlertCommand):
+                target = next(
+                    (item for item in state["alerts"] if item["alert_id"] == command.alert_id), None
+                )
+                if target is None:
+                    raise LiveError(404, "alert_not_found")
+                if target["source_id"] is not None:
+                    self._authorize_command_source(state, principal, target["source_id"])
             previous = connection.execute(
                 "SELECT fingerprint, receipt FROM live_commands "
                 "WHERE principal_id=? AND incident_id=? AND key=?",
@@ -544,9 +678,9 @@ class LiveStore:
                 principal_id=principal.principal_id,
                 role=principal.role,
                 at=now,
-                note=command.note,
+                note=getattr(command, "note", None),
             )
-            alert_id, report_id = None, None
+            alert_id, report_id, handoff_id = None, None, None
             if isinstance(command, AssistanceCommand):
                 if command.source_id is not None:
                     source = next(
@@ -556,7 +690,10 @@ class LiveStore:
                     if (
                         source is None
                         or command.source_id not in configured
-                        or not source_visible(principal, source)
+                        or not source_visible(
+                            principal,
+                            source,
+                        )
                     ):
                         raise LiveError(403, "source_forbidden")
                 elif principal.role == "source":
@@ -598,7 +735,10 @@ class LiveStore:
                     if (
                         source is None
                         or alert["source_id"] not in configured
-                        or not source_visible(principal, source)
+                        or not source_visible(
+                            principal,
+                            source,
+                        )
                     ):
                         raise LiveError(403, "source_forbidden")
                 if command.kind == "acknowledge":
@@ -659,6 +799,48 @@ class LiveStore:
                 report["revoked_by"] = attribution.model_dump(mode="json")
                 report["effective"] = False
                 event_kind = "scene_report_revoked"
+            elif isinstance(command, SubmitHandoffCommand):
+                patient = next(
+                    (
+                        item
+                        for item in self.settings.live_patients
+                        if item.patient_id == command.patient_id and item.incident_id == incident_id
+                    ),
+                    None,
+                )
+                if patient is None or not patient_visible(principal, patient.model_dump()):
+                    raise LiveError(403, "patient_forbidden")
+                handoff_id = "handoff-" + str(uuid.uuid4())
+                revisions = state.setdefault("handoff_revisions", {})
+                revision = revisions.get(command.patient_id, 0) + 1
+                handoff = HumanHandoff(
+                    handoff_id=handoff_id,
+                    incident_id=incident_id,
+                    patient_id=command.patient_id,
+                    handoff_revision=revision,
+                    mechanism=command.mechanism,
+                    injuries=command.injuries,
+                    signs=command.signs,
+                    treatments=command.treatments,
+                    recorded_by=attribution,
+                )
+                histories = state.setdefault("handoffs", [])
+                histories.append(handoff.model_dump(mode="json"))
+                patient_history = [
+                    item for item in histories if item["patient_id"] == command.patient_id
+                ]
+                retained_ids = {
+                    item["handoff_id"]
+                    for item in patient_history[-self.settings.live_handoffs_per_patient :]
+                }
+                state["handoffs"] = [
+                    item
+                    for item in histories
+                    if item["patient_id"] != command.patient_id
+                    or item["handoff_id"] in retained_ids
+                ]
+                revisions[command.patient_id] = revision
+                event_kind = "handoff_recorded"
             else:
                 raise LiveError(422, "unsupported_command")
             self._append_event(connection, state, event_kind, now)
@@ -668,12 +850,30 @@ class LiveStore:
                 revision=state["revision"],
                 alert_id=alert_id,
                 report_id=report_id,
+                handoff_id=handoff_id,
             )
             connection.execute(
                 "INSERT INTO live_commands VALUES (?, ?, ?, ?, ?)",
                 (principal.principal_id, incident_id, key, digest, receipt.model_dump_json()),
             )
             return receipt, False
+
+    def _authorize_command_source(self, state: dict, principal: LivePrincipal, source_id: str):
+        source = next(
+            (
+                item
+                for item in self.settings.live_sources
+                if item.source_id == source_id and item.incident_id == state["incident_id"]
+            ),
+            None,
+        )
+        if source is None or not source_visible(principal, source.model_dump()):
+            raise LiveError(403, "source_forbidden")
+        if source.wearer_role == "patient" and not any(
+            patient.patient_id == source.wearer_id and patient.incident_id == source.incident_id
+            for patient in self.settings.live_patients
+        ):
+            raise LiveError(403, "source_forbidden")
 
     def _machine_source(self, state: dict, source_id: str, kind: str) -> dict:
         configured = next(
@@ -878,6 +1078,7 @@ class LiveStore:
                 None,
             )
             if previous is not None:
+                previous.pop("_monitoring_gap", None)
                 previous["observed_at"] = result.captured_at.isoformat()
                 previous["evidence_refs"] = list(
                     dict.fromkeys(previous["evidence_refs"] + result.evidence_refs)

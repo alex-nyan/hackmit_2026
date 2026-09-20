@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from triage.live_schemas import Identifier, LivePrincipal, SourceEnrollment
+from triage.live_schemas import Identifier, LivePrincipal, PatientEnrollment, SourceEnrollment
 
 
 class Settings(BaseSettings):
@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     live_incident_ids: list[Identifier] = Field(default_factory=list, max_length=100)
     live_principals: list[LivePrincipal] = Field(default_factory=list, max_length=100)
     live_sources: list[SourceEnrollment] = Field(default_factory=list, max_length=100)
+    live_patients: list[PatientEnrollment] = Field(default_factory=list, max_length=100)
+    live_handoffs_per_patient: int = Field(default=20, ge=1, le=100)
     live_max_request_bytes: int = Field(default=65_536, ge=1024, le=262_144)
     live_freshness_seconds: int = Field(default=30, ge=1, le=300)
     live_max_backfill_seconds: int = Field(default=86_400, ge=60, le=604_800)
@@ -106,6 +108,18 @@ class Settings(BaseSettings):
             if len(incident_ids) != len(self.live_incident_ids):
                 raise ValueError("duplicate live incident")
             source_ids = {source.source_id for source in self.live_sources}
+            patient_ids = {patient.patient_id for patient in self.live_patients}
+            if len(patient_ids) != len(self.live_patients):
+                raise ValueError("duplicate live patient")
+            if any(patient.incident_id not in incident_ids for patient in self.live_patients):
+                raise ValueError("patient references unknown incident")
+            patients = {patient.patient_id: patient for patient in self.live_patients}
+            for source in self.live_sources:
+                if source.wearer_role == "patient" and (
+                    source.wearer_id not in patients
+                    or patients[source.wearer_id].incident_id != source.incident_id
+                ):
+                    raise ValueError("patient Watch wearer must match enrolled incident patient")
             if len(source_ids) != len(self.live_sources):
                 raise ValueError("duplicate live source")
             if any(source.incident_id not in incident_ids for source in self.live_sources):
@@ -140,6 +154,14 @@ class Settings(BaseSettings):
                     raise ValueError("principal references unknown incident")
                 if not set(principal.source_ids) <= source_ids:
                     raise ValueError("principal references unknown source")
+                if not set(principal.patient_ids) <= patient_ids:
+                    raise ValueError("principal references unknown patient")
+                if any(
+                    patient.patient_id in principal.patient_ids
+                    and patient.incident_id not in principal.incident_ids
+                    for patient in self.live_patients
+                ):
+                    raise ValueError("patient scope must be inside principal incident scope")
                 if any(
                     source.source_id in principal.source_ids
                     and source.incident_id not in principal.incident_ids

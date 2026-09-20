@@ -19,6 +19,7 @@ class LivePrincipal(Contract):
     role: Role
     incident_ids: list[Identifier] = Field(min_length=1, max_length=100)
     source_ids: list[Identifier] = Field(default_factory=list, max_length=100)
+    patient_ids: list[Identifier] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
     def valid_token(self):
@@ -52,6 +53,13 @@ class SessionInfo(Contract):
     role: Role
     incident_ids: list[Identifier]
     source_ids: list[Identifier]
+    patient_ids: list[Identifier] = Field(default_factory=list)
+
+
+class PatientEnrollment(Contract):
+    patient_id: Identifier
+    incident_id: Identifier
+    display_name: str = Field(min_length=1, max_length=100)
 
 
 class HeartRateValue(Contract):
@@ -162,6 +170,7 @@ class Observation(Contract):
         "device_reported"
     )
     freshness: Literal["fresh", "stale", "historical"]
+    freshness_expires_at: AwareDatetime | None = None
     age_seconds: Finite
     warnings: list[str]
 
@@ -194,6 +203,7 @@ class SourceState(SourceEnrollment):
     sequence_gaps: Counter
     boot_id: Identifier | None
     reason: str | None
+    freshness_expires_at: AwareDatetime | None = None
 
 
 class Attribution(Contract):
@@ -217,6 +227,7 @@ class AlertEvent(Contract):
     attention: Literal["unacknowledged", "acknowledged"]
     disposition: Literal["open", "human_resolved"]
     freshness: Literal["fresh", "stale"]
+    freshness_expires_at: AwareDatetime | None = None
     requires_human_review: Literal[True] = True
     created_by: Attribution | None
     acknowledged_by: Attribution | None = None
@@ -236,6 +247,25 @@ class SceneReport(Contract):
     reassessment_required: bool = False
 
 
+HandoffText = Annotated[str, Field(min_length=1, max_length=1000, pattern=r"\S")]
+
+
+class HumanHandoff(Contract):
+    handoff_id: Identifier
+    incident_id: Identifier
+    patient_id: Identifier
+    handoff_revision: Counter
+    mechanism: HandoffText | None
+    injuries: HandoffText | None
+    signs: HandoffText | None
+    treatments: HandoffText | None
+    recorded_by: Attribution
+    provenance: Literal["human_reported"] = "human_reported"
+    delivery_status: Literal["recorded_locally_not_transmitted"] = (
+        "recorded_locally_not_transmitted"
+    )
+
+
 class IncidentSnapshot(Contract):
     schema_version: Literal["2.0"] = "2.0"
     incident_id: Identifier
@@ -245,6 +275,8 @@ class IncidentSnapshot(Contract):
     observations: list[Observation]
     alerts: list[AlertEvent]
     scene_reports: list[SceneReport]
+    patients: list[PatientEnrollment] = Field(default_factory=list)
+    handoffs: list[HumanHandoff] = Field(default_factory=list)
 
 
 class IncidentEvent(Contract):
@@ -266,6 +298,7 @@ class IncidentEvent(Contract):
         "transcript_observed",
         "context_updated",
         "source_reset",
+        "handoff_recorded",
     ]
     recorded_at: AwareDatetime
 
@@ -305,8 +338,33 @@ class RevokeSceneReportCommand(Contract):
     note: str = Field(min_length=1, max_length=500)
 
 
+class SubmitHandoffCommand(Contract):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "x-at-least-one-non-null": ["mechanism", "injuries", "signs", "treatments"],
+        }
+    )
+    kind: Literal["submit_handoff"]
+    expected_revision: Counter
+    patient_id: Identifier
+    mechanism: HandoffText | None = None
+    injuries: HandoffText | None = None
+    signs: HandoffText | None = None
+    treatments: HandoffText | None = None
+
+    @model_validator(mode="after")
+    def at_least_one_reported_field(self):
+        if not any((self.mechanism, self.injuries, self.signs, self.treatments)):
+            raise ValueError("a handoff needs at least one human-reported field")
+        return self
+
+
 IncidentCommand = Annotated[
-    AssistanceCommand | AlertCommand | SceneReportCommand | RevokeSceneReportCommand,
+    AssistanceCommand
+    | AlertCommand
+    | SceneReportCommand
+    | RevokeSceneReportCommand
+    | SubmitHandoffCommand,
     Field(discriminator="kind"),
 ]
 
@@ -318,3 +376,4 @@ class CommandReceipt(Contract):
     revision: Counter
     alert_id: Identifier | None = None
     report_id: Identifier | None = None
+    handoff_id: Identifier | None = None

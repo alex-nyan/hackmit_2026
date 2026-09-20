@@ -12,6 +12,16 @@
       "title": "Incident Ids",
       "type": "array"
     },
+    "patient_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9_.:-]+$",
+        "type": "string"
+      },
+      "title": "Patient Ids",
+      "type": "array"
+    },
     "principal_id": {
       "maxLength": 128,
       "minLength": 1,
@@ -44,7 +54,8 @@
     "principal_id",
     "role",
     "incident_ids",
-    "source_ids"
+    "source_ids",
+    "patient_ids"
   ],
   "title": "SessionInfo",
   "type": "object"

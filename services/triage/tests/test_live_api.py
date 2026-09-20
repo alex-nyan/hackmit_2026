@@ -71,6 +71,7 @@ async def test_auth_before_body_and_separate_v1_credentials(tmp_path):
             "role": "officer",
             "incident_ids": ["incident-a"],
             "source_ids": [],
+            "patient_ids": [],
         }
         assert OFFICER_TOKEN not in session.text
         assert (

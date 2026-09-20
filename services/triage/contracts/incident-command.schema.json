@@ -173,6 +173,102 @@
       ],
       "title": "SceneReportCommand",
       "type": "object"
+    },
+    "SubmitHandoffCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_revision": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Expected Revision",
+          "type": "integer"
+        },
+        "injuries": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Injuries"
+        },
+        "kind": {
+          "const": "submit_handoff",
+          "title": "Kind",
+          "type": "string"
+        },
+        "mechanism": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mechanism"
+        },
+        "patient_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Patient Id",
+          "type": "string"
+        },
+        "signs": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signs"
+        },
+        "treatments": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Treatments"
+        }
+      },
+      "required": [
+        "kind",
+        "expected_revision",
+        "patient_id"
+      ],
+      "title": "SubmitHandoffCommand",
+      "type": "object",
+      "x-at-least-one-non-null": [
+        "mechanism",
+        "injuries",
+        "signs",
+        "treatments"
+      ]
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -183,7 +279,8 @@
       "reject": "#/$defs/AlertCommand",
       "resolve": "#/$defs/AlertCommand",
       "revoke_scene_report": "#/$defs/RevokeSceneReportCommand",
-      "scene_report": "#/$defs/SceneReportCommand"
+      "scene_report": "#/$defs/SceneReportCommand",
+      "submit_handoff": "#/$defs/SubmitHandoffCommand"
     },
     "propertyName": "kind"
   },
@@ -199,6 +296,9 @@
     },
     {
       "$ref": "#/$defs/RevokeSceneReportCommand"
+    },
+    {
+      "$ref": "#/$defs/SubmitHandoffCommand"
     }
   ]
 }

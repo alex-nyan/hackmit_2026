@@ -20,6 +20,13 @@ def live_settings(tmp_path, **updates):
         live_enabled=True,
         live_database_path=tmp_path / "live.sqlite3",
         live_incident_ids=["incident-a", "incident-b"],
+        live_patients=[
+            {
+                "patient_id": "patient-p",
+                "incident_id": "incident-a",
+                "display_name": "Patient P",
+            }
+        ],
         live_sources=[
             {
                 "source_id": "watch-a",
@@ -70,6 +77,7 @@ def live_settings(tmp_path, **updates):
                 "role": "hospital",
                 "incident_ids": ["incident-a"],
                 "source_ids": ["watch-a", "watch-p", "gps-a"],
+                "patient_ids": ["patient-p"],
             },
         ],
         **updates,
@@ -457,3 +465,43 @@ def test_configuration_requires_explicit_scopes_and_unique_credentials(tmp_path)
         LivePrincipal(
             principal_id="bad", token="s" * 32, role="source", incident_ids=["incident-a"]
         )
+
+
+def test_sqlite_biometrics_and_sidecars_are_private_without_changing_existing_parent(tmp_path):
+    import os
+    import stat
+
+    if os.name != "posix":
+        pytest.skip("POSIX permission regression")
+    parent = tmp_path / "existing"
+    parent.mkdir(mode=0o755)
+    parent.chmod(0o755)
+    settings = live_settings(tmp_path)
+    settings.live_database_path = parent / "incident.sqlite3"
+    settings.live_database_path.touch(mode=0o644)
+    settings.live_database_path.chmod(0o644)
+    first = LiveStore(settings)
+    paths = [
+        settings.live_database_path,
+        parent / "incident.sqlite3-wal",
+        parent / "incident.sqlite3-shm",
+    ]
+    try:
+        assert all(stat.S_IMODE(path.stat().st_mode) == 0o600 for path in paths)
+        assert stat.S_IMODE(parent.stat().st_mode) == 0o755
+        for path in paths:
+            path.chmod(0o644)
+        second = LiveStore(settings)
+        try:
+            assert all(stat.S_IMODE(path.stat().st_mode) == 0o600 for path in paths)
+            assert stat.S_IMODE(parent.stat().st_mode) == 0o755
+        finally:
+            second.close()
+    finally:
+        first.close()
+    settings.live_database_path = tmp_path / "new-private" / "incident.sqlite3"
+    new = LiveStore(settings)
+    try:
+        assert stat.S_IMODE(settings.live_database_path.parent.stat().st_mode) == 0o700
+    finally:
+        new.close()

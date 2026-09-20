@@ -24,6 +24,21 @@
       "title": "Command Id",
       "type": "string"
     },
+    "handoff_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Handoff Id"
+    },
     "incident_id": {
       "maxLength": 128,
       "minLength": 1,
@@ -65,7 +80,8 @@
     "command_id",
     "revision",
     "alert_id",
-    "report_id"
+    "report_id",
+    "handoff_id"
   ],
   "title": "CommandReceipt",
   "type": "object"

@@ -194,6 +194,7 @@ class LiveAPI:
                         role=principal.role,
                         incident_ids=principal.incident_ids,
                         source_ids=principal.source_ids,
+                        patient_ids=principal.patient_ids,
                     )
                 )
             except LiveError as error:

@@ -33,6 +33,7 @@ type Schema = {
   "x-kind-value-models"?: Record<string, string>;
   "x-kind-value-kinds"?: Record<string, string>;
   "x-subject-kind"?: string;
+  "x-at-least-one-non-null"?: string[];
 };
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -144,6 +145,13 @@ function visit(schema: Schema, value: unknown, root: Schema, path: string, depth
         schema["x-subject-kind"] &&
         value.kind !== schema["x-subject-kind"] &&
         value.subject_id !== null
+      )
+        fail();
+      if (
+        schema["x-at-least-one-non-null"] &&
+        !schema["x-at-least-one-non-null"].some(
+          (key) => Object.hasOwn(value, key) && value[key] !== null,
+        )
       )
         fail();
       for (const [first, last, order] of schema["x-ordered-pairs"] ?? []) {

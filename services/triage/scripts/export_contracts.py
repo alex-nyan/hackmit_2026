@@ -60,6 +60,7 @@ SUPPORTED_KEYS = {
     "x-kind-value-models",
     "x-kind-value-kinds",
     "x-subject-kind",
+    "x-at-least-one-non-null",
     "discriminator",
 }
 

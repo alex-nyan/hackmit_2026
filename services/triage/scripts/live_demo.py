@@ -70,6 +70,7 @@ def initialize(env_path: Path) -> tuple[Path, Path]:
             else ["replay-gps", "replay-camera"]
             if role == "hospital"
             else [],
+            "patient_ids": ["simulated-patient"] if role == "hospital" else [],
         }
         for role, token in tokens.items()
     ]
@@ -82,6 +83,16 @@ def initialize(env_path: Path) -> tuple[Path, Path]:
         "TRIAGE_LIVE_DATABASE_PATH": "data/replay-live.sqlite3",
         "TRIAGE_LIVE_INCIDENT_IDS": json.dumps(["replay-demo"]),
         "TRIAGE_LIVE_SOURCES": json.dumps(sources, separators=(",", ":")),
+        "TRIAGE_LIVE_PATIENTS": json.dumps(
+            [
+                {
+                    "patient_id": "simulated-patient",
+                    "incident_id": "replay-demo",
+                    "display_name": "SIMULATED patient — human MIST entry only",
+                }
+            ],
+            separators=(",", ":"),
+        ),
         "TRIAGE_LIVE_PRINCIPALS": json.dumps(principals, separators=(",", ":")),
     }
     body = "# SYNTHETIC REPLAY ONLY. Private credentials; do not commit.\n"
@@ -199,7 +210,12 @@ def main():
 
                 from triage.app import create_app
 
-                uvicorn.run(create_app(settings), host="127.0.0.1", port=arguments.port)
+                uvicorn.run(
+                    create_app(settings),
+                    host="127.0.0.1",
+                    port=arguments.port,
+                    timeout_graceful_shutdown=5,
+                )
             else:
                 print(json.dumps(replay(settings, arguments.url)))
     except (ValueError, OSError, httpx.HTTPError):

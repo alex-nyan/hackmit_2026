@@ -37,6 +37,7 @@ export type AlertEvent = {
   "attention": "unacknowledged" | "acknowledged";
   "disposition": "open" | "human_resolved";
   "freshness": "fresh" | "stale";
+  "freshness_expires_at": string | null;
   "requires_human_review": true;
   "created_by": Attribution | null;
   "acknowledged_by": Attribution | null;
@@ -83,6 +84,7 @@ export type CommandReceipt = {
   "revision": number;
   "alert_id": string | null;
   "report_id": string | null;
+  "handoff_id": string | null;
 };
 
 export type ContextSummary = {
@@ -155,14 +157,28 @@ export type HeartRateValueInput = {
   "sample_origin"?: "healthkit_live_workout_statistics" | null;
 };
 
-export type IncidentCommand = AssistanceCommandInput | AlertCommandInput | SceneReportCommandInput | RevokeSceneReportCommandInput;
+export type HumanHandoff = {
+  "handoff_id": string;
+  "incident_id": string;
+  "patient_id": string;
+  "handoff_revision": number;
+  "mechanism": string | null;
+  "injuries": string | null;
+  "signs": string | null;
+  "treatments": string | null;
+  "recorded_by": Attribution;
+  "provenance": "human_reported";
+  "delivery_status": "recorded_locally_not_transmitted";
+};
+
+export type IncidentCommand = AssistanceCommandInput | AlertCommandInput | SceneReportCommandInput | RevokeSceneReportCommandInput | SubmitHandoffCommandInput;
 
 export type IncidentEvent = {
   "schema_version": "2.0";
   "event_id": string;
   "incident_id": string;
   "revision": number;
-  "kind": "telemetry" | "assistance" | "alert_acknowledged" | "alert_rejected" | "alert_resolved" | "scene_reported" | "scene_report_revoked" | "visual_observed" | "transcript_observed" | "context_updated" | "source_reset";
+  "kind": "telemetry" | "assistance" | "alert_acknowledged" | "alert_rejected" | "alert_resolved" | "scene_reported" | "scene_report_revoked" | "visual_observed" | "transcript_observed" | "context_updated" | "source_reset" | "handoff_recorded";
   "recorded_at": string;
 };
 
@@ -175,6 +191,8 @@ export type IncidentSnapshot = {
   "observations": Array<Observation>;
   "alerts": Array<AlertEvent>;
   "scene_reports": Array<SceneReport>;
+  "patients": Array<PatientEnrollment>;
+  "handoffs": Array<HumanHandoff>;
 };
 
 export type LocationSampleInput = {
@@ -249,6 +267,7 @@ export type Observation = {
   "sequence": number;
   "provenance": "device_reported" | "machine_observed" | "unverified_model_context";
   "freshness": "fresh" | "stale" | "historical";
+  "freshness_expires_at": string | null;
   "age_seconds": number;
   "warnings": Array<string>;
 } & (
@@ -259,6 +278,12 @@ export type Observation = {
   { kind: "transcript"; value: MediaResult & { kind: "audio" }; subject_id: null } |
   { kind: "visual"; value: MediaResult & { kind: "frame" }; subject_id: null }
 );
+
+export type PatientEnrollment = {
+  "patient_id": string;
+  "incident_id": string;
+  "display_name": string;
+};
 
 export type RevokeSceneReportCommandInput = {
   "kind": "revoke_scene_report";
@@ -300,6 +325,7 @@ export type SessionInfo = {
   "role": "source" | "officer" | "dispatch" | "hospital";
   "incident_ids": Array<string>;
   "source_ids": Array<string>;
+  "patient_ids": Array<string>;
 };
 
 export type SourceHealthSampleInput = {
@@ -337,6 +363,17 @@ export type SourceState = {
   "sequence_gaps": number;
   "boot_id": string | null;
   "reason": string | null;
+  "freshness_expires_at": string | null;
+};
+
+export type SubmitHandoffCommandInput = {
+  "kind": "submit_handoff";
+  "expected_revision": number;
+  "patient_id": string;
+  "mechanism"?: string | null;
+  "injuries"?: string | null;
+  "signs"?: string | null;
+  "treatments"?: string | null;
 };
 
 export type TelemetryReceipt = {
