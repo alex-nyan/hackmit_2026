@@ -3,8 +3,11 @@ import { del, get, list, put } from "@vercel/blob";
 import {
   FRAME_PREFIX,
   MEDIA_TYPE,
+  atFromHistoryPath,
   decodeFrame,
   framePath,
+  historyPath,
+  historyPrefix,
   isStale,
   sourceIdFromPath,
   type FrameSubmission,
@@ -30,6 +33,16 @@ import {
 export const STALE_AFTER_MS = 20_000;
 /** A bound on what one wall will render, not a policy about how many officers exist. */
 export const MAX_SOURCES = 12;
+/**
+ * How far back review can go.
+ *
+ * This is the one place the wall stops being amnesiac, so the window is
+ * stated rather than implied: everything older is deleted, and nothing here
+ * is evidence or a substitute for a real retention policy.
+ */
+export const HISTORY_WINDOW_MS = 15 * 60_000;
+/** Pruning on every frame would cost a listing per publish. */
+const PRUNE_ODDS = 1 / 20;
 
 export async function publishFrame(
   submission: FrameSubmission,
@@ -38,15 +51,51 @@ export async function publishFrame(
   const bytes = decodeFrame(submission.base64);
   // put wants a Blob, Buffer or stream rather than a raw byte array.
   const body = new Blob([bytes], { type: MEDIA_TYPE });
-  // One pathname per officer, no random suffix, overwrite allowed: the wall
-  // wants the latest frame, and every older one is simply in the way.
-  await put(framePath(submission.sourceId), body, {
+  const options = {
     access: "private",
     contentType: MEDIA_TYPE,
     addRandomSuffix: false,
     allowOverwrite: true,
-  });
+  } as const;
+
+  // The wall's object and the archive's are written together, so a reviewer
+  // never sees a gap where the live tile had a frame and history did not.
+  await Promise.all([
+    put(framePath(submission.sourceId), body, options),
+    put(historyPath(submission.sourceId, now.getTime()), body, options),
+  ]);
+
+  if (Math.random() < PRUNE_ODDS) {
+    await pruneHistory(submission.sourceId, now.getTime()).catch(() => undefined);
+  }
+
   return { sourceId: submission.sourceId, at: now.toISOString(), bytes: bytes.byteLength };
+}
+
+/** Everything this officer published inside the review window, oldest first. */
+export async function listHistory(sourceId: string, nowMs: number = Date.now()): Promise<number[]> {
+  const { blobs } = await list({ prefix: historyPrefix(sourceId), limit: 1000 });
+  const earliest = nowMs - HISTORY_WINDOW_MS;
+  return blobs
+    .map((blob) => atFromHistoryPath(blob.pathname, sourceId))
+    .filter((at): at is number => at !== null && at >= earliest)
+    .sort((a, b) => a - b);
+}
+
+/** One frame from the archive, by the moment it was published. */
+export async function readFrameAt(sourceId: string, atMs: number): Promise<ReadableStream | null> {
+  const found = await get(historyPath(sourceId, atMs), { access: "private", useCache: false });
+  return found?.stream ?? null;
+}
+
+async function pruneHistory(sourceId: string, nowMs: number): Promise<void> {
+  const { blobs } = await list({ prefix: historyPrefix(sourceId), limit: 1000 });
+  const earliest = nowMs - HISTORY_WINDOW_MS;
+  const expired = blobs.filter((blob) => {
+    const at = atFromHistoryPath(blob.pathname, sourceId);
+    return at === null || at < earliest;
+  });
+  if (expired.length > 0) await del(expired.map((blob) => blob.url));
 }
 
 export async function listFrames(nowMs: number = Date.now()): Promise<FrameSummary[]> {
@@ -88,7 +137,11 @@ export async function readFrame(
 
 /** Demo reset, paired with the incident log's own. */
 export async function clearWall(): Promise<void> {
-  const { blobs } = await list({ prefix: FRAME_PREFIX, limit: 1000 });
-  if (blobs.length === 0) return;
-  await del(blobs.map((blob) => blob.url));
+  const [latest, archived] = await Promise.all([
+    list({ prefix: FRAME_PREFIX, limit: 1000 }),
+    list({ prefix: "history/", limit: 1000 }),
+  ]);
+  const urls = [...latest.blobs, ...archived.blobs].map((blob) => blob.url);
+  if (urls.length === 0) return;
+  await del(urls);
 }

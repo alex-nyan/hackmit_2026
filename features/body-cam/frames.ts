@@ -87,6 +87,35 @@ export function sourceIdFromPath(pathname: string): string | null {
 
 export const FRAME_PREFIX = PREFIX;
 
+/**
+ * The archive, alongside the latest frame rather than instead of it.
+ *
+ * The wall asks "who is publishing right now?" and wants one object per
+ * officer; review asks "what did this officer see?" and wants all of them.
+ * Serving both from one listing would make every wall poll walk the whole
+ * history, so the latest frame stays its own object and this is kept beside
+ * it. Timestamps are zero-padded so the store's ordering is time's ordering.
+ */
+const HISTORY = "history/";
+const STAMP_WIDTH = 13;
+
+export function historyPrefix(sourceId: string): string {
+  return `${HISTORY}${sourceId}/`;
+}
+
+export function historyPath(sourceId: string, atMs: number): string {
+  return `${historyPrefix(sourceId)}${String(atMs).padStart(STAMP_WIDTH, "0")}.jpg`;
+}
+
+export function atFromHistoryPath(pathname: string, sourceId: string): number | null {
+  const prefix = historyPrefix(sourceId);
+  if (!pathname.startsWith(prefix) || !pathname.endsWith(".jpg")) return null;
+  const stamp = pathname.slice(prefix.length, -".jpg".length);
+  if (!/^\d+$/.test(stamp)) return null;
+  const at = Number.parseInt(stamp, 10);
+  return Number.isSafeInteger(at) && at > 0 ? at : null;
+}
+
 export function ageMs(frame: { at: string }, nowMs: number): number {
   const at = Date.parse(frame.at);
   return Number.isNaN(at) ? Number.POSITIVE_INFINITY : Math.max(0, nowMs - at);

@@ -1,5 +1,5 @@
 import { MEDIA_TYPE } from "@/features/body-cam/frames";
-import { readFrame } from "@/features/body-cam/store";
+import { readFrame, readFrameAt } from "@/features/body-cam/store";
 
 /**
  * One officer's latest frame, as bytes.
@@ -14,11 +14,15 @@ import { readFrame } from "@/features/body-cam/store";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ sourceId: string }> },
 ): Promise<Response> {
   const { sourceId } = await params;
-  const stream = await readFrame(sourceId);
+  // `at` names a moment in the archive. Without it this is the live tile,
+  // where the same query doubles as the cache key for the latest frame.
+  const at = Number.parseInt(new URL(request.url).searchParams.get("at") ?? "", 10);
+  const wantsArchive = Number.isSafeInteger(at) && at > 0;
+  const stream = wantsArchive ? await readFrameAt(sourceId, at) : await readFrame(sourceId);
   if (!stream) {
     return Response.json(
       { error: "no-frame" },

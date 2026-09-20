@@ -6,8 +6,17 @@ const get = vi.fn();
 const del = vi.fn();
 vi.mock("@vercel/blob", () => ({ put, list, get, del }));
 
-const { MAX_SOURCES, STALE_AFTER_MS, clearWall, listFrames, publishFrame, readFrame } =
-  await import("./store");
+const {
+  HISTORY_WINDOW_MS,
+  MAX_SOURCES,
+  STALE_AFTER_MS,
+  clearWall,
+  listFrames,
+  listHistory,
+  publishFrame,
+  readFrame,
+  readFrameAt,
+} = await import("./store");
 
 const JPEG = "/9j/4AAQSkZJRg==";
 const NOW = Date.parse("2026-09-19T12:00:00.000Z");
@@ -35,7 +44,10 @@ describe("publishing a frame", () => {
       new Date(NOW),
     );
 
-    expect(put).toHaveBeenCalledOnce();
+    // Two objects: the wall's latest, and the same frame in the archive.
+    expect(put).toHaveBeenCalledTimes(2);
+    const written = put.mock.calls.map(([pathname]) => pathname).sort();
+    expect(written).toEqual(["frames/unit-02.jpg", "history/unit-02/1789819200000.jpg"]);
     const [pathname, , options] = put.mock.calls[0];
     expect(pathname).toBe("frames/unit-02.jpg");
     // A random suffix would leave every old frame behind it in the store.
@@ -121,17 +133,54 @@ describe("reading one officer's frame", () => {
 });
 
 describe("resetting the wall", () => {
-  it("removes every frame at once", async () => {
+  it("removes the latest frames and the archive together", async () => {
     list.mockResolvedValue({ blobs: [blob("unit-01"), blob("unit-02")] });
     await clearWall();
-    expect(del).toHaveBeenCalledWith([
-      "https://blob.example/unit-01",
-      "https://blob.example/unit-02",
-    ]);
+    // Both prefixes are swept, so review cannot outlive a reset.
+    const prefixes = list.mock.calls.map(([options]) => options.prefix).sort();
+    expect(prefixes).toEqual(["frames/", "history/"]);
+    expect(del.mock.calls[0][0]).toHaveLength(4);
   });
 
   it("does nothing when the wall is already empty", async () => {
     await clearWall();
     expect(del).not.toHaveBeenCalled();
+  });
+});
+
+describe("reviewing an officer's recent footage", () => {
+  it("lists the moments inside the review window, oldest first", async () => {
+    list.mockResolvedValue({
+      blobs: [
+        { ...blob("x"), pathname: `history/unit-01/${NOW}.jpg` },
+        { ...blob("x"), pathname: `history/unit-01/${NOW - 60_000}.jpg` },
+      ],
+    });
+    expect(await listHistory("unit-01", NOW)).toEqual([NOW - 60_000, NOW]);
+  });
+
+  it("leaves out anything older than the window", async () => {
+    list.mockResolvedValue({
+      blobs: [
+        { ...blob("x"), pathname: `history/unit-01/${NOW - HISTORY_WINDOW_MS - 1}.jpg` },
+        { ...blob("x"), pathname: `history/unit-01/${NOW}.jpg` },
+      ],
+    });
+    expect(await listHistory("unit-01", NOW)).toEqual([NOW]);
+  });
+
+  it("serves one archived frame by its moment", async () => {
+    const stream = {} as ReadableStream;
+    get.mockResolvedValue({ stream, blob: { uploadedAt: new Date(NOW) } });
+    expect(await readFrameAt("unit-01", NOW)).toBe(stream);
+    expect(get).toHaveBeenCalledWith(`history/unit-01/${NOW}.jpg`, {
+      access: "private",
+      useCache: false,
+    });
+  });
+
+  it("is a miss when that moment was never published", async () => {
+    get.mockResolvedValue(null);
+    expect(await readFrameAt("unit-01", NOW)).toBeNull();
   });
 });

@@ -51,8 +51,9 @@ describe("the body camera wall", () => {
     const shot = screen.getByAltText("Latest frame published by unit-02");
     // The timestamp makes each frame its own URL, so the browser refetches
     // exactly when there is something new.
+    // `at` now names a moment in the archive, so the live tile keys on `live`.
     expect(shot.getAttribute("src")).toBe(
-      "/api/streams/unit-02/frame?at=2026-09-19T12%3A00%3A09.000Z",
+      `/api/streams/unit-02/frame?live=${Date.parse("2026-09-19T12:00:09.000Z")}`,
     );
     expect(screen.getByText("unit-02")).toBeDefined();
     expect(screen.getByText(/1 publishing/)).toBeDefined();
