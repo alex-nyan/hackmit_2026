@@ -103,6 +103,17 @@ describe("workspace entry points", () => {
     expect(ui.queryByRole("heading", { name: "Camera & audio" })).toBeNull();
   });
 
+  // Hospital has its own shell with a camera overlay now, so the shared map is
+  // a claim about the two workspaces that still show one.
+  it("gives dispatch and officer the same operations map", () => {
+    for (const workspace of ["dispatch", "officer"] as const) {
+      const ui = render(<PawPatrol workspace={workspace} />);
+      const map = ui.getByRole("region", { name: "Operations map" });
+      expect(within(map).getByTestId("map-selection").textContent).toBe("P-01");
+      cleanup();
+    }
+  });
+
   it("keeps unit selection in dispatch without changing the workspace", () => {
     const ui = render(<PawPatrol workspace="dispatch" presentation="detailed" />);
     const nav = ui.getByRole("navigation", { name: "Workspace" });
@@ -208,7 +219,7 @@ describe("default map-only workspace shells", () => {
       ).toBeNull();
       expect(CapturePanel).not.toHaveBeenCalled();
       expect(useIncidentBus).toHaveBeenCalled();
-      expect(useLiveTrack).toHaveBeenLastCalledWith(false);
+      expect(useLiveTrack).toHaveBeenLastCalledWith(true);
       expect(bus.publish).not.toHaveBeenCalled();
       expect(bus.clear).not.toHaveBeenCalled();
     },
@@ -249,7 +260,7 @@ describe("default map-only workspace shells", () => {
       fireEvent.click(ui.getByRole("button", { name: "Centre selected officer" }));
       expect(vi.mocked(OperationsMap).mock.calls.at(-1)![0].recenterKey).toBe(1);
       expect(CapturePanel).not.toHaveBeenCalled();
-      expect(useLiveTrack).toHaveBeenLastCalledWith(false);
+      expect(useLiveTrack).toHaveBeenLastCalledWith(true);
       expect(bus.publish).not.toHaveBeenCalled();
       expect(bus.clear).not.toHaveBeenCalled();
     },
@@ -288,15 +299,17 @@ describe("default map-only workspace shells", () => {
 });
 
 describe("existing workspace integrations", () => {
-  it.each(["dispatch"] as const)("keeps live tracking opt-in in %s", (workspace) => {
+  it.each(["dispatch"] as const)("draws tracked units until told not to in %s", (workspace) => {
+    // On by default: a phone that scans the join code and publishes has to
+    // appear without anybody first finding a switch in the map header.
     const ui = render(<PawPatrol workspace={workspace} />);
-    expect(useLiveTrack).toHaveBeenLastCalledWith(false);
-
-    fireEvent.click(ui.getByRole("button", { name: "Show real tracked units" }));
     expect(useLiveTrack).toHaveBeenLastCalledWith(true);
 
     fireEvent.click(ui.getByRole("button", { name: "Stop live tracking" }));
     expect(useLiveTrack).toHaveBeenLastCalledWith(false);
+
+    fireEvent.click(ui.getByRole("button", { name: "Show real tracked units" }));
+    expect(useLiveTrack).toHaveBeenLastCalledWith(true);
   });
 
   it("publishes officer camera and audio reports with the selected identity and provenance", () => {

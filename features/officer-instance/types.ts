@@ -41,7 +41,7 @@ export type PublisherCommand =
       camera?: string | null;
       audio?: string | null;
     }
-  | { type: "gps"; deviceId: number | null };
+  | { type: "gps"; deviceId: string | null };
 export type Command =
   | PublisherCommand
   | { type: "assignment"; requested: boolean }

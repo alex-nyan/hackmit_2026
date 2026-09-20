@@ -78,8 +78,9 @@ export function LiveTrackPanel({ state, onFocusDevice }: LiveTrackPanelProps) {
       <aside className="live-card" role="status">
         <span className="panel-label">Tracking not configured</span>
         <p>
-          Set <code>TRACCAR_URL</code>, <code>TRACCAR_EMAIL</code> and <code>TRACCAR_PASSWORD</code>{" "}
-          in <code>.env</code>, then restart the server.
+          This deployment has nowhere to put a position. Set <code>BLOB_READ_WRITE_TOKEN</code> so
+          phones can publish from <code>/capture</code>, or configure <code>TRACCAR_URL</code>,{" "}
+          <code>TRACCAR_EMAIL</code> and <code>TRACCAR_PASSWORD</code> for a tracking server.
         </p>
       </aside>
     );
@@ -99,9 +100,10 @@ export function LiveTrackPanel({ state, onFocusDevice }: LiveTrackPanelProps) {
       <aside className="live-card" role="status">
         <span className="panel-label">No units</span>
         <p>
-          No devices are visible to this account. Add one in Traccar, or check{" "}
-          <code>TRACCAR_DEVICE_IDS</code>.
+          Nobody is publishing a position. Scan the join code with a phone and tap “Put me on the
+          map” — it appears here within a few seconds.
         </p>
+        {state.note && <p className="panel-note">{state.note}</p>}
       </aside>
     );
   }
@@ -130,6 +132,9 @@ export function LiveTrackPanel({ state, onFocusDevice }: LiveTrackPanelProps) {
           last seen, not where it is now.
         </p>
       )}
+
+      {/* How this picture was arrived at, when it was not the usual way. */}
+      {state.note && <p className="panel-note">{state.note}</p>}
     </aside>
   );
 }

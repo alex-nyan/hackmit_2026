@@ -13,6 +13,7 @@ export class InstanceError extends Error {
   constructor(
     message: string,
     readonly status = 400,
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -107,7 +108,11 @@ export function applyCommand(
   const publisher = command.type !== "assignment" && command.type !== "scene";
   if (publisher) {
     if (!Number.isSafeInteger(sequence) || sequence! <= (next.sequences[command.type] ?? 0))
-      throw new InstanceError("A newer controller update has already arrived.", 409);
+      throw new InstanceError(
+        "A newer controller update has already arrived.",
+        409,
+        "stale_update",
+      );
     next.sequences[command.type] = sequence!;
   }
   switch (command.type) {

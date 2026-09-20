@@ -1,7 +1,7 @@
 import { Redis } from "@upstash/redis";
 import { InstanceError, type StoredInstance } from "./model";
 
-export function instanceNamespace(env: NodeJS.ProcessEnv = process.env) {
+export function instanceNamespace(env: Record<string, string | undefined> = process.env) {
   const project = env.INSTANCE_NAMESPACE?.trim();
   if (!project) throw new InstanceError("Configure INSTANCE_NAMESPACE for this deployment.", 503);
   const scope = env.VERCEL_ENV ?? "development";

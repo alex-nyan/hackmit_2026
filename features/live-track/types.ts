@@ -25,21 +25,37 @@ export interface LiveFix {
 }
 
 export interface LiveDevice {
-  id: number;
+  /**
+   * Identity only — a React key and a map feature property, never arithmetic.
+   * Traccar numbers its devices; a phone publishing from the capture page is
+   * known by the unit name it was given, so this is a string either way.
+   */
+  id: string;
   name: string;
   /**
-   * Traccar's reachability flag. It tracks when data last arrived, which is not
-   * the same as how fresh the position is — a device can be online carrying a
-   * fix that is half an hour old.
+   * Whether the source considers the device reachable. It tracks when data last
+   * arrived, which is not the same as how fresh the position is — a device can
+   * be online carrying a fix that is half an hour old.
    */
   online: boolean;
   /** Null when the device has never produced a usable fix. */
   fix: LiveFix | null;
 }
 
+/**
+ * Why a picture that exists may not be the whole one.
+ *
+ * Carried alongside an answer rather than replacing it: a dashboard that has
+ * units to draw should draw them, and a dashboard reading a degraded source
+ * should say so on the same screen rather than in a log nobody is watching.
+ */
+export interface LiveTrackNote {
+  note?: string;
+}
+
 export type LiveTrackPayload =
-  | { state: "tracking"; devices: LiveDevice[] }
-  | { state: "no-devices" }
+  | ({ state: "tracking"; devices: LiveDevice[] } & LiveTrackNote)
+  | ({ state: "no-devices" } & LiveTrackNote)
   | { state: "not-configured" }
   | { state: "unavailable"; reason: string };
 

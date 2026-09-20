@@ -99,7 +99,9 @@ export async function fetchLiveTrack(
   }
 
   const tracked: LiveDevice[] = devices.map((device) => ({
-    id: device.id,
+    // Traccar numbers its devices; the view model names them, so that a phone
+    // publishing under a unit name sits in the same list without a fake id.
+    id: String(device.id),
     name: typeof device.name === "string" && device.name ? device.name : `Device ${device.id}`,
     online: device.status === "online",
     fix: newestFix(fixesByDevice.get(device.id) ?? []),

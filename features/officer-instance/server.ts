@@ -63,6 +63,13 @@ export async function create(displayName: string, replaceId?: string) {
     );
     await endRoom(ended);
   }
+  if (!replaceId) {
+    const previous = await store.read();
+    if (previous) {
+      const retired = JSON.parse(previous) as StoredInstance;
+      if (retired.instance.lifecycle === "ended") await endRoom(retired);
+    }
+  }
   const id = randomUUID();
   const secret = randomBytes(32).toString("hex");
   const now = Date.now();
@@ -108,6 +115,8 @@ export async function command(id: string, action: Command, secret: string, seque
   if (action.type === "gps" && action.deviceId !== null && now - initial.gpsPolledAt >= 5000) {
     const settings = readSettings(process.env);
     if (settings) {
+      if (process.env.VERCEL && !settings.baseUrl.startsWith("https://"))
+        throw new InstanceError("Use a public HTTPS Traccar endpoint on Vercel.", 503);
       try {
         const result = await fetchLiveTrack(settings, new Date(now));
         if (result.state === "tracking")
@@ -196,9 +205,10 @@ export function parseCommand(raw: Record<string, unknown>): Command {
     return { type, status: raw.status };
   if (
     type === "gps" &&
-    (raw.deviceId === null || (Number.isSafeInteger(raw.deviceId) && Number(raw.deviceId) > 0))
+    (raw.deviceId === null ||
+      (typeof raw.deviceId === "string" && /^[1-9]\d{0,14}$/.test(raw.deviceId)))
   )
-    return { type, deviceId: raw.deviceId as number | null };
+    return { type, deviceId: raw.deviceId as string | null };
   if (type === "telemetry") {
     const result: Extract<Command, { type: "telemetry" }> = { type };
     if (raw.sources !== undefined) {
@@ -248,6 +258,7 @@ export async function respond(run: () => Promise<unknown>) {
   } catch (error) {
     return Response.json(
       {
+        ...(error instanceof InstanceError && error.code ? { code: error.code } : {}),
         error:
           error instanceof InstanceError
             ? error.message

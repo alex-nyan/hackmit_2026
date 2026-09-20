@@ -1,6 +1,8 @@
 import { SharedWorkspace } from "@/features/officer-instance/SharedWorkspace";
+import { headers } from "next/headers";
 import { PawPatrol } from "@/features/paw-patrol/PawPatrol";
 import { parseWorkspace, WORKSPACE_LABELS } from "@/features/paw-patrol/workspace";
+import { buildJoinLink } from "@/features/join/joinLink";
 import { connection } from "next/server";
 import type { Metadata } from "next";
 import { LiveWorkspace } from "@/features/live-incident/LiveWorkspace";
@@ -13,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description:
       process.env.PAW_PATROL_DATA_MODE === "live"
         ? "Authenticated incident observations and human-reviewed coordination."
-        : "A HackMIT demonstration using simulated incident signals.",
+        : "Officer feeds, shared telemetry, and coordinated response.",
   };
 }
 
@@ -26,5 +28,8 @@ export default async function Home() {
   if (mode === "live") return <LiveWorkspace />;
   if (process.env.PAW_PATROL_BROADCAST_ENABLED !== "false")
     return <SharedWorkspace role={workspace ?? "dispatch"} />;
-  return <PawPatrol workspace={workspace} />;
+  // Resolved from the request rather than configured: the address a phone
+  // should scan is whichever one this dashboard was actually opened on.
+  const join = await buildJoinLink(await headers());
+  return <PawPatrol workspace={workspace} join={join} />;
 }

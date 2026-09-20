@@ -157,15 +157,18 @@ function MapWorkspace({
       setBusy(false);
     }
   }
-  const tracked = instance?.lifecycle === "broadcasting" && instance.sources.gps.state !== "unavailable" && instance.gps?.fix
-    ? [
-        {
-          ...instance.gps,
-          name: instance.displayName,
-          online: instance.lifecycle === "broadcasting",
-        },
-      ]
-    : [];
+  const tracked =
+    instance?.lifecycle === "broadcasting" &&
+    instance.sources.gps.state !== "unavailable" &&
+    instance.gps?.fix
+      ? [
+          {
+            ...instance.gps,
+            name: instance.displayName,
+            online: instance.lifecycle === "broadcasting",
+          },
+        ]
+      : [];
   return (
     <div className={`paw-app ${officerStyles.officer} ${styles.mapWorkspace}`}>
       <a className="skip-link" href="#workspace">

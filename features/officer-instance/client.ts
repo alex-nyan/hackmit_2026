@@ -6,6 +6,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -28,7 +29,7 @@ export async function api<T>(
   });
   const result = await response.json();
   if (!response.ok)
-    throw new ApiError(result.error ?? "Shared service unavailable.", response.status);
+    throw new ApiError(result.error ?? "Shared service unavailable.", response.status, result.code);
   return result as T;
 }
 export function sendCommand(owner: Ownership, command: Command, sequence: number) {

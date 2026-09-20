@@ -39,8 +39,10 @@ export interface OperationsMapProps {
   /** Bumped to fly to a tracked unit, so repeat clicks still move the camera. */
   fixRequest: { longitude: number; latitude: number; nonce: number } | null;
   onBuildingSelect: (building: BuildingFacts | null) => void;
-  onLiveDeviceSelect?: (id: number) => void;
+  onLiveDeviceSelect?: (id: string) => void;
 }
+/** The pulsing ground light under a unit. Green for officers, red for reports. */
+type BeaconMarker = { marker: Marker; element: HTMLDivElement };
 type Runtime = {
   updateScene: () => void;
   moveCamera: (officer: boolean) => void;
@@ -108,6 +110,7 @@ export function OperationsMap(props: OperationsMapProps) {
       lastLabelStamp = "";
     let selectedBuildingId: string | number | null = null;
     const markers: UnitMarker[] = [],
+      beacons: BeaconMarker[] = [],
       cleanups: Array<() => void> = [];
     const preference = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     let reducedMotion = preference?.matches ?? false;
@@ -184,7 +187,29 @@ export function OperationsMap(props: OperationsMapProps) {
         });
         ownMap = map;
         map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "bottom-right");
+        // A beacon sits on the ground at the unit's own coordinate, under the
+        // car marker rather than instead of it: the car carries heading, the
+        // light carries presence and reads at a zoom where the car does not.
+        // Colour is the whole point of it — green is an officer, red is a
+        // report about someone else.
+        const createBeacon = (kind: "officer" | "suspect", point: [number, number]) => {
+          const element = document.createElement("div");
+          element.className = styles.beacon;
+          element.dataset.kind = kind;
+          element.setAttribute("aria-hidden", "true");
+          for (const delay of ["0s", "-1.1s"]) {
+            const ring = document.createElement("i");
+            ring.className = styles.beaconRing;
+            ring.style.animationDelay = delay;
+            element.append(ring);
+          }
+          return {
+            element,
+            marker: new mapboxgl.Marker({ element }).setLngLat(point).addTo(map),
+          } satisfies BeaconMarker;
+        };
         for (const [index, person] of PEOPLE.entries()) {
+          beacons.push(createBeacon("officer", vehicleAt(person.id, frameTime).point));
           const anchor = document.createElement("div");
           anchor.className = styles.markerAnchor;
           const button = document.createElement("button");
@@ -244,8 +269,10 @@ export function OperationsMap(props: OperationsMapProps) {
               selected = person.id === current.selectedId,
               pose = vehicleAt(person.id, frameTime);
             const available = !!vehicleRoute(person.id, frameTime);
+            const beacon = beacons[i];
             marker.getElement().hidden = !available;
             direction.getElement().hidden = !available;
+            beacon.element.hidden = !available;
             if (!available) return;
             marker.setLngLat(pose.point).setOffset([0, -26]);
             direction
@@ -254,6 +281,9 @@ export function OperationsMap(props: OperationsMapProps) {
             direction.getElement().dataset.selected = String(selected);
             direction.getElement().dataset.emergency = String(pose.emergency);
             direction.getElement().style.zIndex = selected ? "3" : "2";
+            beacon.marker.setLngLat(pose.point);
+            beacon.element.dataset.emergency = String(pose.emergency);
+            beacon.element.dataset.selected = String(selected);
             button.dataset.selected = String(selected);
             button.dataset.emergency = String(pose.emergency);
             marker.getElement().style.zIndex = selected ? "4" : "3";
@@ -502,7 +532,8 @@ export function OperationsMap(props: OperationsMapProps) {
         marker.remove();
         direction.remove();
       });
-      ownMap?.remove();
+      beacons.forEach(({ marker }) => marker.remove());
+      ownMap?.remove(); // Mapbox calls custom-layer onRemove to release Three resources.
     };
   }, [attempt]);
 

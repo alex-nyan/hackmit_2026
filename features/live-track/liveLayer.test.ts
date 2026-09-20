@@ -30,7 +30,7 @@ function fix(overrides: Partial<LiveFix> = {}): LiveFix {
 }
 
 function device(overrides: Partial<LiveDevice> = {}): LiveDevice {
-  return { id: 1, name: "Unit 1", online: true, fix: fix(), ...overrides };
+  return { id: "1", name: "Unit 1", online: true, fix: fix(), ...overrides };
 }
 
 function fakeMap(existing: { source?: boolean; layers?: string[] } = {}) {
@@ -52,8 +52,8 @@ describe("live position geometry", () => {
 
   it("draws every device that has a fix", () => {
     const collection = buildLiveGeoJson([
-      device({ id: 1, name: "Unit 1" }),
-      device({ id: 2, name: "Unit 2" }),
+      device({ id: "1", name: "Unit 1" }),
+      device({ id: "2", name: "Unit 2" }),
     ]);
     const points = collection.features.filter(
       (feature: LiveFeature) => feature.properties.kind === "device",
@@ -63,30 +63,30 @@ describe("live position geometry", () => {
       "Unit 1",
       "Unit 2",
     ]);
-    expect(points.map((feature: LiveFeature) => feature.properties.deviceId)).toEqual([1, 2]);
+    expect(points.map((feature: LiveFeature) => feature.properties.deviceId)).toEqual(["1", "2"]);
   });
 
   it("skips devices that have no fix instead of placing them at zero", () => {
     const collection = buildLiveGeoJson([
-      device({ id: 1 }),
-      device({ id: 2, name: "Unit 2", fix: null }),
+      device({ id: "1" }),
+      device({ id: "2", name: "Unit 2", fix: null }),
     ]);
     const ids = collection.features
       .filter((feature: LiveFeature) => feature.properties.kind === "device")
       .map((feature: LiveFeature) => feature.properties.deviceId);
-    expect(ids).toEqual([1]);
+    expect(ids).toEqual(["1"]);
   });
 
   it("pairs each device with its own accuracy ring", () => {
     const collection = buildLiveGeoJson([
-      device({ id: 1 }),
-      device({ id: 2, fix: fix({ accuracyMeters: null }) }),
+      device({ id: "1" }),
+      device({ id: "2", fix: fix({ accuracyMeters: null }) }),
     ]);
     const rings = collection.features.filter(
       (feature: LiveFeature) => feature.properties.kind === "accuracy",
     );
     expect(rings).toHaveLength(1);
-    expect(rings[0].properties.deviceId).toBe(1);
+    expect(rings[0].properties.deviceId).toBe("1");
   });
 
   it("uses green only for a live fix", () => {
@@ -98,9 +98,9 @@ describe("live position geometry", () => {
 
   it("colours each device by its own freshness", () => {
     const collection = buildLiveGeoJson([
-      device({ id: 1, fix: fix({ freshness: "live" }) }),
-      device({ id: 2, fix: fix({ freshness: "stale" }) }),
-      device({ id: 3, fix: fix({ freshness: "lost" }) }),
+      device({ id: "1", fix: fix({ freshness: "live" }) }),
+      device({ id: "2", fix: fix({ freshness: "stale" }) }),
+      device({ id: "3", fix: fix({ freshness: "lost" }) }),
     ]);
     const colors = collection.features
       .filter((feature: LiveFeature) => feature.properties.kind === "device")

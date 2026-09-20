@@ -34,65 +34,67 @@ export function ControlFrame() {
     }
   }
   return (
-    <main className={styles.control}>
-      <header>
-        <span className={styles.brand}>Paw Patrol / Main frame</span>
-        <h1>One officer. One broadcast.</h1>
-        <p>Connect the sources here. Keep this page open while broadcasting.</p>
-      </header>
-      {(message || error) && (
-        <p role="alert" className={styles.notice}>
-          {message || error}
-        </p>
-      )}
-      <section className={styles.identityForm} aria-label="Create officer instance">
-        <label htmlFor="officer-name">Officer name</label>
-        <div className={styles.inline}>
-          <input
-            id="officer-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={80}
-            placeholder="Officer’s name"
-          />
-          <button
-            disabled={busy || !name.trim() || (!!occupied && !replace)}
-            onClick={() => void create()}
-          >
-            {busy ? "Creating…" : "Create instance"}
-          </button>
-        </div>
-        {occupied && (
-          <label className={styles.replace}>
-            <input
-              type="checkbox"
-              checked={replace}
-              onChange={(e) => setReplace(e.target.checked)}
-            />
-            End {current.displayName}’s existing instance and replace it
-          </label>
+    <div className={styles.controlPage}>
+      <main className={styles.control}>
+        <header>
+          <span className={styles.brand}>Paw Patrol / Main frame</span>
+          <h1>One officer. One broadcast.</h1>
+          <p>Connect the sources here. Keep this page open while broadcasting.</p>
+        </header>
+        {(message || error) && (
+          <p role="alert" className={styles.notice}>
+            {message || error}
+          </p>
         )}
-      </section>
-      {owner && <ControlSession key={owner.id} owner={owner} current={current ?? null} />}
-      {!owner && (
-        <p className={styles.hint}>
-          {occupied
-            ? `${current.displayName} · ${current.lifecycle}`
-            : "Create an instance to connect camera, audio, GPS, and heart rate."}
-        </p>
-      )}
-      <footer className={styles.links}>
-        <a href="/officer" target="_blank" rel="noreferrer">
-          Officer ↗
-        </a>
-        <a href="/dispatch" target="_blank" rel="noreferrer">
-          Dispatch ↗
-        </a>
-        <a href="/hospital" target="_blank" rel="noreferrer">
-          Hospital ↗
-        </a>
-      </footer>
-    </main>
+        <section className={styles.identityForm} aria-label="Create officer instance">
+          <label htmlFor="officer-name">Officer name</label>
+          <div className={styles.inline}>
+            <input
+              id="officer-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={80}
+              placeholder="Officer’s name"
+            />
+            <button
+              disabled={busy || !name.trim() || (!!occupied && !replace)}
+              onClick={() => void create()}
+            >
+              {busy ? "Creating…" : "Create instance"}
+            </button>
+          </div>
+          {occupied && (
+            <label className={styles.replace}>
+              <input
+                type="checkbox"
+                checked={replace}
+                onChange={(e) => setReplace(e.target.checked)}
+              />
+              End {current.displayName}’s existing instance and replace it
+            </label>
+          )}
+        </section>
+        {owner && <ControlSession key={owner.id} owner={owner} current={current ?? null} />}
+        {!owner && (
+          <p className={styles.hint}>
+            {occupied
+              ? `${current.displayName} · ${current.lifecycle}`
+              : "Create an instance to connect camera, audio, GPS, and heart rate."}
+          </p>
+        )}
+        <footer className={styles.links}>
+          <a href="/officer" target="_blank" rel="noreferrer">
+            Officer ↗
+          </a>
+          <a href="/dispatch" target="_blank" rel="noreferrer">
+            Dispatch ↗
+          </a>
+          <a href="/hospital" target="_blank" rel="noreferrer">
+            Hospital ↗
+          </a>
+        </footer>
+      </main>
+    </div>
   );
 }
 
@@ -116,7 +118,7 @@ function ControlSession({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [gpsDevices, setGpsDevices] = useState<LiveDevice[]>([]);
-  const [gpsId, setGpsId] = useState<number | null>(null);
+  const [gpsId, setGpsId] = useState<string | null>(null);
   const [gpsMessage, setGpsMessage] = useState("Choose a tracked device.");
   const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([]);
   const [output, setOutput] = useState("");
@@ -138,7 +140,11 @@ function ControlSession({
     setEnded(true);
   });
   useEffect(() => {
-    if (current && ((current.id !== owner.id && current.createdAt >= owner.createdAt) || (current.id === owner.id && current.lifecycle === "ended"))) {
+    if (
+      current &&
+      ((current.id !== owner.id && current.createdAt >= owner.createdAt) ||
+        (current.id === owner.id && current.lifecycle === "ended"))
+    ) {
       const timer = setTimeout(() => relinquish(), 0);
       return () => clearTimeout(timer);
     }
@@ -190,7 +196,7 @@ function ControlSession({
       await send({ type: "heartbeat" });
       lastHeartbeat.current = Date.now();
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
+      if (error instanceof ApiError && error.status === 409 && error.code !== "stale_update") {
         relinquish();
         setMessage(error.message);
       } else if (lastHeartbeat.current && Date.now() - lastHeartbeat.current >= 15_000) {
@@ -202,7 +208,10 @@ function ControlSession({
   useEffect(() => {
     const initial = setTimeout(() => void heartbeat(), 0);
     const timer = setInterval(() => void heartbeat(), 5000);
-    return () => { clearTimeout(initial); clearInterval(timer); };
+    return () => {
+      clearTimeout(initial);
+      clearInterval(timer);
+    };
   }, []);
   const publishTelemetry = useEffectEvent(async () => {
     const sample =
@@ -225,7 +234,12 @@ function ControlSession({
         ...(sample ? { heart: sample } : {}),
       });
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
+      if (
+        running.current &&
+        error instanceof ApiError &&
+        error.status === 409 &&
+        error.code !== "stale_update"
+      ) {
         relinquish();
         setMessage(error.message);
       }
@@ -235,7 +249,12 @@ function ControlSession({
     try {
       await send({ type: "gps", deviceId: gpsId });
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
+      if (
+        running.current &&
+        error instanceof ApiError &&
+        error.status === 409 &&
+        error.code !== "stale_update"
+      ) {
         relinquish();
         setMessage(error.message);
       }
@@ -315,7 +334,7 @@ function ControlSession({
   }
   async function refreshGps() {
     try {
-      const response = await fetch("/api/live-position", {
+      const response = await fetch("/api/instances/gps", {
         cache: "no-store",
         signal: AbortSignal.timeout(8000),
       });
@@ -496,7 +515,7 @@ function ControlSession({
             id="gps-device"
             disabled={ended}
             value={gpsId ?? ""}
-            onChange={(e) => setGpsId(e.target.value ? Number(e.target.value) : null)}
+            onChange={(e) => setGpsId(e.target.value || null)}
           >
             <option value="">No device selected</option>
             {gpsDevices.map((d) => (

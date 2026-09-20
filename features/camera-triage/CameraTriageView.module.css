@@ -11,6 +11,9 @@
   flex: 1;
   overflow: hidden;
   background: #000;
+  /* The wall below can outgrow the viewport; without a floor the flex layout
+     would take the height out of the video rather than letting the page scroll. */
+  min-height: 40dvh;
 }
 
 .video {
@@ -157,4 +160,30 @@
   background: #0d1216;
   color: #edf2f3;
   font: inherit;
+}
+
+/* The wall of everybody else's cameras, below this phone's own controls. The
+   tiles bring their own dark treatment, so this only has to supply the frame. */
+.wall {
+  padding: 4px 18px calc(18px + env(safe-area-inset-bottom));
+  background: #111b22;
+  border-top: 1px solid rgb(237 242 243 / 10%);
+}
+
+.wall h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Who is publishing, once sign-in has settled it. */
+.identity {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.identity small {
+  color: rgb(237 242 243 / 55%);
 }

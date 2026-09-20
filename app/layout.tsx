@@ -15,8 +15,7 @@ const prose = Cormorant_Garamond({
 
 export const metadata: Metadata = {
   title: "Paw Patrol · Connected response",
-  description:
-    "A HackMIT demo of officer safety, coordinated response and hospital handoff. All signals are simulated.",
+  description: "Officer feeds, shared telemetry, and coordinated response.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

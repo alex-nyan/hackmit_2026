@@ -30,6 +30,19 @@ reads real vector height/min_height fields; buildings are extruded from zoom 15.
 style reloads, state refs, resize, timers and cleanup. Synthetic routes are explicitly
 illustrative and must not be used for navigation. They are not calculated road routes.
 
+`OperationsMapPanel` wraps it with the chrome — heading, follow/recentre/tracking/theme
+controls, area switch, telemetry and legend — and Dispatch, Officer and Hospital all
+mount that one panel. The three roles disagreeing about whether there was a map at all
+meant they could not talk about the same picture. The panel owns only view state for its
+own screen (area, theme, follow, tracking, building selection); positions come from the
+shared scenario clock, so every workspace draws the same units at the same second.
+
+Position colour is fixed per role and is never reused for state: green is an officer,
+red is a reported person of interest (`suspects.ts`). Both draw a pulsing ground beacon
+plus a label, so the reading survives zoom, the 3D vehicle layer failing, and colour
+being unavailable to the viewer. Urgency changes the beacon's rhythm, not its hue. A
+report is not a unit: its chip is inert, carries `UNVERIFIED`, and names its source.
+
 ## Human visualization
 
 The local GLB uses the supplied Blender Studio bundle's realistic male body and eyes.
