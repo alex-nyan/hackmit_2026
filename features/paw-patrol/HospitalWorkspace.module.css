@@ -26,12 +26,34 @@
 }
 .hospital :global(.topbar) {
   order: 1;
+  position: static;
+  width: auto;
   min-height: 60px;
   margin: 0 24px 24px;
   padding: 8px 0;
   background: transparent;
   gap: 16px;
+  border: 0;
   border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  animation: none;
+}
+
+.hospital :global(.topbar)::before,
+.hospital :global(.topbar)::after {
+  display: none;
+}
+
+.hospital :global(.topbar nav) {
+  --nav-track: transparent;
+  --nav-track-line: none;
+  --nav-hover: rgb(55 97 155 / 9%);
+  --pill-ink: var(--ink);
+  --pill-bg: rgb(55 97 155 / 11%);
+  --pill-shadow: none;
 }
 .hospital :global(.wordmark) {
   font-size: 15px;
@@ -50,7 +72,7 @@
   font-size: 13px;
 }
 .hospital :global(.nav-item.active) {
-  background: rgb(55 97 155 / 9%);
+  background: transparent;
   color: var(--ink);
 }
 

@@ -7,6 +7,13 @@ import { PEOPLE, type View } from "./scenario";
 import type { Workspace } from "./workspace";
 import officerStyles from "./OfficerWorkspace.module.css";
 import styles from "./WorkspaceMapShell.module.css";
+import { WorkspaceNav } from "./WorkspaceNav";
+
+const NAV_LABELS: Record<View, string> = {
+  command: "Command",
+  officer: "Officer",
+  hospital: "Hospital",
+};
 
 interface Props {
   workspace: Workspace | null;
@@ -41,31 +48,12 @@ export function WorkspaceMapShell({
           <Shield />
           <span>Paw Patrol</span>
         </Link>
-        <nav aria-label="Workspace">
-          {workspace ? (
-            <span className="nav-item active" aria-current="page">
-              <RoleIcon aria-hidden="true" /> {label}
-            </span>
-          ) : (
-            (["command", "officer", "hospital"] as const).map((role) => (
-              <button
-                key={role}
-                className={`nav-item ${view === role ? "active" : ""}`}
-                aria-pressed={view === role}
-                onClick={() => onViewChange(role)}
-              >
-                {role === "command" ? (
-                  <Radio aria-hidden="true" />
-                ) : role === "officer" ? (
-                  <Shield aria-hidden="true" />
-                ) : (
-                  <HeartPulse aria-hidden="true" />
-                )}
-                {role === "command" ? "Command" : role === "officer" ? "Officer" : "Hospital"}
-              </button>
-            ))
-          )}
-        </nav>
+        <WorkspaceNav
+          view={view}
+          labels={NAV_LABELS}
+          pinnedLabel={workspace ? label : null}
+          onSelect={onViewChange}
+        />
         <span aria-hidden="true" />
       </header>
       <main id="workspace">
