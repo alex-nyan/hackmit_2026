@@ -77,7 +77,9 @@ beforeEach(() => {
 afterEach(cleanup);
 
 function renderWorkspace(workspace: "dispatch" | "officer" | "hospital") {
-  const ui = render(<PawPatrol workspace={workspace} />);
+  const ui = render(
+    <PawPatrol workspace={workspace} presentation={workspace === "officer" ? "map" : "detailed"} />,
+  );
   if (workspace === "officer") {
     expect(ui.queryByLabelText("Selected person heart rate")).toBeNull();
     expect(ui.queryByRole("button", { name: /connect heart rate/i })).toBeNull();
@@ -120,7 +122,12 @@ describe("dashboard heart-rate integration", () => {
       expect(ui.queryByRole("img", { name: "Synthetic heart rate trend" })).toBeNull();
 
       mockUseHeartRate.mockReturnValue({ ...receiving(), bpm: 129 });
-      ui.rerender(<PawPatrol workspace={workspace} />);
+      ui.rerender(
+        <PawPatrol
+          workspace={workspace}
+          presentation={workspace === "officer" ? "map" : "detailed"}
+        />,
+      );
       expect(reading.getByText("129")).toBeTruthy();
       expect(reading.queryByText("123")).toBeNull();
       expect(bus.publish).not.toHaveBeenCalled();
@@ -196,7 +203,7 @@ describe("dashboard heart-rate integration", () => {
   );
 
   it("updates the connection identity when a different dispatch unit is selected", () => {
-    const ui = render(<PawPatrol workspace="dispatch" />);
+    const ui = render(<PawPatrol workspace="dispatch" presentation="detailed" />);
     fireEvent.click(ui.getByRole("button", { name: new RegExp(`${PEOPLE[1].name}.*P-02`) }));
     expect(mockUseHeartRate).toHaveBeenLastCalledWith("P-02", 0);
     expect(ui.getByTestId("map-selection").textContent).toBe("P-02");
@@ -207,7 +214,7 @@ describe("dashboard heart-rate integration", () => {
 
   it("keeps the same selected-person session when switching standalone views", () => {
     mockUseHeartRate.mockReturnValue(receiving());
-    const ui = render(<PawPatrol />);
+    const ui = render(<PawPatrol presentation="detailed" />);
     const navigation = within(ui.getByRole("navigation", { name: "Workspace" }));
     for (const name of ["Officer", "Hospital", "Command"]) {
       fireEvent.click(navigation.getByRole("button", { name }));
@@ -219,7 +226,7 @@ describe("dashboard heart-rate integration", () => {
 
   it("does not attach local device data to a shared assistance request", () => {
     mockUseHeartRate.mockReturnValue(receiving());
-    const ui = render(<PawPatrol workspace="dispatch" />);
+    const ui = render(<PawPatrol workspace="dispatch" presentation="detailed" />);
     fireEvent.click(ui.getByRole("button", { name: "Demo panic · P-01" }));
 
     expect(bus.publish).toHaveBeenCalledTimes(1);
@@ -240,7 +247,7 @@ describe("dashboard heart-rate integration", () => {
     });
     try {
       mockUseHeartRate.mockReturnValue(receiving());
-      const ui = render(<PawPatrol workspace="hospital" />);
+      const ui = render(<PawPatrol workspace="hospital" presentation="detailed" />);
       expect(ui.queryByRole("region", { name: "MIST clinical handoff" })).toBeNull();
       // Exercise copying explicitly: continuous patrol no longer opens a scripted handoff.
       render(
