@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { triageFixture } from "../contracts/fixtures";
 import { forwardFrame, readTriageSettings, type TriageSettings } from "./triageProxy";
 
 const SETTINGS: TriageSettings = {
@@ -65,14 +66,21 @@ describe("forwarding a frame", () => {
     try {
       const pending = forwardFrame(SETTINGS, KEY, BODY, async (_url, init) => {
         return new Promise<Response>((resolve, reject) => {
-          setTimeout(() => resolve(new Response('{"request_id":"slow-result"}')), 31_000);
+          setTimeout(
+            () =>
+              resolve(new Response(JSON.stringify(triageFixture({ request_id: "slow-result" })))),
+            31_000,
+          );
           init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
             once: true,
           });
         });
       });
       await vi.advanceTimersByTimeAsync(31_000);
-      expect(await pending).toMatchObject({ status: 200, body: '{"request_id":"slow-result"}' });
+      expect(await pending).toMatchObject({
+        status: 200,
+        body: JSON.stringify(triageFixture({ request_id: "slow-result" })),
+      });
     } finally {
       vi.useRealTimers();
     }
@@ -91,7 +99,7 @@ describe("forwarding a frame", () => {
   });
 
   it("returns the triage result unchanged on success", async () => {
-    const result = '{"request_id":"r1","status":"needs_review"}';
+    const result = JSON.stringify(triageFixture());
     const outcome = await forwardFrame(
       SETTINGS,
       KEY,
@@ -100,6 +108,23 @@ describe("forwarding a frame", () => {
     );
     expect(outcome).toEqual({ status: 200, body: result, json: true });
   });
+
+  it.each(["{}", '{"requires_human_review":false}', "not json"])(
+    "rejects malformed upstream success: %s",
+    async (body) => {
+      const outcome = await forwardFrame(
+        SETTINGS,
+        KEY,
+        BODY,
+        upstream(200, body) as unknown as typeof fetch,
+      );
+      expect(outcome).toEqual({
+        status: 502,
+        body: JSON.stringify({ error: "invalid-upstream-contract" }),
+        json: true,
+      });
+    },
+  );
 
   it("rejects a key the service would reject, without calling it", async () => {
     const fetchMock = upstream(200, "{}");

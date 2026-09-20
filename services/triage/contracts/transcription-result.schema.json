@@ -35,7 +35,8 @@
       },
       "required": [
         "provider",
-        "model"
+        "model",
+        "revision"
       ],
       "title": "ModelProvenance",
       "type": "object"
@@ -79,10 +80,18 @@
       "required": [
         "start_seconds",
         "end_seconds",
-        "text"
+        "text",
+        "no_speech_probability"
       ],
       "title": "TranscriptSegment",
-      "type": "object"
+      "type": "object",
+      "x-ordered-pairs": [
+        [
+          "start_seconds",
+          "end_seconds",
+          "lte"
+        ]
+      ]
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -216,6 +225,7 @@
     }
   },
   "required": [
+    "schema_version",
     "request_id",
     "source_id",
     "incident_id",
@@ -230,7 +240,10 @@
     "segments",
     "models",
     "warnings",
-    "timings_ms"
+    "timings_ms",
+    "requires_human_review",
+    "confidence_semantics",
+    "transcript_semantics"
   ],
   "title": "TranscriptionResult",
   "type": "object"

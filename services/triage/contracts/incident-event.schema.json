@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "An authorized invalidation event; clients fetch the role-projected snapshot.",
+  "properties": {
+    "event_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "incident_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "telemetry",
+        "assistance",
+        "alert_acknowledged",
+        "alert_rejected",
+        "alert_resolved",
+        "scene_reported",
+        "scene_report_revoked",
+        "visual_observed",
+        "transcript_observed",
+        "context_updated",
+        "source_reset"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "recorded_at": {
+      "format": "date-time",
+      "title": "Recorded At",
+      "type": "string"
+    },
+    "revision": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "event_id",
+    "incident_id",
+    "revision",
+    "kind",
+    "recorded_at"
+  ],
+  "title": "IncidentEvent",
+  "type": "object"
+}

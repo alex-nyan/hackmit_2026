@@ -1,0 +1,851 @@
+{
+  "$defs": {
+    "AlertEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "acknowledged_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "alert_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Alert Id",
+          "type": "string"
+        },
+        "attention": {
+          "enum": [
+            "unacknowledged",
+            "acknowledged"
+          ],
+          "title": "Attention",
+          "type": "string"
+        },
+        "claim": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Claim",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attribution"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "disposition": {
+          "enum": [
+            "open",
+            "human_resolved"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "evidence_status": {
+          "enum": [
+            "human_reported",
+            "machine_observed",
+            "human_rejected"
+          ],
+          "title": "Evidence Status",
+          "type": "string"
+        },
+        "freshness": {
+          "enum": [
+            "fresh",
+            "stale"
+          ],
+          "title": "Freshness",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "assistance_request",
+            "possible_visible_weapon",
+            "visual_review"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "priority": {
+          "enum": [
+            "urgent_review",
+            "review"
+          ],
+          "title": "Priority",
+          "type": "string"
+        },
+        "rejected_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "requires_human_review": {
+          "const": true,
+          "default": true,
+          "title": "Requires Human Review",
+          "type": "boolean"
+        },
+        "resolved_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Source Id"
+        },
+        "subject_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subject Id"
+        }
+      },
+      "required": [
+        "alert_id",
+        "kind",
+        "claim",
+        "source_id",
+        "subject_id",
+        "observed_at",
+        "created_at",
+        "evidence_refs",
+        "priority",
+        "evidence_status",
+        "attention",
+        "disposition",
+        "freshness",
+        "requires_human_review",
+        "created_by",
+        "acknowledged_by",
+        "rejected_by",
+        "resolved_by"
+      ],
+      "title": "AlertEvent",
+      "type": "object"
+    },
+    "Attribution": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "principal_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Principal Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "source",
+            "officer",
+            "dispatch",
+            "hospital"
+          ],
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "principal_id",
+        "role",
+        "at",
+        "note"
+      ],
+      "title": "Attribution",
+      "type": "object"
+    },
+    "HeartRateValue": {
+      "additionalProperties": false,
+      "properties": {
+        "bpm": {
+          "maximum": 400,
+          "minimum": 1,
+          "title": "Bpm",
+          "type": "number"
+        },
+        "measured_until": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Measured Until"
+        },
+        "measurement_origin": {
+          "const": "watch_healthkit",
+          "default": "watch_healthkit",
+          "title": "Measurement Origin",
+          "type": "string"
+        },
+        "sample_origin": {
+          "anyOf": [
+            {
+              "const": "healthkit_live_workout_statistics",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sample Origin"
+        },
+        "session_mode": {
+          "anyOf": [
+            {
+              "const": "user_started_walking_workout",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Mode"
+        },
+        "signal_quality": {
+          "const": "unknown",
+          "default": "unknown",
+          "title": "Signal Quality",
+          "type": "string"
+        },
+        "unit": {
+          "const": "bpm",
+          "default": "bpm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bpm",
+        "unit",
+        "measurement_origin",
+        "signal_quality",
+        "measured_until",
+        "session_mode",
+        "sample_origin"
+      ],
+      "title": "HeartRateValue",
+      "type": "object"
+    },
+    "LocationValue": {
+      "additionalProperties": false,
+      "properties": {
+        "course_degrees": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 360,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Course Degrees"
+        },
+        "horizontal_accuracy_m": {
+          "maximum": 100000,
+          "minimum": 0,
+          "title": "Horizontal Accuracy M",
+          "type": "number"
+        },
+        "latitude": {
+          "maximum": 90,
+          "minimum": -90,
+          "title": "Latitude",
+          "type": "number"
+        },
+        "longitude": {
+          "maximum": 180,
+          "minimum": -180,
+          "title": "Longitude",
+          "type": "number"
+        },
+        "speed_mps": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speed Mps"
+        }
+      },
+      "required": [
+        "latitude",
+        "longitude",
+        "horizontal_accuracy_m",
+        "speed_mps",
+        "course_degrees"
+      ],
+      "title": "LocationValue",
+      "type": "object"
+    },
+    "Observation": {
+      "additionalProperties": false,
+      "properties": {
+        "age_seconds": {
+          "title": "Age Seconds",
+          "type": "number"
+        },
+        "boot_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Boot Id",
+          "type": "string"
+        },
+        "freshness": {
+          "enum": [
+            "fresh",
+            "stale",
+            "historical"
+          ],
+          "title": "Freshness",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "heart_rate",
+            "location",
+            "source_health"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "measured_at": {
+          "format": "date-time",
+          "title": "Measured At",
+          "type": "string"
+        },
+        "observation_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Observation Id",
+          "type": "string"
+        },
+        "provenance": {
+          "const": "device_reported",
+          "default": "device_reported",
+          "title": "Provenance",
+          "type": "string"
+        },
+        "received_at": {
+          "format": "date-time",
+          "title": "Received At",
+          "type": "string"
+        },
+        "sequence": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "source_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "subject_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subject Id"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HeartRateValue"
+            },
+            {
+              "$ref": "#/$defs/LocationValue"
+            },
+            {
+              "$ref": "#/$defs/SourceHealthValue"
+            }
+          ],
+          "title": "Value"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "observation_id",
+        "source_id",
+        "subject_id",
+        "kind",
+        "measured_at",
+        "received_at",
+        "boot_id",
+        "sequence",
+        "value",
+        "provenance",
+        "freshness",
+        "age_seconds",
+        "warnings"
+      ],
+      "title": "Observation",
+      "type": "object"
+    },
+    "SceneReport": {
+      "additionalProperties": false,
+      "properties": {
+        "effective": {
+          "title": "Effective",
+          "type": "boolean"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "note": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Note",
+          "type": "string"
+        },
+        "reassessment_required": {
+          "default": false,
+          "title": "Reassessment Required",
+          "type": "boolean"
+        },
+        "report_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Report Id",
+          "type": "string"
+        },
+        "reported_by": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "revoked_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "scope": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "reported_clear",
+            "restricted",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "report_id",
+        "status",
+        "scope",
+        "note",
+        "reported_by",
+        "expires_at",
+        "revoked_by",
+        "effective",
+        "reassessment_required"
+      ],
+      "title": "SceneReport",
+      "type": "object"
+    },
+    "SourceHealthValue": {
+      "additionalProperties": false,
+      "properties": {
+        "availability": {
+          "enum": [
+            "available",
+            "interrupted",
+            "unavailable"
+          ],
+          "title": "Availability",
+          "type": "string"
+        },
+        "battery_fraction": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Battery Fraction"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "availability",
+        "reason",
+        "battery_fraction"
+      ],
+      "title": "SourceHealthValue",
+      "type": "object"
+    },
+    "SourceState": {
+      "additionalProperties": false,
+      "properties": {
+        "age_seconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Age Seconds"
+        },
+        "availability": {
+          "enum": [
+            "unknown",
+            "available",
+            "interrupted",
+            "unavailable",
+            "stale"
+          ],
+          "title": "Availability",
+          "type": "string"
+        },
+        "boot_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Boot Id"
+        },
+        "display_name": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Display Name",
+          "type": "string"
+        },
+        "incident_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "watch",
+            "camera",
+            "microphone",
+            "gps",
+            "device"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "last_measured_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Measured At"
+        },
+        "last_received_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Received At"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "sequence_gaps": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Sequence Gaps",
+          "type": "integer"
+        },
+        "source_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "wearer_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wearer Id"
+        },
+        "wearer_role": {
+          "anyOf": [
+            {
+              "enum": [
+                "responder",
+                "patient"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wearer Role"
+        }
+      },
+      "required": [
+        "source_id",
+        "incident_id",
+        "kind",
+        "display_name",
+        "wearer_id",
+        "wearer_role",
+        "availability",
+        "last_received_at",
+        "last_measured_at",
+        "age_seconds",
+        "sequence_gaps",
+        "boot_id",
+        "reason"
+      ],
+      "title": "SourceState",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "alerts": {
+      "items": {
+        "$ref": "#/$defs/AlertEvent"
+      },
+      "title": "Alerts",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "incident_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "observations": {
+      "items": {
+        "$ref": "#/$defs/Observation"
+      },
+      "title": "Observations",
+      "type": "array"
+    },
+    "revision": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "scene_reports": {
+      "items": {
+        "$ref": "#/$defs/SceneReport"
+      },
+      "title": "Scene Reports",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/SourceState"
+      },
+      "title": "Sources",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "incident_id",
+    "revision",
+    "generated_at",
+    "sources",
+    "observations",
+    "alerts",
+    "scene_reports"
+  ],
+  "title": "IncidentSnapshot",
+  "type": "object"
+}

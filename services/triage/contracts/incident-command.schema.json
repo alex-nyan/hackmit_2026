@@ -1,0 +1,204 @@
+{
+  "$defs": {
+    "AlertCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "alert_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Alert Id",
+          "type": "string"
+        },
+        "expected_revision": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Expected Revision",
+          "type": "integer"
+        },
+        "kind": {
+          "enum": [
+            "acknowledge",
+            "reject",
+            "resolve"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "kind",
+        "expected_revision",
+        "alert_id"
+      ],
+      "title": "AlertCommand",
+      "type": "object"
+    },
+    "AssistanceCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "assistance",
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Note",
+          "type": "string"
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Id"
+        }
+      },
+      "required": [
+        "kind",
+        "note"
+      ],
+      "title": "AssistanceCommand",
+      "type": "object"
+    },
+    "RevokeSceneReportCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_revision": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Expected Revision",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "revoke_scene_report",
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Note",
+          "type": "string"
+        },
+        "report_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Report Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "expected_revision",
+        "report_id",
+        "note"
+      ],
+      "title": "RevokeSceneReportCommand",
+      "type": "object"
+    },
+    "SceneReportCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_revision": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Expected Revision",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "scene_report",
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Note",
+          "type": "string"
+        },
+        "scope": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "reported_clear",
+            "restricted",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "valid_for_seconds": {
+          "maximum": 900,
+          "minimum": 1,
+          "title": "Valid For Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "expected_revision",
+        "status",
+        "scope",
+        "note",
+        "valid_for_seconds"
+      ],
+      "title": "SceneReportCommand",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "discriminator": {
+    "mapping": {
+      "acknowledge": "#/$defs/AlertCommand",
+      "assistance": "#/$defs/AssistanceCommand",
+      "reject": "#/$defs/AlertCommand",
+      "resolve": "#/$defs/AlertCommand",
+      "revoke_scene_report": "#/$defs/RevokeSceneReportCommand",
+      "scene_report": "#/$defs/SceneReportCommand"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/AssistanceCommand"
+    },
+    {
+      "$ref": "#/$defs/AlertCommand"
+    },
+    {
+      "$ref": "#/$defs/SceneReportCommand"
+    },
+    {
+      "$ref": "#/$defs/RevokeSceneReportCommand"
+    }
+  ]
+}

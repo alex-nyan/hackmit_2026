@@ -12,7 +12,9 @@ Seconds = Annotated[float, Field(ge=0, le=86_400, allow_inf_nan=False)]
 
 
 class Contract(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(
+        extra="forbid", str_strip_whitespace=True, json_schema_serialization_defaults_required=True
+    )
 
 
 class TriageRequest(Contract):
@@ -25,6 +27,10 @@ class TriageRequest(Contract):
 
 
 class BoundingBox(Contract):
+    model_config = ConfigDict(
+        json_schema_extra={"x-ordered-pairs": [["x1", "x2", "lt"], ["y1", "y2", "lt"]]}
+    )
+
     x1: Score
     y1: Score
     x2: Score
@@ -114,6 +120,10 @@ class TranscriptionRequest(Contract):
 
 
 class TranscriptSegment(Contract):
+    model_config = ConfigDict(
+        json_schema_extra={"x-ordered-pairs": [["start_seconds", "end_seconds", "lte"]]}
+    )
+
     start_seconds: Seconds
     end_seconds: Seconds
     text: Text

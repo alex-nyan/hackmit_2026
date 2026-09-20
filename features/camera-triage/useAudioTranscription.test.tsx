@@ -1,11 +1,12 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { transcriptFixture } from "../contracts/fixtures";
 import { useAudioTranscription } from "./useAudioTranscription";
 
 const getUserMedia = vi.fn<() => Promise<MediaStream>>();
 const fetchMock = vi.fn<typeof fetch>();
-const transcript = { request_id: "r1", text: "hello", speech_detected: true };
+const transcript = transcriptFixture({ request_id: "r1", text: "hello" });
 
 function microphone() {
   const track = { stop: vi.fn(), onended: null as (() => void) | null };

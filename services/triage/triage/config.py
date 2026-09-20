@@ -7,6 +7,8 @@ from urllib.parse import urlsplit
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from triage.live_schemas import Identifier, LivePrincipal, SourceEnrollment
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -48,12 +50,63 @@ class Settings(BaseSettings):
     database_path: Path = Path("data/triage.sqlite3")
     retention_hours: int = Field(default=24, ge=1, le=168)
     max_records: int = Field(default=10_000, ge=1, le=100_000)
+    live_enabled: bool = False
+    live_database_path: Path = Path("data/live.sqlite3")
+    live_incident_ids: list[Identifier] = Field(default_factory=list, max_length=100)
+    live_principals: list[LivePrincipal] = Field(default_factory=list, max_length=100)
+    live_sources: list[SourceEnrollment] = Field(default_factory=list, max_length=100)
+    live_max_request_bytes: int = Field(default=65_536, ge=1024, le=262_144)
+    live_freshness_seconds: int = Field(default=30, ge=1, le=300)
+    live_max_backfill_seconds: int = Field(default=86_400, ge=60, le=604_800)
+    live_max_events_per_incident: int = Field(default=1000, ge=10, le=10_000)
+    live_max_observations_per_incident: int = Field(default=128, ge=10, le=1000)
+    live_max_alerts_per_incident: int = Field(default=256, ge=10, le=10_000)
+    live_max_scene_reports_per_incident: int = Field(default=100, ge=10, le=1000)
+    live_max_idempotency_records: int = Field(default=10_000, ge=100, le=100_000)
+    live_sse_heartbeat_seconds: float = Field(default=10, ge=0.1, le=60)
+    live_max_sse_connections: int = Field(default=32, ge=1, le=256)
 
     @model_validator(mode="after")
     def valid_deployment(self):
         token = self.api_token.get_secret_value()
         if not token.isascii() or any(character.isspace() for character in token):
             raise ValueError("API token must be ASCII without whitespace")
+        if self.live_enabled:
+            if not self.live_incident_ids or not self.live_principals:
+                raise ValueError("live mode requires explicit incidents and principals")
+            incident_ids = set(self.live_incident_ids)
+            if len(incident_ids) != len(self.live_incident_ids):
+                raise ValueError("duplicate live incident")
+            source_ids = {source.source_id for source in self.live_sources}
+            if len(source_ids) != len(self.live_sources):
+                raise ValueError("duplicate live source")
+            if any(source.incident_id not in incident_ids for source in self.live_sources):
+                raise ValueError("source references unknown incident")
+            for incident_id in incident_ids:
+                current_capacity = sum(
+                    2 if source.kind in {"watch", "gps"} else 1
+                    for source in self.live_sources
+                    if source.incident_id == incident_id
+                )
+                if current_capacity > self.live_max_observations_per_incident:
+                    raise ValueError("observation capacity must preserve current enrolled sources")
+            principal_ids = {principal.principal_id for principal in self.live_principals}
+            tokens = {principal.token.get_secret_value() for principal in self.live_principals}
+            if len(principal_ids) != len(self.live_principals):
+                raise ValueError("duplicate live principal")
+            if len(tokens) != len(self.live_principals) or token in tokens:
+                raise ValueError("live tokens must be unique and distinct from the v1 token")
+            for principal in self.live_principals:
+                if not set(principal.incident_ids) <= incident_ids:
+                    raise ValueError("principal references unknown incident")
+                if not set(principal.source_ids) <= source_ids:
+                    raise ValueError("principal references unknown source")
+                if any(
+                    source.source_id in principal.source_ids
+                    and source.incident_id not in principal.incident_ids
+                    for source in self.live_sources
+                ):
+                    raise ValueError("source scope must be inside principal incident scope")
         local = urlsplit(self.ollama_base_url)
         if (
             local.scheme not in {"http", "https"}

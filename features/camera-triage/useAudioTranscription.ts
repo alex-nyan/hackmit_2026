@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ContractValidationError, parseTranscriptionResult } from "../../shared/contracts";
 import { buildTranscriptionRequest, pickRecorderMimeType, type TranscriptionResult } from "./audio";
 
 /** Long enough for a sentence, short enough to stay useful while it is spoken. */
@@ -117,14 +118,18 @@ export function useAudioTranscription(sourceId: string) {
           return;
         }
 
-        const result = (await response.json()) as TranscriptionResult;
+        const result = parseTranscriptionResult(await response.json());
         setState((current) =>
           sessionRef.current === session && current.state === "recording"
             ? { state: "recording", lastResult: result, lastError: null }
             : current,
         );
-      } catch {
-        reportError("Could not reach the transcription route.");
+      } catch (error) {
+        reportError(
+          error instanceof ContractValidationError
+            ? "Invalid transcription response. Speech hypotheses are unavailable."
+            : "Could not reach the transcription route.",
+        );
       } finally {
         if (session.request === request) session.request = null;
       }

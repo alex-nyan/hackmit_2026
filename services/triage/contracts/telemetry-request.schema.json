@@ -1,0 +1,383 @@
+{
+  "$defs": {
+    "HeartRateSample": {
+      "additionalProperties": false,
+      "properties": {
+        "boot_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Boot Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "heart_rate",
+          "title": "Kind",
+          "type": "string"
+        },
+        "measured_at": {
+          "format": "date-time",
+          "title": "Measured At",
+          "type": "string"
+        },
+        "sample_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "sequence": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "value": {
+          "$ref": "#/$defs/HeartRateValue"
+        }
+      },
+      "required": [
+        "sample_id",
+        "boot_id",
+        "sequence",
+        "measured_at",
+        "kind",
+        "value"
+      ],
+      "title": "HeartRateSample",
+      "type": "object"
+    },
+    "HeartRateValue": {
+      "additionalProperties": false,
+      "properties": {
+        "bpm": {
+          "maximum": 400,
+          "minimum": 1,
+          "title": "Bpm",
+          "type": "number"
+        },
+        "measured_until": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Measured Until"
+        },
+        "measurement_origin": {
+          "const": "watch_healthkit",
+          "default": "watch_healthkit",
+          "title": "Measurement Origin",
+          "type": "string"
+        },
+        "sample_origin": {
+          "anyOf": [
+            {
+              "const": "healthkit_live_workout_statistics",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sample Origin"
+        },
+        "session_mode": {
+          "anyOf": [
+            {
+              "const": "user_started_walking_workout",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Mode"
+        },
+        "signal_quality": {
+          "const": "unknown",
+          "default": "unknown",
+          "title": "Signal Quality",
+          "type": "string"
+        },
+        "unit": {
+          "const": "bpm",
+          "default": "bpm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bpm"
+      ],
+      "title": "HeartRateValue",
+      "type": "object"
+    },
+    "LocationSample": {
+      "additionalProperties": false,
+      "properties": {
+        "boot_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Boot Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "location",
+          "title": "Kind",
+          "type": "string"
+        },
+        "measured_at": {
+          "format": "date-time",
+          "title": "Measured At",
+          "type": "string"
+        },
+        "sample_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "sequence": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "value": {
+          "$ref": "#/$defs/LocationValue"
+        }
+      },
+      "required": [
+        "sample_id",
+        "boot_id",
+        "sequence",
+        "measured_at",
+        "kind",
+        "value"
+      ],
+      "title": "LocationSample",
+      "type": "object"
+    },
+    "LocationValue": {
+      "additionalProperties": false,
+      "properties": {
+        "course_degrees": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 360,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Course Degrees"
+        },
+        "horizontal_accuracy_m": {
+          "maximum": 100000,
+          "minimum": 0,
+          "title": "Horizontal Accuracy M",
+          "type": "number"
+        },
+        "latitude": {
+          "maximum": 90,
+          "minimum": -90,
+          "title": "Latitude",
+          "type": "number"
+        },
+        "longitude": {
+          "maximum": 180,
+          "minimum": -180,
+          "title": "Longitude",
+          "type": "number"
+        },
+        "speed_mps": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speed Mps"
+        }
+      },
+      "required": [
+        "latitude",
+        "longitude",
+        "horizontal_accuracy_m"
+      ],
+      "title": "LocationValue",
+      "type": "object"
+    },
+    "SourceHealthSample": {
+      "additionalProperties": false,
+      "properties": {
+        "boot_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Boot Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "source_health",
+          "title": "Kind",
+          "type": "string"
+        },
+        "measured_at": {
+          "format": "date-time",
+          "title": "Measured At",
+          "type": "string"
+        },
+        "sample_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "sequence": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "value": {
+          "$ref": "#/$defs/SourceHealthValue"
+        }
+      },
+      "required": [
+        "sample_id",
+        "boot_id",
+        "sequence",
+        "measured_at",
+        "kind",
+        "value"
+      ],
+      "title": "SourceHealthSample",
+      "type": "object"
+    },
+    "SourceHealthValue": {
+      "additionalProperties": false,
+      "properties": {
+        "availability": {
+          "enum": [
+            "available",
+            "interrupted",
+            "unavailable"
+          ],
+          "title": "Availability",
+          "type": "string"
+        },
+        "battery_fraction": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Battery Fraction"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "availability"
+      ],
+      "title": "SourceHealthValue",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "incident_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "samples": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "heart_rate": "#/$defs/HeartRateSample",
+            "location": "#/$defs/LocationSample",
+            "source_health": "#/$defs/SourceHealthSample"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/HeartRateSample"
+          },
+          {
+            "$ref": "#/$defs/LocationSample"
+          },
+          {
+            "$ref": "#/$defs/SourceHealthSample"
+          }
+        ]
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "title": "Samples",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Source Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "incident_id",
+    "source_id",
+    "samples"
+  ],
+  "title": "TelemetryRequest",
+  "type": "object"
+}
