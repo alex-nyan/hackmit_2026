@@ -20,6 +20,21 @@ export function parseWorkspace(value: string | undefined): Workspace | null {
   throw new Error("PAW_PATROL_WORKSPACE must be dispatch, officer, or hospital.");
 }
 
+/**
+ * Whether a server dedicated to one role should refuse another role's page.
+ *
+ * A role is pinned two ways now. `PAW_PATROL_WORKSPACE` dedicates a whole
+ * server to one, which is what the three-port launcher does; a role route
+ * pins one window on a server that is serving every role at once. The second
+ * is what lets three separate dashboards share one incident log and one body
+ * camera wall, because sharing needs a single process. Where a server has been
+ * dedicated, the other roles' routes are not its to serve.
+ */
+export function pinnedElsewhere(workspace: Workspace, value: string | undefined): boolean {
+  const pinned = parseWorkspace(value);
+  return pinned !== null && pinned !== workspace;
+}
+
 export function workspaceConfig(
   workspaceValue: string | undefined,
   distDirValue: string | undefined,

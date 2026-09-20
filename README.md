@@ -61,6 +61,11 @@ These are independent, synthetic browser demo sessions. Starting playback or
 entering a handoff in one browser does not update another. Port separation selects
 the UI; it is not authentication or role authorization.
 
+**One server is required for anything shared.** The incident log and the body
+camera wall live in a server's memory, so three `next dev` processes each see
+only their own. Three ports give you isolation, not a shared incident — use the
+role routes below when the workspaces need to see each other.
+
 See [the development guide](docs/development.md) for the directory map, individual
 commands and troubleshooting. Setup preserves existing local configuration.
 
@@ -72,9 +77,18 @@ reachable in one place:
 | Route            | What it is                                                       |
 | ---------------- | ---------------------------------------------------------------- |
 | `/`              | The dashboard with switchable Command, Officer and Hospital tabs |
+| `/dispatch`      | The Dispatch dashboard alone, with no tab switcher               |
+| `/officer`       | The Officer dashboard alone                                      |
+| `/hospital`      | The Hospital dashboard alone                                     |
 | `/map`           | The standalone 3D building map with live fleet tracking          |
 | `/capture`       | The phone-oriented camera page for hazard triage                 |
 | `/capture/check` | Whether this device will provide camera and microphone           |
+
+The three role routes are how you get separate dashboards that still share an
+incident and a body camera wall: open them in three windows on the one server.
+Each looks exactly like its pinned port does, without the tab switcher. A server
+started with `PAW_PATROL_WORKSPACE` set is dedicated to its own role and answers
+404 for the other two.
 
 To run it alongside the pinned workspaces:
 
