@@ -1,0 +1,207 @@
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+  padding: 20px;
+  border: 1px solid var(--bento-border, #2c2c31);
+  border-radius: 18px;
+  background: var(--bento-card, #131316);
+  color: var(--bento-text, #f2f1ec);
+  animation: bento-enter 360ms ease-out;
+  transition: border-color 180ms ease;
+}
+
+.cell:focus-within {
+  border-color: var(--bento-accent, #ff8a4c);
+}
+
+@media (hover: hover) {
+  .cell:hover {
+    border-color: color-mix(
+      in srgb,
+      var(--bento-accent, #ff8a4c) 42%,
+      var(--bento-border, #2c2c31)
+    );
+  }
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--bento-muted, #a4a4ae);
+  font:
+    500 10px/1.5 ui-monospace,
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+  letter-spacing: 0.095em;
+  text-transform: uppercase;
+}
+
+.label > svg {
+  flex: 0 0 auto;
+}
+
+.labelText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.trailing {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 5px;
+  margin-left: auto;
+  color: var(--bento-accent, #ff8a4c);
+  letter-spacing: 0.04em;
+}
+
+.number {
+  color: var(--bento-text, #f2f1ec);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.25rem, 3.5vw, 3.75rem);
+  font-weight: 400;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.065em;
+}
+
+.ring {
+  display: block;
+  width: 96px;
+  height: 96px;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.ringTrack,
+.ringValue {
+  fill: none;
+  stroke-width: 5;
+}
+
+.ringTrack {
+  stroke: var(--bento-raised, #29292f);
+}
+
+.ringValue {
+  stroke: var(--bento-good, #5fbf8f);
+  transition: stroke-dashoffset 480ms ease;
+}
+
+.ringNumber {
+  fill: var(--bento-text, #f2f1ec);
+  font:
+    400 23px/1 Georgia,
+    "Times New Roman",
+    serif;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.ringCaption {
+  fill: var(--bento-muted, #a4a4ae);
+  font:
+    500 8px/1 ui-monospace,
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+  letter-spacing: 0.03em;
+}
+
+.sparkline,
+.sparklineEmpty {
+  display: block;
+  width: 100%;
+  height: 64px;
+  min-width: 0;
+}
+
+.sparklinePath {
+  fill: none;
+  stroke: var(--bento-accent, #ff8a4c);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sparklinePoint {
+  fill: var(--bento-accent, #ff8a4c);
+  stroke: var(--bento-card, #131316);
+  stroke-width: 1.5;
+}
+
+.sparklineEmpty {
+  display: flex;
+  align-items: center;
+  color: var(--bento-muted, #a4a4ae);
+  font:
+    11px/1.5 ui-monospace,
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+}
+
+@keyframes bento-enter {
+  from {
+    opacity: 0.65;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell {
+    animation: none;
+    transition: none;
+  }
+
+  .ringValue {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .cell {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    animation: none;
+  }
+
+  .cell:hover,
+  .cell:focus-within {
+    border-color: Highlight;
+  }
+
+  .label,
+  .trailing,
+  .number,
+  .sparklineEmpty {
+    color: CanvasText;
+  }
+
+  .ringTrack {
+    stroke: GrayText;
+  }
+
+  .ringValue,
+  .sparklinePath {
+    stroke: Highlight;
+  }
+
+  .ringNumber,
+  .ringCaption {
+    fill: CanvasText;
+  }
+
+  .sparklinePoint {
+    fill: Highlight;
+    stroke: Canvas;
+  }
+}

@@ -30,7 +30,7 @@ import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, UnitCard, useLiveTrack, type LiveDevice } from "@/features/live-track";
 import { JoinCard, type JoinLink } from "@/features/join";
 import { OperationsMap } from "./OperationsMap";
-import { WorkspaceMapShell } from "./WorkspaceMapShell";
+import { DispatchDashboard } from "./DispatchDashboard";
 import { OfficerOverview } from "./OfficerOverview";
 import { GlassEffect } from "@/components/ui/liquid-glass";
 import glassStyles from "./OfficerGlass.module.css";
@@ -168,7 +168,7 @@ export function PawPatrol({
 }: {
   workspace?: Workspace | null;
   officerMedia?: OfficerMediaInput | null;
-  /** Dispatch defaults to the map; retain its detailed workflows for regression coverage. */
+  /** Dispatch defaults to the map-first dashboard; retain its detailed workflows. */
   presentation?: "map" | "detailed";
   /** Resolved on the server from the request's own origin. */
   join?: JoinLink | null;
@@ -187,6 +187,10 @@ export function PawPatrol({
   const [selectedId, setSelectedId] = useState<string>("P-01");
   const [focus, setFocus] = useState<MapFocus>("all");
   const [theme, setTheme] = useState<MapTheme>("light");
+  // Command owns its presentation theme; switching to Officer/Hospital keeps theirs intact.
+  const [dispatchTheme, setDispatchTheme] = useState<MapTheme>("dark");
+  const dispatchDashboard = view === "command" && presentation === "map";
+  const mapTheme = dispatchDashboard ? dispatchTheme : theme;
   const [recenterKey, setRecenterKey] = useState(0);
   const [following, setFollowing] = useState(false);
   const [hardware, setHardware] = useState(false);
@@ -397,9 +401,13 @@ export function PawPatrol({
             className="icon-control"
             title="Toggle map theme"
             aria-label="Toggle map theme"
-            onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+            onClick={() => {
+              const toggle = (current: MapTheme) => (current === "light" ? "dark" : "light");
+              if (dispatchDashboard) setDispatchTheme(toggle);
+              else setTheme(toggle);
+            }}
           >
-            {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
+            {mapTheme === "light" ? <Moon size={17} /> : <Sun size={17} />}
           </button>
         </div>
       </div>
@@ -412,7 +420,7 @@ export function PawPatrol({
           selectedId={selectedId}
           onSelect={setSelectedId}
           focus={focus}
-          theme={theme}
+          theme={mapTheme}
           recenterKey={recenterKey}
           following={following}
           onStopFollowing={() => setFollowing(false)}
@@ -423,7 +431,9 @@ export function PawPatrol({
         />
         {view !== "officer" && (
           <div className="map-overlay">
-            <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+            {!dispatchDashboard && (
+              <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+            )}
             {openDevice && (
               <UnitCard
                 device={openDevice}
@@ -431,7 +441,7 @@ export function PawPatrol({
                 onDismiss={() => setOpenDeviceId(null)}
               />
             )}
-            {view === "command" && <JoinCard join={join} />}
+            {view === "command" && !dispatchDashboard && <JoinCard join={join} />}
             <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
           </div>
         )}
@@ -484,16 +494,24 @@ export function PawPatrol({
   // panels (especially capture) in the new Dispatch presentation.
   // Hospital keeps its dedicated camera and heart-rate overlay.
   // Officer capture callbacks and all backend/live-mode paths remain unchanged.
-  if (view === "command" && presentation === "map") {
+  if (dispatchDashboard) {
     return (
-      <WorkspaceMapShell
+      <DispatchDashboard
         workspace={workspace}
-        view={view}
         onViewChange={setView}
         selectedId={selectedId}
         onSelect={setSelectedId}
-        status={personStatus(person.id, time)}
+        onCenter={() => setRecenterKey((key) => key + 1)}
+        time={time}
+        running={running}
+        onTogglePlayback={() => (running ? dispatch({ type: "pause" }) : play())}
+        theme={dispatchTheme}
         map={map}
+        liveTrack={liveTrack}
+        trackingPanel={<LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />}
+        joinPanel={<JoinCard join={join} />}
+        events={bus.events}
+        busStatus={bus.status}
       />
     );
   }
