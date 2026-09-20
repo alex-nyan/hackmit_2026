@@ -1,0 +1,17 @@
+# Secrets never enter the build context; the image gets what it needs as a
+# build argument and nothing else.
+.env
+.env.*
+certificates/
+
+node_modules
+.next
+.next-*
+.git
+.github
+docs
+services
+scripts/*.test.mjs
+**/*.test.ts
+**/*.test.tsx
+.DS_Store

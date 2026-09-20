@@ -14,6 +14,9 @@ const { workspace, distDir } = workspaceConfig(
 );
 
 const config: NextConfig = {
+  // The container copies only traced files, so the image carries the server
+  // and its dependencies rather than the whole workspace.
+  output: "standalone",
   distDir,
   typescript: {
     tsconfigPath: workspace ? `tsconfig.${workspace}.json` : "tsconfig.json",
