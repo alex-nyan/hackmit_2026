@@ -12,6 +12,12 @@ Apple Watch heart rate, local inference and shared incident state. Start with th
 [live pipeline runbook](docs/live-pipeline.md) and its model-free replay. The
 default startup below remains the synthetic demonstration.
 
+The default dashboard also supports an optional [HeartCast Bluetooth heart-rate
+test](docs/paw-patrol/heartcast-local-test.md) in desktop Chrome. Connect explicitly
+from the selected person's heart-rate panel. Device readings stay in that tab;
+they do not enter the shared incident log, MIST handoff, or authenticated live
+pipeline. This is separate from the live mode's Apple Watch telemetry.
+
 ## Quick start
 
 Requirements:
@@ -351,6 +357,7 @@ app/api/live-position/   Server-only Traccar bridge; credentials never reach the
 app/api/triage/          Server-only bridge to the hazard-triage service
 app/api/transcribe/      Server-only bridge to audio transcription
 features/paw-patrol/     Workspace UI, scenario clock, and 3D patrol vehicles
+features/heart-rate/     Local-only Bluetooth connection, heart-rate parsing, and panel
 features/anatomy/        Officer anatomy viewer used by the hospital handoff
 features/boston-map/     Map lifecycle, camera settings, building layer, and selection
 features/live-track/     Position validation, freshness, live map layer, and panel
