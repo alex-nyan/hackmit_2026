@@ -6,6 +6,7 @@ import type { Map as MapboxMap, Marker } from "mapbox-gl";
 import type { IncidentSnapshot } from "../../shared/contracts";
 import { loadMapbox } from "../boston-map/mapboxClient";
 import { add3DBuildings, basemapStyle } from "../boston-map/buildingLayer";
+import { paintNaturalFeatures } from "../boston-map/naturalPalette";
 import { effectiveFreshness } from "./freshness";
 
 export function liveLocations(
@@ -84,6 +85,7 @@ export function LiveMap({
         instance.on("load", () => {
           if (!disposed) {
             add3DBuildings(instance, "light");
+            paintNaturalFeatures(instance, "light");
             setReady(true);
             setMessage("");
           }
