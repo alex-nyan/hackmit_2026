@@ -1021,7 +1021,7 @@
 .layout {
   height: max(600px, calc(100dvh - 200px));
 }
-@media (max-width: 760px) {
+@media (max-width: 780px) {
   .header {
     padding: 12px 16px;
     gap: 12px;
