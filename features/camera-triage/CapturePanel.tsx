@@ -4,7 +4,7 @@ import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { distressTerms, significantHazard } from "@/features/paw-patrol/hazardSignal";
-import { useLiveTrack } from "@/features/live-track";
+import { useDevicePosition, useLiveTrack } from "@/features/live-track";
 import { useLivePublisher } from "@/features/live-video";
 
 import { describeTranscript, type TranscriptionResult } from "./audio";
@@ -83,7 +83,14 @@ export function CapturePanel({
     },
   });
   const { watchers } = useLivePublisher(sourceId, stream);
-  const liveTrack = useLiveTrack(stream !== null);
+  const liveTrack = useLiveTrack(true);
+  const position = useDevicePosition(sourceId, displayName ?? sourceId);
+  const [locationMode, setLocationMode] = useState<"this-device" | "paired-phone">("this-device");
+  useEffect(() => {
+    const release = () => position.stop();
+    window.addEventListener("pagehide", release);
+    return () => window.removeEventListener("pagehide", release);
+  }, [position.stop]);
   const audio = useAudioTranscription(
     sourceId,
     (result) => {
@@ -242,6 +249,7 @@ export function CapturePanel({
       if (startAttempt.current !== attempt) return;
       const opened = await start(chosen.cameraId);
       if (!opened || startAttempt.current !== attempt) return;
+      if (locationMode === "this-device") position.start();
       // Let Continuity finish opening video before acquiring its microphone.
       void startListening();
     } finally {
@@ -250,7 +258,7 @@ export function CapturePanel({
         setDiscovering(false);
       }
     }
-  }, [resolveDevices, start, startListening]);
+  }, [resolveDevices, start, startListening, locationMode, position.start]);
 
   useEffect(() => {
     if (!autoStart || startedAutomatically.current) return;
@@ -366,7 +374,7 @@ export function CapturePanel({
             } else void startCamera();
           }}
         >
-          {busy || listening ? "Stop camera & audio" : "Start camera & AI listening"}
+          {busy || listening ? "Stop camera & audio" : "Start camera, audio & location"}
         </button>
         <button
           type="button"
@@ -398,6 +406,56 @@ export function CapturePanel({
         </p>
       )}
 
+      <label className="capture-card__note">
+        Location source
+        <select
+          className="capture-card__picker"
+          aria-label="Location source"
+          value={locationMode}
+          onChange={(event) => {
+            const mode = event.target.value as "this-device" | "paired-phone";
+            setLocationMode(mode);
+            if (mode === "paired-phone") position.stop();
+            else if (running) position.start();
+          }}
+        >
+          <option value="this-device">This browser’s location</option>
+          <option value="paired-phone">iPhone GPS via pairing QR</option>
+        </select>
+      </label>
+      <p className="capture-card__note">
+        Camera and location share officer ID {sourceId}. Continuity Camera supplies video; it does
+        not supply the iPhone’s GPS. Choose iPhone GPS and scan below to use the phone’s position.
+      </p>
+      {locationMode === "this-device" && (
+        <>
+          <button
+            type="button"
+            className="capture-card__button"
+            onClick={() =>
+              position.state.state === "publishing" || position.state.state === "requesting"
+                ? position.stop()
+                : position.start()
+            }
+          >
+            {position.state.state === "publishing" || position.state.state === "requesting"
+              ? "Stop sharing location"
+              : "Share this device’s location"}
+          </button>
+          <p className="capture-card__note" role="status">
+            {position.state.state === "publishing"
+              ? (position.state.lastError ??
+                (position.state.lastFixAt
+                  ? `Location updating · ${position.state.accuracyMeters === null ? "accuracy unknown" : `±${Math.round(position.state.accuracyMeters)} m`}`
+                  : "Waiting for first GPS fix…"))
+              : position.state.state === "requesting"
+                ? "Allow location access to appear on other officers’ maps."
+                : position.state.state === "denied" || position.state.state === "unsupported"
+                  ? position.state.reason
+                  : "Location sharing is off."}
+          </p>
+        </>
+      )}
       {
         <PhoneLocationPairing
           sourceId={sourceId}

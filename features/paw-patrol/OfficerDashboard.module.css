@@ -784,6 +784,7 @@
 }
 @media (max-width: 780px) {
   .header {
+    flex-wrap: wrap;
     padding: 8px 10px;
     gap: 10px;
   }
@@ -876,7 +877,7 @@
     fill: CanvasText;
   }
   .heartFace strong {
-    color: Canvas;
+    color: CanvasText;
   }
 }
 
@@ -952,4 +953,12 @@
   .setupSection
   :global(.capture-card__button:not(.capture-card__button--quiet)) {
   color: #fff;
+}
+
+.setupSection :global(.capture-card__location) > div:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.setupSection :global(.capture-card__location-link) {
+  max-width: 100%;
 }

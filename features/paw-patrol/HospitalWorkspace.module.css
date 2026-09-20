@@ -479,7 +479,8 @@
     padding: 24px 16px 8px;
   }
   .hospital :global(.topbar) {
-    margin: 0 16px 16px;
+    margin: 0;
+    padding: 12px 16px;
     flex-wrap: wrap;
   }
   .hospital :global(.topbar nav) {
