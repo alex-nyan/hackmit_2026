@@ -4,7 +4,7 @@ export type SceneStatus = "unknown" | "unsafe" | "cleared";
 export type SceneReport = {
   status: SceneStatus;
   at: number;
-  source: "Demo operator" | "Scripted command report";
+  source: "Demo operator" | "Not reported";
 };
 export type PanicReport = { personId: Person["id"]; at: number; acknowledgedAt: number | null };
 export type ConsultEvent = {
@@ -40,25 +40,17 @@ export const AVPU: Avpu[] = [
 export function isPersonId(id: string): id is Person["id"] {
   return PEOPLE.some((p) => p.id === id);
 }
-export function sceneAt(time: number, override: SceneReport | null): SceneReport {
-  if (override) return override;
-  if (time >= 56) return { status: "cleared", at: 56, source: "Scripted command report" };
-  return {
-    status: time >= 15 ? "unsafe" : "unknown",
-    at: time >= 15 ? 15 : 0,
-    source: "Scripted command report",
-  };
+export function sceneAt(_time: number, override: SceneReport | null): SceneReport {
+  return override ?? { status: "unknown", at: 0, source: "Not reported" };
 }
-export function emsStatus(time: number, scene: SceneStatus) {
-  if (time >= 90) return "Handoff complete";
-  if (time >= 60) return "In transport";
-  if (time < 45) return "Not requested";
-  if (time < 52) return "Requested · awaiting assignment";
-  return scene === "cleared" ? "Patient access authorized in demo" : "Staging · no scene entry";
+export function emsStatus(_time: number, _scene: SceneStatus) {
+  void _time;
+  void _scene;
+  return "Not requested";
 }
 export function emptyMist(time: number): MistRecord {
   return {
-    mechanism: "Reported gunshot — scripted scenario",
+    mechanism: "",
     injuries: "",
     symptoms: "",
     bpMethod: "Not measured",
@@ -68,8 +60,8 @@ export function emptyMist(time: number): MistRecord {
     pulseSite: "",
     consciousness: "Not assessed",
     treatments: "",
-    reporter: "Scripted scenario",
-    at: Math.min(time, 45),
+    reporter: "Not reported",
+    at: time,
   };
 }
 export function bloodPressure(record: MistRecord) {

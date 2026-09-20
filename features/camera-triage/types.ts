@@ -1,79 +1,19 @@
+import type { TriageResult } from "../../shared/contracts";
+
 import type { Encoding } from "./frameQuality";
 
-/** Mirrors services/triage/contracts/triage-request.schema.json. */
-export interface TriageRequestBody {
-  image_base64: string;
-  media_type: "image/jpeg";
-  source_id: string;
-  captured_at: string;
-  incident_id?: string | null;
-  allow_cloud?: boolean;
-}
+export type {
+  BoundingBox,
+  Detection,
+  Hazard,
+  VisionAssessment,
+  ModelProvenance,
+  TriageRequest as TriageRequestBody,
+  TriageResult,
+} from "../../shared/contracts";
 
-export interface Detection {
-  label: string;
-  confidence: number;
-  bbox: number[];
-}
-
-/** Mirrors the `Hazard` contract in services/triage/triage/schemas.py. */
-export type HazardCategory =
-  | "fire_smoke"
-  | "traffic_collision"
-  | "blocked_access"
-  | "structural_damage"
-  | "flooding"
-  | "electrical_hazard"
-  | "person_down"
-  | "visible_weapon"
-  | "other";
-
-export type HazardSeverity = "low" | "moderate" | "high" | "critical";
-
-export interface Hazard {
-  category: HazardCategory;
-  severity: HazardSeverity;
-  /** Uncalibrated model score. Never read this as a probability. */
-  confidence: number;
-  visual_evidence: string;
-  uncertainty: string;
-  detection_indices: number[];
-}
-
-export interface ModelProvenance {
-  provider: string;
-  model: string;
-  revision?: string | null;
-}
-
-export interface VisionAssessment {
-  summary: string;
-  hazards: Hazard[];
-  image_quality: string | null;
-  limitations: string[] | null;
-}
-
-/**
- * The service never returns a clean bill of health: `status` is only ever
- * `needs_review` or `insufficient_evidence`, and `requires_human_review` is a
- * constant true. Treat every result as a prompt for a person, not a verdict.
- */
-export interface TriageResult {
-  request_id: string;
-  source_id: string;
-  incident_id?: string | null;
-  captured_at: string;
-  processed_at: string;
-  status: "needs_review" | "insufficient_evidence";
-  review_priority: "immediate" | "urgent" | "routine" | "insufficient_evidence";
-  /** Always true. The service has no "safe" outcome to report. */
-  requires_human_review?: boolean;
-  assessment: VisionAssessment | null;
-  detections: Detection[];
-  models?: ModelProvenance[];
-  warnings: string[];
-  timings_ms: Record<string, number>;
-}
+export type HazardCategory = import("../../shared/contracts").Hazard["category"];
+export type HazardSeverity = import("../../shared/contracts").Hazard["severity"];
 
 export type CaptureState =
   | { state: "idle" }

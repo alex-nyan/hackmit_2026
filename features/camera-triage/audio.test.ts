@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { transcriptFixture } from "../contracts/fixtures";
 
 import {
   MAX_AUDIO_BASE64,
@@ -8,25 +9,12 @@ import {
   pickRecorderMimeType,
   stripAudioDataUrl,
   toServiceMediaType,
-  type TranscriptionResult,
 } from "./audio";
 
 const CAPTURED_AT = new Date("2026-09-19T21:00:00.000Z");
 const DATA_URL = "data:audio/mp4;base64,AAABBBCCC==";
 
-function result(overrides: Partial<TranscriptionResult> = {}): TranscriptionResult {
-  return {
-    request_id: "r1",
-    text: "dispatch we need backup",
-    speech_detected: true,
-    language: "en",
-    language_probability: 0.98,
-    duration_seconds: 10,
-    segments: [],
-    warnings: [],
-    ...overrides,
-  };
-}
+const result = transcriptFixture;
 
 describe("recorder format selection", () => {
   it("prefers MP4, which is what Safari can actually record", () => {

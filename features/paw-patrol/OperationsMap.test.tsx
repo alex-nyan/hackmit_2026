@@ -2,12 +2,13 @@ import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OperationsMap, type OperationsMapProps } from "./OperationsMap";
+import { BUILDING_LAYER_ID } from "../boston-map/buildingLayer";
 import { MAP_FOCUS } from "../boston-map/types";
 import { initialDemo } from "./useScenario";
 import { PEOPLE } from "./scenario";
-import { SUSPECTS, suspectAt } from "./suspects";
 import { vehicleAt } from "./vehicles/vehicleMotion";
-import type { PatrolVehicleLayerOptions } from "./vehicles/PatrolVehicleLayer";
+import * as vehicleMotion from "./vehicles/vehicleMotion";
+import { patrolCarScreenHeading } from "./vehicles/createPatrolCarMarker";
 import type { LiveDevice } from "@/features/live-track";
 
 type Handler = (data: Record<string, unknown>) => void;
@@ -15,7 +16,6 @@ type TestLayer = { id: string; onRemove?: () => void; [key: string]: unknown };
 const mocked = vi.hoisted(() => ({
   maps: [] as TestMap[],
   markers: [] as TestMarker[],
-  layers: [] as Array<{ options: PatrolVehicleLayerOptions; dispose: ReturnType<typeof vi.fn> }>,
   frames: new Map<number, FrameRequestCallback>(),
   nextFrame: 1,
   supported: vi.fn(() => true),
@@ -29,6 +29,8 @@ class TestMap {
     ["composite", { setData: vi.fn() }],
   ]);
   zoom = 16.1;
+  bearing = -17.6;
+  pitch = 45;
   center = { lng: -71.092, lat: 42.36 };
   addControl = vi.fn();
   flyTo = vi.fn((options: { center?: number[]; zoom?: number }) => {
@@ -85,10 +87,10 @@ class TestMap {
     return this.center;
   }
   getBearing() {
-    return -17.6;
+    return this.bearing;
   }
   getPitch() {
-    return 45;
+    return this.pitch;
   }
   isMoving() {
     return false;
@@ -103,7 +105,15 @@ class TestMap {
     return document.createElement("canvas");
   }
   project(point: number[]) {
-    return { x: point[0] * 10, y: point[1] * 10 };
+    const radians = (this.bearing * Math.PI) / 180;
+    const east = (point[0] - this.center.lng) * Math.cos((42.36 * Math.PI) / 180) * 10_000;
+    const north = (point[1] - this.center.lat) * 10_000;
+    return {
+      x: east * Math.cos(radians) - north * Math.sin(radians),
+      y:
+        -(east * Math.sin(radians) + north * Math.cos(radians)) *
+        Math.cos((this.pitch * Math.PI) / 180),
+    };
   }
   on(event: string, handler: Handler) {
     if (!this.handlers.has(event)) this.handlers.set(event, new Set());
@@ -130,7 +140,14 @@ class TestMarker {
   setRotationAlignment = vi.fn(() => this);
   setPitchAlignment = vi.fn(() => this);
   remove = vi.fn(() => this.options.element.remove());
-  constructor(public options: { element: HTMLElement }) {
+  constructor(
+    public options: {
+      element: HTMLElement;
+      anchor?: string;
+      rotationAlignment?: string;
+      pitchAlignment?: string;
+    },
+  ) {
     mocked.markers.push(this);
   }
   addTo(map: TestMap) {
@@ -151,21 +168,10 @@ vi.mock("../boston-map/mapboxClient", () => ({
   }),
 }));
 
-vi.mock("./vehicles/PatrolVehicleLayer", () => ({
-  VEHICLE_MIN_ZOOM: 16,
-  VEHICLE_LAYER_ID: "paw-patrol-vehicles",
-  createPatrolVehicleLayer: (options: PatrolVehicleLayerOptions) => {
-    const dispose = vi.fn();
-    mocked.layers.push({ options, dispose });
-    return { id: "paw-patrol-vehicles", type: "custom", renderingMode: "3d", onRemove: dispose };
-  },
-}));
-
 beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN", "pk.unit-test-not-a-real-token");
   mocked.maps.length = 0;
   mocked.markers.length = 0;
-  mocked.layers.length = 0;
   mocked.frames.clear();
   mocked.nextFrame = 1;
   mocked.supported.mockReturnValue(true);
@@ -226,8 +232,52 @@ async function mount(overrides: Partial<OperationsMapProps> = {}) {
   const current = props(overrides);
   const view = render(<OperationsMap {...current} />);
   await waitFor(() => expect(mocked.maps).toHaveLength(1));
-  await waitFor(() => expect(mocked.layers).toHaveLength(1));
+  await waitFor(() => expect(mocked.markers).toHaveLength(PEOPLE.length * 3));
+  await waitFor(() => expect(mocked.maps[0].getLayer(BUILDING_LAYER_ID)).toBeDefined());
+  await waitFor(() => expect(view.queryByRole("status")).toBeNull());
+  expectNoPatrolRoutes(mocked.maps[0]);
   return { ...view, current, map: mocked.maps[0] };
+}
+
+function expectNoPatrolRoutes(map: TestMap) {
+  for (const id of ["paw-scenario-route", "paw-route-arrows"]) {
+    expect(map.getSource(id)).toBeUndefined();
+    expect(map.addSource.mock.calls.some(([sourceId]) => sourceId === id)).toBe(false);
+  }
+  for (const id of [
+    "paw-scenario-route-casing",
+    "paw-scenario-route-line",
+    "paw-route-arrow-line",
+  ]) {
+    expect(map.getLayer(id)).toBeUndefined();
+    expect(map.addLayer.mock.calls.some(([layer]) => layer.id === id)).toBe(false);
+  }
+}
+
+function carMarkers() {
+  return mocked.markers.filter(
+    (marker) =>
+      marker.options.element.getAttribute("aria-hidden") === "true" &&
+      // The ground beacon is aria-hidden too; only the car is wanted here.
+      !marker.options.element.dataset.kind,
+  );
+}
+
+function expectFixedCar(marker: TestMarker) {
+  const element = marker.options.element;
+  const car = element.querySelector("svg");
+  expect(car).not.toBeNull();
+  expect(car?.getAttribute("width")).toBe("32");
+  expect(car?.getAttribute("height")).toBe("44");
+  expect(element.hidden).toBe(false);
+  expect(element.hasAttribute("data-detail")).toBe(false);
+  expect(marker.options).toEqual(
+    expect.objectContaining({
+      anchor: "center",
+      pitchAlignment: "viewport",
+      rotationAlignment: "viewport",
+    }),
+  );
 }
 
 function device(name: string, ageSeconds: number): LiveDevice {
@@ -269,16 +319,9 @@ describe("patrol map integration", () => {
     expect(map.flyTo).not.toHaveBeenCalled();
     expect(map.jumpTo).not.toHaveBeenCalled();
     expect(map.easeTo).not.toHaveBeenCalled();
-    const frameData = mocked.layers[0].options.getVehicles();
-    expect(frameData.find((vehicle) => vehicle.id === "P-02")?.selected).toBe(true);
-    expect(frameData.find((vehicle) => vehicle.id === "P-01")?.selected).toBe(false);
-    expect(map.getSource("paw-scenario-route")?.setData).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        features: [
-          expect.objectContaining({ properties: expect.objectContaining({ unit: "P-02" }) }),
-        ],
-      }),
-    );
+    expect(carMarkers()[1].options.element.dataset.selected).toBe("true");
+    expect(carMarkers()[0].options.element.dataset.selected).toBe("false");
+    expectNoPatrolRoutes(map);
   });
 
   it("uses an explicit recenter or area change for camera movement", async () => {
@@ -317,35 +360,74 @@ describe("patrol map integration", () => {
     expect(map.jumpTo).not.toHaveBeenCalled();
   });
 
-  it("shares the continuous clock between marker and 3D vehicle positions", async () => {
+  it("shares the continuous clock between label positions, car positions and headings", async () => {
     let time = 0;
     const readClock = vi.fn(() => ({ ...initialDemo, running: true, time }));
-    await mount({ running: true, readClock });
+    const { map } = await mount({ running: true, readClock });
     time = 2.5;
     frame();
-    const vehicles = mocked.layers[0].options.getVehicles();
-    expect(mocked.layers[0].options.getSeconds()).toBe(2.5);
+    expectNoPatrolRoutes(map);
     for (const person of PEOPLE) {
-      const vehicle = vehicles.find((value) => value.id === person.id);
-      expect(vehicle?.point).toEqual(vehicleAt(person.id, time).point);
+      const vehicle = vehicleAt(person.id, time);
       const marker = mocked.markers.find((value) =>
         value.options.element.textContent?.includes(person.id),
       );
-      expect(marker?.point).toEqual(vehicle?.point);
+      expect(marker?.point).toEqual(vehicle.point);
+      expect(marker?.setOffset).toHaveBeenLastCalledWith([0, -26]);
+      const car = carMarkers()[PEOPLE.indexOf(person)];
+      expect(car.point).toEqual(vehicle.point);
+      expect(car.setRotation).toHaveBeenLastCalledWith(
+        patrolCarScreenHeading(map, vehicle.point, vehicle.heading),
+      );
     }
   });
 
-  it("restores one vehicle layer on the existing map after theme changes", async () => {
+  it("updates paused car headings after camera movement without recursively moving a followed camera", async () => {
+    const { map } = await mount({ following: true });
+    const car = carMarkers()[0];
+    const initialHeading = car.setRotation.mock.calls.at(-1);
+    map.jumpTo.mockClear();
+    map.flyTo.mockClear();
+    map.bearing = 72.4;
+    map.pitch = 65;
+    map.zoom = 13;
+    act(() => map.emit("move"));
+    const pose = vehicleAt("P-01", 0);
+    expect(car.setRotation.mock.calls.at(-1)).not.toEqual(initialHeading);
+    expect(car.setRotation).toHaveBeenLastCalledWith(
+      patrolCarScreenHeading(map, pose.point, pose.heading),
+    );
+    expect(car.point).toEqual(pose.point);
+    expectFixedCar(car);
+    expectNoPatrolRoutes(map);
+    expect(map.jumpTo).not.toHaveBeenCalled();
+    expect(map.flyTo).not.toHaveBeenCalled();
+    expect(mocked.frames.size).toBe(0);
+  });
+
+  it("preserves DOM cars and restores buildings and live tracking without route overlays on theme changes", async () => {
     const { map, current, rerender } = await mount();
+    const cars = carMarkers();
     rerender(<OperationsMap {...current} theme="dark" />);
     expect(map.setStyle).toHaveBeenLastCalledWith("mapbox://styles/mapbox/dark-v11");
     act(() => map.emit("style.load"));
     expect(mocked.maps).toHaveLength(1);
-    expect(map.layers.has("paw-patrol-vehicles")).toBe(true);
-    expect(mocked.layers[0].dispose).toHaveBeenCalledOnce();
-    const count = mocked.layers.length;
+    expect(map.layers.has("paw-patrol-vehicles")).toBe(false);
+    expect(map.addLayer.mock.calls.some(([layer]) => layer.type === "custom")).toBe(false);
+    expect(map.getLayer(BUILDING_LAYER_ID)).toBeDefined();
+    expect(map.getSource("live-position")).toBeDefined();
+    expectNoPatrolRoutes(map);
+    expect(carMarkers()).toEqual(cars);
+    for (const car of cars) {
+      expectFixedCar(car);
+      expect(car.options.element.isConnected).toBe(true);
+      expect(car.remove).not.toHaveBeenCalled();
+    }
+    const count = map.addLayer.mock.calls.length;
     act(() => map.emit("style.load"));
-    expect(mocked.layers).toHaveLength(count);
+    expect(map.addLayer).toHaveBeenCalledTimes(count);
+    expect(mocked.markers).toHaveLength(PEOPLE.length * 3);
+    expectNoPatrolRoutes(map);
   });
 
   it("cleans up frame scheduling, marker nodes, listeners and map resources", async () => {
@@ -359,8 +441,10 @@ describe("patrol map integration", () => {
     expect(map.remove).toHaveBeenCalledOnce();
     expect(mocked.disconnect).toHaveBeenCalledOnce();
     expect([...map.handlers.values()].every((handlers) => handlers.size === 0)).toBe(true);
-    for (const marker of mocked.markers) expect(marker.remove).toHaveBeenCalledOnce();
-    expect(mocked.layers[0].dispose).toHaveBeenCalledOnce();
+    for (const marker of mocked.markers) {
+      expect(marker.remove).toHaveBeenCalledOnce();
+      expect(marker.options.element.isConnected).toBe(false);
+    }
   });
 
   it("cancels unnecessary frames while hidden and when the shared clock stops", async () => {
@@ -382,7 +466,7 @@ describe("patrol map integration", () => {
     const onSelect = vi.fn();
     const { map, getByRole } = await mount({ onSelect });
     map.zoom = 13;
-    act(() => map.emit("zoom"));
+    act(() => map.emit("move"));
     const marker = getByRole("button", { name: new RegExp(`${PEOPLE[1].name}.*P-02`) });
     expect(marker.tagName).toBe("BUTTON");
     expect(marker.getAttribute("aria-pressed")).toBe("false");
@@ -393,7 +477,7 @@ describe("patrol map integration", () => {
     expect(onSelect).toHaveBeenLastCalledWith("P-02");
   });
 
-  it("selects the unit represented by a projected 3D vehicle hit", async () => {
+  it("selects the unit represented by a projected car marker hit", async () => {
     const onSelect = vi.fn();
     const { map } = await mount({ onSelect });
     const point = map.project(vehicleAt("P-04", 0).point);
@@ -404,12 +488,47 @@ describe("patrol map integration", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("keeps selectable fallback markers if 3D rendering fails while paused", async () => {
-    const { getByRole, getByText } = await mount();
-    act(() => mocked.layers[0].options.onFailure());
-    expect(getByText(/3D vehicles unavailable/)).toBeTruthy();
-    const marker = getByRole("button", { name: new RegExp(`${PEOPLE[0].name}.*P-01`) });
-    expect(marker.getAttribute("data-detail")).toBe("false");
+  it.each([10.5, 13, 16, 19.5])(
+    "keeps every patrol car at the same screen size at zoom %s",
+    async (zoom) => {
+      const { map, getByRole } = await mount();
+      map.zoom = zoom;
+      act(() => map.emit("move"));
+      expect(carMarkers()).toHaveLength(PEOPLE.length);
+      for (const car of carMarkers()) expectFixedCar(car);
+      for (const person of PEOPLE) {
+        const button = getByRole("button", { name: new RegExp(`${person.name}.*${person.id}`) });
+        expect(button.hasAttribute("data-detail")).toBe(false);
+        const label = mocked.markers.find((marker) => marker.options.element.contains(button));
+        expect(label?.setOffset).toHaveBeenLastCalledWith([0, -26]);
+      }
+      expect(map.layers.has("paw-patrol-vehicles")).toBe(false);
+      expect(map.addLayer.mock.calls.some(([layer]) => layer.type === "custom")).toBe(false);
+      expectNoPatrolRoutes(map);
+    },
+  );
+
+  it("changes selection and emergency styling without changing the car size", async () => {
+    const { current, rerender } = await mount();
+    const cars = carMarkers();
+    expect(cars[0].options.element.dataset.selected).toBe("true");
+    expect(cars[1].options.element.dataset.selected).toBe("false");
+    expect(cars[1].options.element.dataset.emergency).toBe("false");
+    const originalVehicleAt = vehicleMotion.vehicleAt;
+    const sample = vi.spyOn(vehicleMotion, "vehicleAt").mockImplementation((id, time) => ({
+      ...originalVehicleAt(id, time),
+      emergency: id === "P-02",
+    }));
+    try {
+      rerender(<OperationsMap {...current} selectedId="P-02" />);
+      expect(cars[0].options.element.dataset.selected).toBe("false");
+      expect(cars[1].options.element.dataset.selected).toBe("true");
+      expect(cars[1].options.element.dataset.emergency).toBe("true");
+      expect(carMarkers()).toEqual(cars);
+      for (const car of cars) expectFixedCar(car);
+    } finally {
+      sample.mockRestore();
+    }
   });
 
   it("handles missing map access and unavailable WebGL without orphan resources", async () => {
@@ -489,7 +608,7 @@ describe("patrol map integration", () => {
     expect(map.queryRenderedFeatures).not.toHaveBeenCalled();
   });
 
-  it("beams a green beacon from every officer and a red one from a reported person", async () => {
+  it("beams a green beacon from under every officer", async () => {
     let time = 0;
     const readClock = () => ({ ...initialDemo, time, running: true });
     const { container } = await mount({ running: true, readClock });
@@ -497,36 +616,14 @@ describe("patrol map integration", () => {
       ...container.querySelectorAll<HTMLElement>(`[data-kind="${kind}"]`),
     ];
     expect(beacons("officer")).toHaveLength(PEOPLE.length);
-    expect(beacons("suspect")).toHaveLength(SUSPECTS.length);
-    // Before the report is made, the red beacon is not on the map at all.
-    expect(beacons("suspect")[0].hidden).toBe(true);
 
     time = 30;
     frame();
-    const red = beacons("suspect")[0];
-    expect(red.hidden).toBe(false);
-    expect(markerFor(red).point).toEqual(suspectAt(SUSPECTS[0].id, time)!.point);
     PEOPLE.forEach((person, index) => {
       const green = beacons("officer")[index];
       expect(green.hidden).toBe(false);
       expect(markerFor(green).point).toEqual(vehicleAt(person.id, time).point);
     });
-  });
-
-  it("marks the reported person as a report rather than a selectable unit", async () => {
-    let time = 30;
-    const readClock = () => ({ ...initialDemo, time, running: true });
-    const { getByRole, queryByRole } = await mount({ running: true, readClock });
-    const chip = getByRole("img", { name: new RegExp(SUSPECTS[0].id) });
-    expect(chip.tagName).toBe("DIV");
-    expect(chip.textContent).toContain("UNVERIFIED");
-    expect(chip.getAttribute("aria-label")).toContain(SUSPECTS[0].source);
-    expect(queryByRole("button", { name: new RegExp(SUSPECTS[0].id) })).toBeNull();
-
-    // The report holds its last position rather than disappearing or looping.
-    time = 90;
-    frame();
-    expect(markerFor(chip).point).toEqual([...SUSPECTS[0].path.at(-1)!]);
   });
 
   it("publishes tracked units to the live layer and refreshes them on each poll", async () => {

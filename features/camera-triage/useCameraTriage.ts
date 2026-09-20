@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ContractValidationError, parseTriageResult } from "../../shared/contracts";
 import { trackConstraint } from "./devices";
 import { buildTriageRequest, nextDelayMs, type FrameOutcome } from "./frame";
 import {
@@ -289,7 +290,7 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
         return "error" as const;
       }
 
-      const result = (await response.json()) as TriageResult;
+      const result = parseTriageResult(await response.json());
       settle(result.timings_ms?.total);
       if (!cancelled) {
         setState((current) =>
@@ -311,11 +312,17 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
       let outcome: FrameOutcome = "error";
       try {
         outcome = await sendOneFrame();
-      } catch {
+      } catch (error) {
         if (!cancelled) {
           setState((current) =>
             current.state === "running"
-              ? { ...current, lastError: "Could not reach the triage route." }
+              ? {
+                  ...current,
+                  lastError:
+                    error instanceof ContractValidationError
+                      ? "Invalid triage response. Human review data is unavailable."
+                      : "Could not reach the triage route.",
+                }
               : current,
           );
         }

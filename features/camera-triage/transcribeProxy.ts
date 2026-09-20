@@ -1,3 +1,5 @@
+import { parseTranscriptionResult } from "../../shared/contracts";
+
 import { MAX_BODY_BYTES, REQUEST_TIMEOUT_MS, type TriageSettings } from "./triageProxy";
 
 export interface ClipProxyOutcome {
@@ -38,7 +40,13 @@ export async function forwardClip(
         body: JSON.stringify({ error: "upstream", status: upstream.status }),
       };
     }
-    return { status: 200, body: await upstream.text() };
+    const responseBody = await upstream.text();
+    try {
+      parseTranscriptionResult(JSON.parse(responseBody));
+    } catch {
+      return { status: 502, body: JSON.stringify({ error: "invalid-upstream-contract" }) };
+    }
+    return { status: 200, body: responseBody };
   } catch (error) {
     const timedOut = error instanceof Error && error.name === "TimeoutError";
     return {

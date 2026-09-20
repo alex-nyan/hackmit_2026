@@ -63,29 +63,13 @@ describe("shared scenario clock", () => {
     expect(clock.read().time).toBeCloseTo(0.8);
   });
 
-  it("holds an unsafe scene without a rewind from a fractional frame", () => {
-    const clock = fixture({
-      ...initialDemo,
-      time: 59.75,
-      running: true,
-      sceneOverride: { status: "unsafe", at: 45, source: "Demo operator" },
-    });
-    clock.at(100);
-    expect(clock.read().time).toBeCloseTo(59.85);
-    clock.at(200);
-    const before = clock.read().time;
+  it("keeps patrol running beyond the former scene boundaries", () => {
+    const clock = fixture({ ...initialDemo, time: 59.75, running: true });
     clock.at(300);
-    const held = clock.read();
-    expect(held.time).toBe(before);
-    expect(held.running).toBe(false);
-    clock.at(10_000);
-    expect(clock.read()).toBe(held);
-    clock.dispatch({ type: "scene", status: "cleared" });
-    clock.dispatch({ type: "play" });
-    clock.at(10_100);
-    expect(clock.read().time).toBeCloseTo(60.05);
+    expect(clock.read()).toMatchObject({ time: 60.05, running: true });
+    clock.at(100000);
+    expect(clock.read()).toMatchObject({ time: 159.75, running: true, panics: [], audit: [] });
   });
-
   it("materializes report timestamps from the same clock", () => {
     const clock = fixture({ ...initialDemo, time: 40, running: true });
     clock.at(155);
@@ -110,12 +94,14 @@ describe("shared scenario clock", () => {
     expect(clock.read().time).toBeCloseTo(5.421);
   });
 
-  it("resets, restarts and completes with no stale time accumulation", () => {
+  it("resets and restarts continuous patrol without stale time accumulation", () => {
     const clock = fixture({ ...initialDemo, time: 89, running: true });
     clock.at(2000);
-    expect(clock.read()).toMatchObject({ time: 90, running: false });
+    expect(clock.read()).toMatchObject({ time: 91, running: true });
     clock.at(10_000);
-    expect(clock.dispatch({ type: "play" }).time).toBe(0);
+    expect(clock.dispatch({ type: "pause" }).time).toBe(99);
+    clock.dispatch({ type: "reset" });
+    clock.dispatch({ type: "play" });
     clock.at(10_500);
     expect(clock.read().time).toBe(0.5);
     clock.dispatch({ type: "reset" });
@@ -126,12 +112,12 @@ describe("shared scenario clock", () => {
     expect(clock.read().time).toBeCloseTo(0.2);
   });
 
-  it("treats next-stage as one intentional seek and preserves the new anchor", () => {
+  it("treats forward seek as a time change without an incident stage", () => {
     const clock = fixture({ ...initialDemo, running: true });
     clock.at(1500);
-    expect(clock.dispatch({ type: "next" }).time).toBe(15);
+    expect(clock.dispatch({ type: "next" }).time).toBe(16.5);
     clock.at(1700);
-    expect(clock.read().time).toBeCloseTo(15.2);
+    expect(clock.read().time).toBeCloseTo(16.7);
   });
 
   it("ignores invalid or backwards monotonic samples", () => {

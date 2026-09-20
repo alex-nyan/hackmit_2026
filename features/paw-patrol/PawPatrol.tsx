@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   Shield,
@@ -10,28 +9,33 @@ import {
   Play,
   Pause,
   RotateCcw,
-  SkipForward,
   ArrowUpRight,
+  MapPin,
   Camera,
   Mic,
   Watch,
   Smartphone,
   Laptop,
   X,
-  Check,
+  LocateFixed,
+  Sun,
+  Moon,
   ArrowRight,
-  Ambulance,
   WifiOff,
-  Info,
-  ChevronDown,
 } from "lucide-react";
-import { BodyCamWall } from "@/features/body-cam";
+import { type MapFocus, type MapTheme, MAP_FOCUS } from "../boston-map/types";
+import { BuildingPanel } from "../boston-map/BuildingPanel";
+import type { BuildingFacts } from "../boston-map/buildingSelection";
 import { CapturePanel } from "@/features/camera-triage";
-import { JoinCard } from "@/features/join";
-import type { JoinLink } from "@/features/join";
-import { OperationsMapPanel } from "./OperationsMapPanel";
+import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-track";
+import { JoinCard, type JoinLink } from "@/features/join";
+import { OperationsMap } from "./OperationsMap";
+import { WorkspaceMapShell } from "./WorkspaceMapShell";
+import officerStyles from "./OfficerWorkspace.module.css";
+import hospitalStyles from "./HospitalWorkspace.module.css";
+import { HospitalWorkspace } from "./HospitalWorkspace";
+import type { OfficerMediaInput } from "./OfficerFeed";
 import {
-  DURATION,
   EVENTS,
   PEOPLE,
   PHASES,
@@ -43,50 +47,75 @@ import {
   stamp,
 } from "./scenario";
 import { useScenario, type DemoAction } from "./useScenario";
+import { vehicleAt } from "./vehicles/vehicleMotion";
 import { useDemoTools } from "./useDemoTools";
-import { sceneAt, emsStatus, type MistRecord } from "./consult";
-import { SceneCoordination, TacticalBrief, MistHandoff, emptyTactical } from "./ConsultPanels";
+import { sceneAt } from "./consult";
+import { SceneCoordination, TacticalBrief, emptyTactical } from "./ConsultPanels";
 import { WORKSPACE_LABELS, WORKSPACE_VIEWS, type Workspace } from "./workspace";
 import { useIncidentBus } from "./useIncidentBus";
 import { hazardIncident, transcriptIncident } from "./hazardSignal";
-import { draftMist, hasDraft, type MistDraft } from "./draftMist";
 import type { IncidentDraft } from "./incidents";
-import {
-  BusIndicator,
-  MistDraftCard,
-  NotConcluded,
-  PreArrival,
-  SharedTimeline,
-} from "./Provenance";
+import { BusIndicator, SharedTimeline } from "./Provenance";
 import type { TriageResult } from "../camera-triage/types";
 import type { TranscriptionResult } from "../camera-triage/audio";
+import { HeartRatePanel } from "../heart-rate/HeartRatePanel";
+import {
+  useHeartRate,
+  type HeartRateConnection,
+  type HeartRateSample,
+} from "../heart-rate/useHeartRate";
 
-const AnatomyViewer = dynamic(() => import("../anatomy/AnatomyViewer"), {
-  ssr: false,
-  loading: () => (
-    <div className="model-pending" role="status">
-      Preparing anatomy viewer…
-    </div>
-  ),
-});
+/** Stable identity so a poll that finds nothing does not rerun the map effect. */
+const EMPTY_DEVICES: LiveDevice[] = [];
+
 const VIEW_NAMES = {
   command: "Command",
   officer: "Officer",
   hospital: "Hospital",
 };
 
-function HeartChart({ time, id }: { time: number; id: string }) {
-  const values = Array.from({ length: 24 }, (_, i) =>
-    sampleHeartRate(id, Math.max(0, time - (23 - i) * 2)),
-  );
-  const path = values.map((v, i) => `${i * 10},${80 - (v - 65) * 0.85}`).join(" ");
+function HeartChart({
+  time,
+  id,
+  deviceSamples,
+}: {
+  time: number;
+  id: string;
+  deviceSamples?: HeartRateSample[];
+}) {
+  const values =
+    deviceSamples?.map((sample) => sample.bpm) ??
+    Array.from({ length: 24 }, (_, i) => sampleHeartRate(id, Math.max(0, time - (23 - i) * 2)));
+  if (deviceSamples && deviceSamples.length < 2) {
+    return (
+      <p className="small-note">
+        The device trend appears after two readings. No synthetic points are added.
+      </p>
+    );
+  }
+  const minimum = Math.min(...values) - 5;
+  const range = Math.max(...values) + 5 - minimum;
+  const y = (value: number) =>
+    deviceSamples ? 75 - ((value - minimum) / range) * 65 : 80 - (value - 65) * 0.85;
+  const firstAt = deviceSamples?.[0]?.receivedAt ?? 0;
+  const elapsed = (deviceSamples?.at(-1)?.receivedAt ?? 0) - firstAt;
+  const x = (index: number) =>
+    deviceSamples && elapsed > 0
+      ? ((deviceSamples[index].receivedAt - firstAt) / elapsed) * 230
+      : (index / Math.max(1, values.length - 1)) * 230;
+  const path = values.map((value, i) => `${x(i)},${y(value)}`).join(" ");
   return (
     <svg
       className="heart-chart"
       viewBox="0 0 230 84"
       role="img"
-      aria-label="Synthetic heart rate trend"
+      aria-label={deviceSamples ? "Received heart rate trend" : "Synthetic heart rate trend"}
     >
+      <title>
+        {deviceSamples
+          ? "Past device readings by browser receipt time; not an ECG"
+          : "Synthetic scenario readings"}
+      </title>
       <path d="M0 75H230M0 40H230M0 5H230" stroke="#dedfd9" strokeWidth="1" />
       <polyline
         points={path}
@@ -95,27 +124,55 @@ function HeartChart({ time, id }: { time: number; id: string }) {
         strokeWidth="2.5"
         strokeLinejoin="round"
       />
-      <circle cx="230" cy={80 - (values[23] - 65) * 0.85} r="3" fill="#343e8a" />
+      <circle cx="230" cy={y(values[values.length - 1])} r="3" fill="#343e8a" />
     </svg>
+  );
+}
+
+function HeartRateReadout({
+  connection,
+  time,
+  personId,
+}: {
+  connection: HeartRateConnection;
+  time: number;
+  personId: string;
+}) {
+  const deviceMode = connection.mode === "device";
+  const current = connection.status === "receiving" ? connection.bpm : null;
+  return (
+    <div className="reading" aria-label="Selected person heart rate">
+      <strong>{deviceMode ? (current ?? "--") : sampleHeartRate(personId, time)}</strong>
+      <span>
+        bpm
+        <small>
+          {deviceMode
+            ? current !== null
+              ? "Live device reading"
+              : "Device test · no current reading"
+            : `Synthetic sample · ${stamp(time)}`}
+        </small>
+      </span>
+    </div>
   );
 }
 
 export function PawPatrol({
   workspace = null,
+  officerMedia,
+  presentation = "map",
   join = null,
 }: {
   workspace?: Workspace | null;
+  officerMedia?: OfficerMediaInput | null;
+  /** Dispatch defaults to the map; retain its detailed workflows for regression coverage. */
+  presentation?: "map" | "detailed";
   /** Resolved on the server from the request's own origin. */
   join?: JoinLink | null;
 }) {
   const { time, running, readClock, dispatch, sceneOverride, panics, audit } = useScenario();
-  // One of the two things that cross workspaces, the body camera wall being
-  // the other. Both live on the server, so both need the workspaces to be one
-  // process. Everything below this line is local to a browser.
+  // The only state shared across workspaces. Everything else stays local.
   const bus = useIncidentBus();
-  const [draftDismissed, setDraftDismissed] = useState(false);
-  const [appliedDraft, setAppliedDraft] = useState<MistDraft | null>(null);
-  const [records, setRecords] = useState<Record<string, MistRecord>>({});
   const [session, setSession] = useState(0);
   const [tactical, setTactical] = useState(emptyTactical);
   const fixedView = workspace ? WORKSPACE_VIEWS[workspace] : undefined;
@@ -125,13 +182,43 @@ export function PawPatrol({
     if (!fixedView) setSelectedView(nextView);
   }
   const [selectedId, setSelectedId] = useState<string>("P-01");
+  const [focus, setFocus] = useState<MapFocus>("all");
+  const [theme, setTheme] = useState<MapTheme>("light");
+  const [recenterKey, setRecenterKey] = useState(0);
+  const [following, setFollowing] = useState(false);
   const [hardware, setHardware] = useState(false);
   const [evidence, setEvidence] = useState<"camera" | "audio" | null>(null);
+  // The camera and microphone stay opt-in. Tracking does not: it was opt-in
+  // when it meant reaching out to a Traccar server holding credentials
+  // somewhere else, and the positions now come from this deployment's own
+  // store — with a join code on screen inviting people to publish into it.
+  // Left off, a phone could scan, join and publish and still appear nowhere.
+  const [tracking, setTracking] = useState(true);
+  const liveTrack = useLiveTrack(tracking);
+  const liveDevices = liveTrack.state === "tracking" ? liveTrack.devices : EMPTY_DEVICES;
+  const [building, setBuilding] = useState<BuildingFacts | null>(null);
+  const handleBuildingSelect = useCallback((next: BuildingFacts | null) => setBuilding(next), []);
+  const [fixRequest, setFixRequest] = useState<{
+    longitude: number;
+    latitude: number;
+    nonce: number;
+  } | null>(null);
+  // The nonce is what makes a repeat click move the camera again.
+  const handleFocusDevice = useCallback((device: LiveDevice) => {
+    if (!device.fix) return;
+    setFollowing(false);
+    setFixRequest((previous) => ({
+      longitude: device.fix!.longitude,
+      latitude: device.fix!.latitude,
+      nonce: (previous?.nonce ?? 0) + 1,
+    }));
+  }, []);
   const person = PEOPLE.find((p) => p.id === selectedId) ?? PEOPLE[0];
-  const phase = phaseAt(time),
-    medical = phase >= 3,
-    complete = time === DURATION;
-  const selectedCase = medical && person.id === "P-01";
+  // Local-only: never pass device readings to the incident bus or MIST records.
+  const heartRate = useHeartRate(person.id, session);
+  const vehicle = vehicleAt(person.id, time);
+  const phase = phaseAt(time);
+  const complete = false;
   const scene = sceneAt(time, sceneOverride);
 
   const { publish } = bus;
@@ -217,28 +304,21 @@ export function PawPatrol({
     [captureContext, publish],
   );
 
-  const modelDraft = draftMist(bus.events, person.id);
-  const draftAvailable = hasDraft(modelDraft) && !draftDismissed && !records[person.id];
-
-  const events = [
-    ...EVENTS.filter((e) => e.at <= time && !(sceneOverride && e.at === 56)),
-    ...audit,
-  ].sort((a, b) => a.at - b.at);
+  const events = [...EVENTS, ...audit].sort((a, b) => a.at - b.at);
   function reset() {
     dispatch({ type: "reset" });
     setSelectedId("P-01");
+    setFollowing(false);
+    setFocus("all");
+    setRecenterKey((k) => k + 1);
     setEvidence(null);
-    setRecords({});
     setTactical(emptyTactical);
     setSession((s) => s + 1);
-    setDraftDismissed(false);
-    setAppliedDraft(null);
     // Clears the shared log in every workspace, not only this one.
     void bus.clear();
   }
   function play() {
     if (complete) {
-      setRecords({});
       setTactical(emptyTactical);
       setSession((s) => s + 1);
     }
@@ -260,36 +340,147 @@ export function PawPatrol({
     setSelectedId(p.id);
     setView("officer");
   }
-  const annotation = selectedCase
-    ? {
-        label: "Staged injury report",
-        detail: "The demo script reports an injury. Site, severity and diagnosis are not provided.",
-      }
-    : null;
-
-  // One map, one legend, one set of positions, in all three workspaces.
   const map = (
-    <OperationsMapPanel
-      time={time}
-      running={running}
-      readClock={readClock}
-      selectedId={selectedId}
-      onSelect={setSelectedId}
-      resetSignal={session}
-    />
+    <section className="map-panel" aria-label="Operations map">
+      <div className="map-heading">
+        <span>
+          <MapPin size={16} />
+          Boston & Cambridge
+        </span>
+        <div className="map-actions">
+          <button
+            className="follow-control"
+            disabled={!vehicle.routeId}
+            aria-pressed={following}
+            title={
+              following
+                ? "Stop following. You can also drag the map."
+                : "Keep the selected patrol vehicle centred"
+            }
+            onClick={() => setFollowing((value) => !value)}
+          >
+            <LocateFixed size={14} aria-hidden="true" />
+            {following ? "Stop following" : `Follow ${person.id}`}
+          </button>
+          <button
+            className="icon-control"
+            title="Centre selected officer"
+            aria-label="Centre selected officer"
+            onClick={() => setRecenterKey((k) => k + 1)}
+          >
+            <LocateFixed size={17} />
+          </button>
+          <button
+            className="icon-control"
+            data-on={tracking ? "true" : undefined}
+            aria-pressed={tracking}
+            title={tracking ? "Stop live tracking" : "Show real tracked units"}
+            aria-label={tracking ? "Stop live tracking" : "Show real tracked units"}
+            onClick={() => setTracking((value) => !value)}
+          >
+            {tracking ? <LocateFixed size={17} /> : <WifiOff size={17} />}
+          </button>
+          <button
+            className="icon-control"
+            title="Toggle map theme"
+            aria-label="Toggle map theme"
+            onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+          >
+            {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
+          </button>
+        </div>
+      </div>
+      <div className="map-wrapper">
+        <OperationsMap
+          time={time}
+          running={running}
+          readClock={readClock}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          focus={focus}
+          theme={theme}
+          recenterKey={recenterKey}
+          following={following}
+          onStopFollowing={() => setFollowing(false)}
+          liveDevices={liveDevices}
+          fixRequest={fixRequest}
+          onBuildingSelect={handleBuildingSelect}
+        />
+        <div className="map-overlay">
+          <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+          {view === "command" && <JoinCard join={join} />}
+          <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
+        </div>
+        <div className="campus-switch" aria-label="Map area">
+          {Object.entries(MAP_FOCUS).map(([key, target]) => (
+            <button
+              key={key}
+              aria-pressed={focus === key}
+              onClick={() => {
+                setFollowing(false);
+                setFocus(key as MapFocus);
+              }}
+            >
+              {target.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {view === "command" && presentation === "detailed" && (
+        <>
+          <div className="vehicle-telemetry" aria-label="Selected unit simulated position">
+            <span>
+              <strong>{person.id}</strong> {personStatus(person.id, time)}
+            </span>
+            <span>
+              {vehicle.routeId ? `${Math.round(vehicle.speedMps * 3.6)} km/h` : "Route unavailable"}
+            </span>
+            {vehicle.routeId && (
+              <span className="vehicle-coordinates">
+                {vehicle.point[1].toFixed(5)}, {vehicle.point[0].toFixed(5)}
+              </span>
+            )}
+          </div>
+          <div className="map-legend">
+            <span>
+              <i className="legend-officer" />
+              Simulated patrol
+            </span>
+          </div>
+        </>
+      )}
+    </section>
   );
 
+  // Keep the shared state/subscription above mounted, but do not mount legacy
+  // panels (especially capture) in the new Dispatch presentation.
+  // Hospital keeps its dedicated camera and heart-rate overlay.
+  // Officer capture callbacks and all backend/live-mode paths remain unchanged.
+  if (view === "command" && presentation === "map") {
+    return (
+      <WorkspaceMapShell
+        workspace={workspace}
+        view={view}
+        onViewChange={setView}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        status={personStatus(person.id, time)}
+        map={map}
+      />
+    );
+  }
+
   return (
-    <div className="paw-app">
+    <div
+      className={`paw-app ${view === "officer" ? officerStyles.officer : view === "hospital" ? hospitalStyles.hospital : ""}`}
+    >
       <a className="skip-link" href="#workspace">
         Skip to workspace
       </a>
       <header className="topbar">
         <Link className="wordmark" href="/" aria-label="Paw Patrol home">
           <Shield />
-          <span>
-            Paw Patrol<small>CONNECTED RESPONSE</small>
-          </span>
+          <span>Paw Patrol{view === "command" && <small>CONNECTED RESPONSE</small>}</span>
         </Link>
         <nav aria-label="Workspace">
           {workspace ? (
@@ -317,81 +508,78 @@ export function PawPatrol({
             ))
           )}
         </nav>
-        <button
-          className="hardware-toggle"
-          onClick={() => setHardware(!hardware)}
-          aria-expanded={hardware}
-        >
-          <WifiOff size={16} />
-          <span>Devices offline</span>
-        </button>
+        {view !== "hospital" && (
+          <button
+            className="hardware-toggle"
+            aria-label={view === "officer" ? "Devices" : "Devices offline"}
+            onClick={() => setHardware(!hardware)}
+            aria-expanded={hardware}
+          >
+            <Watch size={16} />
+            <span>
+              {heartRate.status === "receiving" ? "Heart rate live" : "Devices & HeartCast"}
+            </span>
+          </button>
+        )}
       </header>
       <main id="workspace">
-        <div className="page-heading">
-          <div>
-            <p className="eyebrow">
-              {view === "command"
-                ? "BOSTON & CAMBRIDGE · OPERATIONS"
-                : view === "officer"
-                  ? "OFFICER WORKSPACE · DESKTOP"
-                  : "RECEIVING DESK · SIMULATED HOSPITAL"}
-            </p>
-            <h1>
-              {view === "command"
-                ? PHASES[phase].title
-                : view === "officer"
-                  ? "Never out there alone."
-                  : "Ready before arrival."}
-            </h1>
-          </div>
-          <div className="demo-buttons">
-            <button
-              className="primary"
-              onClick={() => (running ? dispatch({ type: "pause" }) : play())}
-            >
-              {running ? <Pause size={16} /> : <Play size={16} />}{" "}
-              {running
-                ? "Pause demo"
-                : complete
-                  ? "Replay demo"
-                  : time > 0
-                    ? "Resume demo"
-                    : "Run demo"}
-              <ArrowUpRight size={16} />
-            </button>
-            <button
-              className="outline-button"
-              onClick={reset}
-              title="Reset demo"
-              aria-label="Reset demo"
-            >
-              <RotateCcw size={17} />
-            </button>
-          </div>
-        </div>
-        <div className="demo-notice">
-          <span className="tag">SIMULATION</span>
-          <span>Synthetic people and signals. No live monitoring or real dispatch.</span>
-          <span className="auto-label">
-            {complete
-              ? "Demo complete"
-              : running
-                ? "Automatic sequence running"
-                : time > 0
-                  ? "Paused · press Resume to continue"
-                  : "90-second automatic scenario"}
-          </span>
-        </div>
-        <BusIndicator status={bus.status} count={bus.events.length} />
-        <SceneCoordination
-          time={time}
-          scene={scene}
-          person={person}
-          panics={panics}
-          command={view === "command"}
-          dispatch={sharedDispatch}
-        />
-        {hardware && (
+        {view === "command" && (
+          <>
+            <div className="page-heading">
+              <div>
+                <p className="eyebrow">BOSTON &amp; CAMBRIDGE · OPERATIONS</p>
+                <h1>{PHASES[phase].title}</h1>
+              </div>
+              <div className="demo-buttons">
+                <button
+                  className="primary"
+                  onClick={() => (running ? dispatch({ type: "pause" }) : play())}
+                >
+                  {running ? <Pause size={16} /> : <Play size={16} />}{" "}
+                  {running
+                    ? "Pause demo"
+                    : complete
+                      ? "Replay demo"
+                      : time > 0
+                        ? "Resume demo"
+                        : "Run demo"}
+                  <ArrowUpRight size={16} />
+                </button>
+                <button
+                  className="outline-button"
+                  onClick={reset}
+                  title="Reset demo"
+                  aria-label="Reset demo"
+                >
+                  <RotateCcw size={17} />
+                </button>
+              </div>
+            </div>
+            <div className="demo-notice">
+              <span className="tag">SIMULATION</span>
+              <span>15 simulated patrol vehicles.</span>
+              <span className="auto-label">
+                {complete
+                  ? "Demo complete"
+                  : running
+                    ? "Patrol running"
+                    : time > 0
+                      ? "Paused · press Resume to continue"
+                      : "15 units · continuous patrol"}
+              </span>
+            </div>
+            <BusIndicator status={bus.status} count={bus.events.length} />
+            <SceneCoordination
+              time={time}
+              scene={scene}
+              person={person}
+              panics={panics}
+              command={view === "command"}
+              dispatch={sharedDispatch}
+            />
+          </>
+        )}
+        {hardware && view !== "hospital" && (
           <section className="hardware-panel panel">
             <div className="panel-heading">
               <h2>Hardware readiness</h2>
@@ -403,6 +591,21 @@ export function PawPatrol({
                 <X size={18} />
               </button>
             </div>
+            {view === "officer" && (
+              <>
+                <HeartRateReadout connection={heartRate} time={time} personId={person.id} />
+                <HeartChart
+                  time={time}
+                  id={person.id}
+                  deviceSamples={heartRate.mode === "device" ? heartRate.history : undefined}
+                />
+                <HeartRatePanel
+                  connection={heartRate}
+                  personId={person.id}
+                  personName={person.name}
+                />
+              </>
+            )}
             <div className="hardware-grid">
               {[
                 {
@@ -414,8 +617,8 @@ export function PawPatrol({
                 {
                   icon: Watch,
                   name: "Apple Watch SE",
-                  purpose: "Heart rate · generation not specified",
-                  state: "Not connected",
+                  purpose: "Heart rate via iPhone HeartCast · optional local test",
+                  state: heartRate.mode === "device" ? heartRate.status : "Not connected",
                 },
                 {
                   icon: Laptop,
@@ -433,8 +636,10 @@ export function PawPatrol({
               ))}
             </div>
             <p className="small-note">
-              The device inventory is recorded, but this build does not pair devices, run models,
-              record media or collect health data.
+              HeartCast can provide heart rate after you choose a Bluetooth device. Readings stay in
+              this tab’s memory and are not uploaded or saved. Camera, microphone and tracking use
+              separate opt-in controls; Bluetooth readings are never added to their shared incident
+              log.
             </p>
             <p className="small-note">
               <strong>ATAK integration · planned, not connected.</strong> A native Android plugin or
@@ -444,29 +649,12 @@ export function PawPatrol({
           </section>
         )}
 
-        {view !== "command" && (
-          <div className="person-bar">
-            <label htmlFor="person">
-              Selected person <ChevronDown size={14} />
-            </label>
-            <select id="person" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
-              {PEOPLE.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} · {p.id}
-                </option>
-              ))}
-            </select>
-            <span className="tag paper">{personStatus(person.id, time)}</span>
-            <span className="person-note">Fictional demo identity</span>
-          </div>
-        )}
-
         {view === "command" && (
           <div className="workspace">
             <aside className="panel units-panel">
               <div className="panel-heading">
                 <h2>On the ground</h2>
-                <span>04</span>
+                <span>{PEOPLE.length}</span>
               </div>
               <p className="muted">Demo patrol units</p>
               {PEOPLE.map((p) => (
@@ -493,20 +681,19 @@ export function PawPatrol({
               <div className="selected-summary">
                 <span className="eyebrow">SELECTED OFFICER</span>
                 <h3>{person.name}</h3>
-                <div className="reading">
-                  <strong>{sampleHeartRate(person.id, time)}</strong>
-                  <span>
-                    bpm <small>synthetic</small>
-                  </span>
-                  <HeartPulse size={21} />
-                </div>
+                <HeartRateReadout connection={heartRate} time={time} personId={person.id} />
+                <HeartRatePanel
+                  connection={heartRate}
+                  personId={person.id}
+                  personName={person.name}
+                  compact
+                />
                 {!workspace && (
                   <button className="text-button" onClick={() => inspect(person)}>
                     Open officer & body view <ArrowUpRight size={15} />
                   </button>
                 )}
               </div>
-              <JoinCard join={join} />
             </aside>
             {map}
             <aside className="panel incident-panel">
@@ -537,12 +724,14 @@ export function PawPatrol({
               </div>
               <dl className="details">
                 <div>
-                  <dt>Location</dt>
-                  <dd>Kendall Square</dd>
+                  <dt>Patrol area</dt>
+                  <dd>{person.area}</dd>
                 </div>
                 <div>
-                  <dt>Primary unit</dt>
-                  <dd>P-01 · Alex Morgan</dd>
+                  <dt>Selected unit</dt>
+                  <dd>
+                    {person.id} · {person.name}
+                  </dd>
                 </div>
                 <div>
                   <dt>Backup</dt>
@@ -550,13 +739,7 @@ export function PawPatrol({
                 </div>
                 <div>
                   <dt>Medical</dt>
-                  <dd>
-                    {time >= 52
-                      ? "EMS-01 · simulated"
-                      : medical
-                        ? "Coordinating in demo"
-                        : "No injury reported"}
-                  </dd>
+                  <dd>No injury reported</dd>
                 </div>
               </dl>
               <div className="evidence-buttons">
@@ -592,253 +775,85 @@ export function PawPatrol({
 
         {view === "officer" && (
           <>
-            <div className="officer-summary">
-              <section className="panel assignment">
-                <p className="eyebrow">{person.id} · ASSIGNMENT</p>
-                <h2>{person.area} patrol</h2>
-                <p className="prose">
-                  {person.id === "P-01"
-                    ? phase === 0
-                      ? "Stay connected to your team. Your surroundings and status, in one place."
-                      : PHASES[phase].detail
-                    : personStatus(person.id, time) === "On patrol"
-                      ? "Continue the assigned patrol. The sample unit is available to the command desk."
-                      : "Responding to the staged incident near Kendall Square. Assignment is simulated."}
-                </p>
-              </section>
-              <section className="panel vital-card">
-                <div className="panel-heading">
-                  <h3>Heart rate</h3>
-                  <HeartPulse size={20} />
-                </div>
-                <div className="reading">
-                  <strong>{sampleHeartRate(person.id, time)}</strong>
-                  <span>
-                    bpm<small>Synthetic sample · {stamp(time)}</small>
-                  </span>
-                </div>
-                <HeartChart time={time} id={person.id} />
-              </section>
-              <section className="panel support-card">
-                <p className="eyebrow">INCIDENT RESPONSE UNITS</p>
-                <h3>{phase >= 2 ? "Support for P-01." : "Available for response."}</h3>
-                <div className="support-avatars">
-                  <span className="avatar sage">JL</span>
-                  <span className="avatar sky">SR</span>
-                  <span>
-                    P-02 & P-03
-                    <br />
-                    <small>
-                      {phase >= 3
-                        ? "At staged scene"
-                        : phase >= 2
-                          ? "On illustrative response paths"
-                          : "Available in demo"}
-                    </small>
-                  </span>
-                </div>
-              </section>
-            </div>
-            <div className="officer-grid">
-              {map}
-              <AnatomyViewer
-                personId={person.id}
-                personName={person.name}
-                annotation={annotation}
-              />
-            </div>
-            <section className="panel evidence-panel">
-              <div className="panel-heading">
-                <h2>Body camera · live</h2>
-                <span className="tag">REAL CAPTURE</span>
-              </div>
-              <div className="evidence-content">
-                <Camera size={34} />
-                <div>
-                  <h3>This camera opens the incident</h3>
-                  <p>
-                    Frames from this device go to the triage service. A reported weapon or person
-                    down publishes to the shared log, so Command and the receiving desk see it
-                    without a radio call. The service has no &quot;safe&quot; result to return and
-                    every output needs a person to review it.
-                  </p>
-                </div>
-              </div>
-              <div className="evidence-capture">
-                <CapturePanel
-                  sourceId={`officer-${person.id}`}
-                  onResult={onHazard}
-                  onTranscript={onTranscript}
-                />
-              </div>
-            </section>
-            <section className="panel device-strip">
-              <Smartphone size={20} />
-              <strong>iPhone 16 Pro Max</strong>
-              <span>Video, audio & GPS not connected</span>
-              <Watch size={20} />
-              <strong>Apple Watch SE</strong>
-              <span>Heart-rate feed not connected</span>
-            </section>
-          </>
-        )}
-
-        {view === "hospital" && (
-          <div className="hospital-grid">
-            {/* The receiving desk sees the same picture as the other two: where
-                the units are, and where the report places the person of
-                interest. It is context for an arrival, not a clinical input. */}
+            <h1 className="sr-only">Officer workspace</h1>
             {map}
-            <section className="panel handoff-panel">
+            <div className={officerStyles.unitPicker}>
+              <Shield size={18} aria-hidden="true" />
+              <label className="sr-only" htmlFor="officer-person">
+                Selected person
+              </label>
+              <select
+                id="officer-person"
+                value={selectedId}
+                onChange={(e) => setSelectedId(e.target.value)}
+              >
+                {PEOPLE.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.id} · {p.name}
+                  </option>
+                ))}
+              </select>
+              <span>{personStatus(person.id, time)}</span>
+            </div>
+            <div className={officerStyles.tools}>
+              <button
+                aria-expanded={evidence === "camera"}
+                aria-controls="officer-camera"
+                onClick={() => setEvidence(evidence === "camera" ? null : "camera")}
+              >
+                <Camera size={17} /> Camera
+              </button>
+              <button onClick={() => (running ? dispatch({ type: "pause" }) : play())}>
+                {running ? <Pause size={17} /> : <Play size={17} />}
+                {running
+                  ? "Pause demo"
+                  : complete
+                    ? "Replay demo"
+                    : time > 0
+                      ? "Resume demo"
+                      : "Run demo"}
+              </button>
+              <button aria-label="Reset demo" title="Reset demo" onClick={reset}>
+                <RotateCcw size={17} />
+              </button>
+            </div>
+            <section
+              id="officer-camera"
+              className={officerStyles.camera}
+              hidden={evidence !== "camera"}
+            >
               <div className="panel-heading">
-                <span className={`tag ${selectedCase ? "sky" : "sage"}`}>
-                  {selectedCase
-                    ? complete
-                      ? "HANDOFF COMPLETE"
-                      : "SIMULATED INCOMING"
-                    : "STANDBY"}
-                </span>
-                <Ambulance size={25} />
+                <h2>Camera & audio</h2>
+                <button
+                  className="icon-control"
+                  aria-label="Close camera"
+                  onClick={() => setEvidence(null)}
+                >
+                  <X size={18} />
+                </button>
               </div>
-              <h2>{selectedCase ? person.name : "Awaiting a handoff."}</h2>
-              <p className="prose">
-                {selectedCase
-                  ? "A single view of the staged incident and sample observations. No clinical assessment has been performed."
-                  : `No injury or incoming transfer is reported for ${person.name} in the current scenario.`}
-              </p>
-              {selectedCase ? (
-                <>
-                  <PreArrival
-                    time={time}
-                    duration={DURATION}
-                    arrived={complete}
-                    landed={[
-                      { label: "Scene status reported", present: scene.status !== "unknown" },
-                      {
-                        label: "Mechanism drafted from scene camera",
-                        present: Boolean(modelDraft.mechanism),
-                      },
-                      { label: "Scene audio reviewed", present: Boolean(modelDraft.symptoms) },
-                      { label: "Heart-rate series available", present: true },
-                      {
-                        label: "Clinician-entered handoff saved",
-                        present: Boolean(records[person.id]),
-                      },
-                    ]}
-                  />
-                  <dl className="details">
-                    <div>
-                      <dt>Demo case</dt>
-                      <dd>DEMO-001 / P-01</dd>
-                    </div>
-                    <div>
-                      <dt>Transport</dt>
-                      <dd>{emsStatus(time, scene.status)}</dd>
-                    </div>
-                    <div>
-                      <dt>Destination</dt>
-                      <dd>Demo receiving point, Cambridge</dd>
-                    </div>
-                    <div>
-                      <dt>Injury site</dt>
-                      <dd>Not provided</dd>
-                    </div>
-                    <div>
-                      <dt>Diagnosis</dt>
-                      <dd>Not assessed</dd>
-                    </div>
-                    <div>
-                      <dt>History / allergies</dt>
-                      <dd>Not provided</dd>
-                    </div>
-                  </dl>
-                  <div className="handoff-note">
-                    <Info size={17} />
-                    <p>
-                      Unverified weapon report remains unconfirmed. Heart-rate changes do not
-                      establish an injury or a diagnosis.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <div className="empty-handoff">
-                  <HeartPulse size={48} />
-                  <p>
-                    When the demo reaches its explicit injury event, the handoff for Alex Morgan
-                    appears here automatically.
-                  </p>
-                  <button className="secondary" onClick={() => setSelectedId("P-01")}>
-                    Select primary officer
-                  </button>
-                </div>
-              )}
-            </section>
-            <AnatomyViewer personId={person.id} personName={person.name} annotation={annotation} />
-            <section className="panel observations">
-              <p className="eyebrow">SAMPLE OBSERVATIONS</p>
-              <h2>Context, not conclusions.</h2>
-              <div className="reading">
-                <strong>{sampleHeartRate(person.id, time)}</strong>
-                <span>
-                  bpm<small>Scripted heart rate</small>
-                </span>
-              </div>
-              <HeartChart time={time} id={person.id} />
-              <p className="small-note">
-                No measurements received from a watch. No live blood pressure, oxygen saturation,
-                ECG or diagnosis is available.
-              </p>
-              <h3 className="section-label">Handoff contents</h3>
-              {[
-                "Scenario event timeline",
-                "Sample heart-rate series",
-                "Scripted transport status",
-              ].map((s) => (
-                <div className="check-row" key={s}>
-                  <Check size={16} />
-                  {s}
-                </div>
-              ))}
-              <div className="feed-unavailable">
-                <Camera size={23} />
-                <strong>No body-camera footage</strong>
-                <p>No recording was supplied. A detection result is not a visual confirmation.</p>
-              </div>
-              <p className="small-note">
-                All people and coordination are simulated. No hospital was contacted.
-              </p>
-            </section>
-          </div>
-        )}
-
-        {view === "hospital" && selectedCase && (
-          <>
-            {draftAvailable && (
-              <MistDraftCard
-                draft={modelDraft}
-                onApply={() => setAppliedDraft(modelDraft)}
-                onDismiss={() => setDraftDismissed(true)}
+              <CapturePanel
+                sourceId={`officer-${person.id}`}
+                onResult={onHazard}
+                onTranscript={onTranscript}
               />
-            )}
-            <MistHandoff
-              // Remounting is what seeds the editable form from an applied
-              // draft; the form owns its state once a person is typing in it.
-              key={`${session}-${person.id}-${appliedDraft ? "drafted" : "blank"}`}
-              person={person}
-              time={time}
-              scene={scene}
-              saved={records[person.id]}
-              seed={appliedDraft}
-              onSave={(record) => setRecords((current) => ({ ...current, [person.id]: record }))}
-            />
+            </section>
           </>
         )}
 
         {view === "hospital" && (
-          <NotConcluded
+          <HospitalWorkspace
+            person={person}
+            onSelect={setSelectedId}
+            heartRate={heartRate}
+            session={session}
             events={bus.events}
-            personId={person.id}
-            hasSavedRecord={Boolean(records[person.id])}
+            busStatus={bus.status}
+            media={officerMedia}
+            running={running}
+            onPlay={play}
+            onPause={() => dispatch({ type: "pause" })}
+            onReset={reset}
           />
         )}
 
@@ -857,15 +872,9 @@ export function PawPatrol({
             <div className="evidence-content">
               {evidence === "camera" ? <Camera size={34} /> : <Mic size={34} />}
               <div>
-                <h3>The {evidence === "camera" ? "weapon" : "concern"} signal is scripted</h3>
-                <p>
-                  That event came from the demo timeline, not from a sensor. Capture below is
-                  separate and real: this device&apos;s{" "}
-                  {evidence === "camera" ? "camera" : "microphone"} feeds the triage service, and
-                  what comes back is a model reading for a person to check.
-                </p>
+                <h3>{evidence === "camera" ? "Camera capture" : "Audio capture"}</h3>
+                <p>Start capture to review readings from this device.</p>
               </div>
-              <span className="tag">DEMO SIGNAL ONLY</span>
             </div>
             <div className="evidence-capture">
               <CapturePanel sourceId={`dispatch-${evidence}`} />
@@ -873,69 +882,52 @@ export function PawPatrol({
           </section>
         )}
 
-        {/* Command watches every officer publishing, not just this device. */}
-        {view === "command" && <BodyCamWall />}
-
-        <section className="scenario-strip" aria-label="Demo playback">
-          <div className="scenario-caption">
-            <span className="eyebrow">THE RESPONSE CHAIN</span>
-            <span className="clock">
-              {stamp(time)} <small>/ 01:30</small>
-            </span>
-            <button
-              className="next-button"
-              disabled={complete}
-              onClick={() => dispatch({ type: "next" })}
-            >
-              Next stage <SkipForward size={15} />
-            </button>
-          </div>
-          <ol className="phases">
-            {PHASES.map((p, i) => (
-              <li key={p.label} className={phase === i ? "current" : phase > i ? "done" : ""}>
-                <span>{phase > i ? <Check size={14} /> : String(i + 1).padStart(2, "0")}</span>
-                <strong>{p.label}</strong>
-                <small>{stamp(p.at)}</small>
-              </li>
-            ))}
-          </ol>
-          <div className="progress-track">
-            <div style={{ width: `${(time / DURATION) * 100}%` }} />
-          </div>
-        </section>
-        <section className="activity-panel panel">
-          <div className="panel-heading">
-            <h2>Shared incident log</h2>
-            <span className="tag">ALL WORKSPACES</span>
-          </div>
-          <SharedTimeline events={bus.events} />
-        </section>
-        <section className="activity-panel panel">
-          <div className="panel-heading">
-            <h2>Event timeline</h2>
-            <span className="tag">SCRIPTED EVENTS</span>
-          </div>
-          <div className="activity-list">
-            {[...events].reverse().map((e) => (
-              <article key={"id" in e ? String(e.id) : `${e.at}-${e.title}`}>
-                <time>{stamp(e.at)}</time>
-                <div>
-                  <strong>{e.title}</strong>
-                  <p>{e.detail}</p>
-                </div>
-                <span>{e.source}</span>
-              </article>
-            ))}
-          </div>
-        </section>
+        {view === "command" && (
+          <>
+            <section className="scenario-strip" aria-label="Demo playback">
+              <div className="scenario-caption">
+                <span className="eyebrow">15 UNITS · CONTINUOUS PATROL</span>
+                <span className="clock">{stamp(time)}</span>
+              </div>
+            </section>
+            <section className="activity-panel panel">
+              <div className="panel-heading">
+                <h2>Shared incident log</h2>
+                <span className="tag">ALL WORKSPACES</span>
+              </div>
+              <SharedTimeline events={bus.events} />
+            </section>
+            <section className="activity-panel panel">
+              <div className="panel-heading">
+                <h2>Event timeline</h2>
+                <span className="tag">OPERATOR ACTIONS</span>
+              </div>
+              <div className="activity-list">
+                {events.length === 0 && <p>No operator actions recorded.</p>}
+                {[...events].reverse().map((e) => (
+                  <article key={"id" in e ? String(e.id) : `${e.at}-${e.title}`}>
+                    <time>{stamp(e.at)}</time>
+                    <div>
+                      <strong>{e.title}</strong>
+                      <p>{e.detail}</p>
+                    </div>
+                    <span>{e.source}</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
         <p className="sr-only" role="status">
           {PHASES[phase].label}: {PHASES[phase].detail}
         </p>
       </main>
-      <footer>
-        <span>PAW PATROL · HACKMIT 2026</span>
-        <span>Frontend demo · No external dispatch or clinical decisions</span>
-      </footer>
+      {view === "command" && (
+        <footer>
+          <span>PAW PATROL · HACKMIT 2026</span>
+          <span>Frontend demo · No external dispatch or clinical decisions</span>
+        </footer>
+      )}
     </div>
   );
 }

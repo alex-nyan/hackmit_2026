@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "SampleReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "observation_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Observation Id",
+          "type": "string"
+        },
+        "sample_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "historical",
+            "duplicate"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "sample_id",
+        "status",
+        "observation_id",
+        "warnings"
+      ],
+      "title": "SampleReceipt",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "incident_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "results": {
+      "items": {
+        "$ref": "#/$defs/SampleReceipt"
+      },
+      "title": "Results",
+      "type": "array"
+    },
+    "revision": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "incident_id",
+    "revision",
+    "results"
+  ],
+  "title": "TelemetryReceipt",
+  "type": "object"
+}

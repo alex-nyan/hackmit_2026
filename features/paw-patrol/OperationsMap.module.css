@@ -31,10 +31,10 @@
   gap: 5px;
   min-height: 30px;
   padding: 6px 8px;
-  border: 1px solid rgb(52 62 138 / 18%);
+  border: 1px solid var(--route-color, #343e8a);
   border-radius: 7px;
   background: #fcf7ed;
-  color: #343e8a;
+  color: var(--route-color, #343e8a);
   box-shadow: 0 3px 12px rgb(40 46 78 / 20%);
   font:
     700 10px/1.1 Arial,
@@ -65,15 +65,15 @@
   outline-offset: 4px;
 }
 .officerMarker[data-selected="true"] {
-  background: #343e8a;
-  color: #fcf7ed;
-  border-color: #343e8a;
+  background: var(--route-color, #343e8a);
+  color: #fff;
+  border-color: var(--route-color, #343e8a);
   box-shadow:
-    0 0 0 3px #efdb98,
-    0 5px 16px rgb(40 46 78 / 25%);
+    0 0 0 2px #fff,
+    0 3px 8px rgb(24 39 65 / 25%);
 }
 .officerMarker[data-selected="true"]::after {
-  background: #343e8a;
+  background: var(--route-color, #343e8a);
 }
 /* The chip repeats the beacon's hue so a unit reads as an officer at city
    zoom, where the 3D car is not drawn. */
@@ -230,8 +230,8 @@
 
 .feedback {
   position: absolute;
-  top: 22px;
-  left: 20px;
+  top: var(--map-feedback-top, 22px);
+  left: var(--map-feedback-left, 20px);
   right: 20px;
   z-index: 6;
   display: flex;
@@ -324,21 +324,6 @@
   border-top: 2px dashed #343e8a;
   flex-shrink: 0;
 }
-.fallback {
-  position: absolute;
-  bottom: 40px;
-  left: 12px;
-  right: 52px;
-  z-index: 5;
-  max-width: 340px;
-  padding: 8px 11px;
-  border-radius: 7px;
-  color: #343e8a;
-  background: #fcf7ed;
-  font:
-    11px/1.5 Arial,
-    sans-serif;
-}
 
 .root :global(.mapboxgl-ctrl-attrib) {
   color: #343e8a;
@@ -365,8 +350,8 @@
 
 @media (max-width: 480px) {
   .feedback {
-    top: 12px;
-    left: 12px;
+    top: var(--map-feedback-top, 12px);
+    left: var(--map-feedback-left, 12px);
     right: 12px;
     padding: 13px;
   }
@@ -388,4 +373,35 @@
   .beaconRing + .beaconRing {
     display: none;
   }
+}
+
+/* Screen-sized cars: zoom, pitch and selection never scale the artwork. */
+.vehicleDirection {
+  width: 32px;
+  height: 44px;
+  z-index: 2;
+  pointer-events: none;
+  color: var(--route-color, #343e8a);
+  filter: drop-shadow(0 2px 2px rgb(20 35 55 / 40%));
+}
+.vehicleDirection svg {
+  display: block;
+  width: 32px;
+  height: 44px;
+  overflow: visible;
+}
+.vehicleDirection[hidden] {
+  display: none;
+}
+.vehicleDirection [data-car-outline] {
+  fill: none;
+  stroke: none;
+}
+.vehicleDirection[data-selected="true"] [data-car-outline] {
+  fill: rgb(255 255 255 / 25%);
+  stroke: currentColor;
+}
+.vehicleDirection[data-emergency="true"] [data-car-outline] {
+  fill: rgb(223 139 90 / 22%);
+  stroke: #ae6c3e;
 }
