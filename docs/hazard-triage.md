@@ -81,9 +81,12 @@ uv run --no-sync uvicorn triage.app:create_app --factory \
 ```
 
 The map still starts separately from the repository root with `pnpm run dev`.
-No public, unauthenticated Next.js proxy is added. A future authenticated incident
-backend calls the triage service using its server credential and enforces its own
-user, tenant, and incident authorization.
+The optional `/capture` page calls a Next.js `/api/triage` proxy using the server's
+`TRIAGE_URL` and `TRIAGE_API_TOKEN`; see the root README for setup. The dashboard
+has no user login, so enabling this proxy grants submission access to everyone
+who can reach it. Use a trusted LAN or authenticated reverse proxy. A production
+incident backend must enforce user, tenant, and incident authorization separately
+from this service credential.
 
 ## Submit an image
 

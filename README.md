@@ -119,6 +119,57 @@ a fresh fix; the roster reports the two separately.
 Tracking is off until you press the button, only the latest fix per unit is held,
 and no location history is kept by the dashboard.
 
+## Camera hazard triage (optional)
+
+`/capture` opens a phone-oriented page that sends camera frames to the hazard
+triage service in `services/triage`. Add to `.env.local`:
+
+```dotenv
+TRIAGE_URL=http://127.0.0.1:8090
+TRIAGE_API_TOKEN=your_triage_bearer_token
+TRIAGE_TIMEOUT_SECONDS=240
+```
+
+Server-side only. **Never prefix these with `NEXT_PUBLIC_`** — the bearer token
+would otherwise reach every visitor. The browser posts to `/api/triage`, which
+attaches the token and forwards to `/v1/triage`.
+
+The timeout covers the service's default inference deadlines plus overhead.
+Increase it if the service uses a longer provider timeout (maximum 3600 seconds).
+The dashboard has no user login: anyone who can reach `/api/triage` can submit a
+frame using the configured service credential. Keep this demo on a trusted LAN,
+or put authenticated access in front of the dashboard before exposing it publicly.
+
+### Camera access needs HTTPS
+
+Browsers expose `getUserMedia` only in a secure context. `localhost` is exempt,
+so development works over plain HTTP on the machine itself, but a phone on the
+LAN needs real HTTPS:
+
+```bash
+pnpm exec next dev --experimental-https
+```
+
+The first run downloads mkcert and installs a local certificate authority, which
+**prompts for your password**. On iOS, also install that CA on the device and
+enable full trust under Settings → General → About → Certificate Trust Settings;
+without that second step Safari still refuses the camera.
+
+### What it does and does not do
+
+Frames go out one at a time. The service admits a single frame concurrently and
+answers `429` when busy, so the page waits for each response before capturing
+again rather than queueing frames until they age out.
+
+The service never reports a scene as safe: `status` is only ever `needs_review`
+or `insufficient_evidence`, and `requires_human_review` is always true. Treat the
+output as a prompt for a person, and the confidence values as uncalibrated model
+scores rather than probabilities.
+
+**iOS suspends camera capture when the tab is backgrounded or the screen locks.**
+A browser page cannot keep recording from a pocket; it needs to stay in the
+foreground.
+
 ## What is included
 
 - Real vector basemaps: Mapbox `light-v11` and `dark-v11`.
@@ -130,6 +181,8 @@ and no location history is kept by the dashboard.
 - Responsive layout, loading feedback, missing-token and failed-load states.
 - Optional live fleet tracking from a Traccar server: every unit on one map,
   opt-in and server-authenticated.
+- Optional camera hazard triage at `/capture`, proxied so the service token
+  stays on the server.
 - Isolated map feature modules, TypeScript, tests, and CI checks.
 
 There are intentionally **no energy overlays, mock metrics, heatmap circles,

@@ -22,3 +22,6 @@ services/triage/data/
 services/triage/models/
 services/triage/.runtime/
 *.egg-info/
+
+# next dev --experimental-https writes a TLS private key here.
+certificates/
