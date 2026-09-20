@@ -26,7 +26,11 @@ const MAX_BODY_BYTES = 2_048;
 export async function POST(request: Request): Promise<Response> {
   if (!isPositionStoreConfigured()) {
     return Response.json(
-      { error: "not-configured", reason: "Set BLOB_READ_WRITE_TOKEN." },
+      {
+        error: "not-configured",
+        reason:
+          "This deployment has nowhere to store positions, so it cannot put anyone on the map.",
+      },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }
@@ -57,11 +61,24 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const stored = await publishPosition(submission);
-  return Response.json(
-    { sourceId: stored.sourceId, publishedAt: stored.publishedAt },
-    { status: 201, headers: { "Cache-Control": "no-store" } },
-  );
+  try {
+    const stored = await publishPosition(submission);
+    return Response.json(
+      { sourceId: stored.sourceId, publishedAt: stored.publishedAt },
+      { status: 201, headers: { "Cache-Control": "no-store" } },
+    );
+  } catch {
+    // An unhandled throw here reaches the phone as a bare 500, which it can
+    // only report as "something went wrong" — on the one screen where the
+    // person is still deciding whether this app works at all.
+    return Response.json(
+      {
+        error: "publish-failed",
+        reason: "The server could not record this position. Tell whoever is running the dashboard.",
+      },
+      { status: 502, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 }
 
 /**
@@ -94,6 +111,9 @@ export async function DELETE(request: Request): Promise<Response> {
     return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   }
 
-  await removePosition(sourceId);
+  // Whether the withdrawal landed is not the caller's problem: they left, and
+  // an unremoved fix ages out on its own. A 500 here would only be reported on
+  // a page that is usually already closing.
+  await removePosition(sourceId).catch(() => undefined);
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }

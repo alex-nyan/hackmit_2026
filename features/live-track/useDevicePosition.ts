@@ -93,6 +93,28 @@ function finite(value: number | null | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+/**
+ * What the server said went wrong, in words the person holding the phone can
+ * act on.
+ *
+ * Every refusal from the publish route carries a `reason`. Collapsing them all
+ * into "the last position could not be published" is how somebody stands there
+ * watching a button that says they are on the map, on a page that cannot tell
+ * them the store behind it has been switched off.
+ */
+async function reasonFrom(response: Response): Promise<string> {
+  try {
+    const body: unknown = await response.json();
+    if (typeof body === "object" && body !== null) {
+      const { reason } = body as { reason?: unknown };
+      if (typeof reason === "string" && reason.trim()) return reason;
+    }
+  } catch {
+    // A body that is not JSON says nothing the status has not already said.
+  }
+  return "The last position could not be published.";
+}
+
 export function useDevicePosition(
   sourceId: string,
   /**
@@ -204,15 +226,15 @@ export function useDevicePosition(
             fixedAt: new Date(position.timestamp).toISOString(),
           }),
         });
-        if (!response.ok) throw new Error(String(response.status));
+        if (!response.ok) throw new Error(await reasonFrom(response));
         session.published = true;
         report({ lastError: null });
       } catch (error) {
         if (controller.signal.aborted) return;
         report({
           lastError:
-            error instanceof Error && error.message === "503"
-              ? "This deployment has nowhere to store positions."
+            error instanceof Error && error.message
+              ? error.message
               : "The last position could not be published.",
         });
       }

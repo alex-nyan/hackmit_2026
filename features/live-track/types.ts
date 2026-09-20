@@ -42,9 +42,20 @@ export interface LiveDevice {
   fix: LiveFix | null;
 }
 
+/**
+ * Why a picture that exists may not be the whole one.
+ *
+ * Carried alongside an answer rather than replacing it: a dashboard that has
+ * units to draw should draw them, and a dashboard reading a degraded source
+ * should say so on the same screen rather than in a log nobody is watching.
+ */
+export interface LiveTrackNote {
+  note?: string;
+}
+
 export type LiveTrackPayload =
-  | { state: "tracking"; devices: LiveDevice[] }
-  | { state: "no-devices" }
+  | ({ state: "tracking"; devices: LiveDevice[] } & LiveTrackNote)
+  | ({ state: "no-devices" } & LiveTrackNote)
   | { state: "not-configured" }
   | { state: "unavailable"; reason: string };
 
