@@ -4,10 +4,18 @@ This is frontend demonstration software, not an operational public-safety or med
 
 ## One scenario across three views
 
+The [root development launcher](../../../docs/development.md) runs this shared
+code in three processes: Dispatch (5176), Officer (5177) and Hospital (5178).
+Server configuration selects a fixed workspace; generated outputs are isolated
+per process. Running this app's own `npm run dev` retains the combined demo with
+workspace tabs. These entry points select presentation, not an authorization role.
+
 `scenario.ts` owns fictional identities, fixed geographical coordinates, chronological
 events, pulse samples and derived status. `useScenario.ts` owns a single reducer and
 clock. Workspace switching preserves it; pause, reset, skip and completion are atomic.
 There is no network ingestion, database, authentication or synchronization across browsers.
+Each separate port/browser has its own scenario, panic state, notes and handoff
+entries. Shared operational state requires an explicit backend integration.
 
 The UI never derives an injury from a weapon flag or pulse. An explicit script event
 at 45 seconds introduces the injury. Only P-01 receives that annotation. Other selected

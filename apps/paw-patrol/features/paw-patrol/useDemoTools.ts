@@ -5,6 +5,7 @@ import { PEOPLE, type View } from "./scenario";
 import type { DemoAction } from "./useScenario";
 interface Props {
   view: View;
+  fixedView?: View;
   selectedId: string;
   time: number;
   running: boolean;
@@ -59,6 +60,7 @@ export function useDemoTools(props: Props) {
             person: s.selectedId,
             time: s.time,
             running: s.running,
+            workspaceLocked: Boolean(s.fixedView),
             simulated: true,
           };
         },
@@ -97,11 +99,13 @@ export function useDemoTools(props: Props) {
       {
         name: "navigate_paw_patrol_demo",
         description:
-          "Select the visible Command, Officer or Hospital workspace and optionally a fictional officer.",
+          props.fixedView
+            ? "Select a fictional officer within this server's fixed workspace. Switching workspaces is unavailable."
+            : "Select the visible Command, Officer or Hospital workspace and optionally a fictional officer.",
         inputSchema: {
           type: "object",
           properties: {
-            view: { enum: ["command", "officer", "hospital"] },
+            view: { enum: props.fixedView ? [props.fixedView] : ["command", "officer", "hospital"] },
             personId: { enum: PEOPLE.map((p) => p.id) },
           },
           required: ["view"],
@@ -119,6 +123,9 @@ export function useDemoTools(props: Props) {
               !PEOPLE.some((p) => p.id === x.personId))
           )
             throw new Error("Invalid workspace or person");
+          if (state.current.fixedView && x.view !== state.current.fixedView) {
+            throw new Error("This server has a fixed workspace.");
+          }
           flushSync(() => {
             state.current.setView(x.view as View);
             if (x.personId) state.current.setSelectedId(String(x.personId));
@@ -138,5 +145,5 @@ export function useDemoTools(props: Props) {
       }
     }
     return () => abort.abort();
-  }, []);
+  }, [props.fixedView]);
 }

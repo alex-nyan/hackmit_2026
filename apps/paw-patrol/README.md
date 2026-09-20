@@ -9,6 +9,15 @@ contacts hospitals, diagnoses injuries or stores personal data.
 
 ## Run locally
 
+For three separate servers, use **`npm run dev` from the repository root** after
+the [root quick start](../../README.md#quick-start): Dispatch at 5176, Officer at
+5177, Hospital at 5178. Each opens its own workspace and has an independent browser
+demo session. See [local development](../../docs/development.md) for service
+selection, configuration and process shutdown.
+
+For the combined, switchable-workspace demo in one browser, follow the steps below.
+It uses the same port as Dispatch, so stop the root launcher first.
+
 Use Node 22.23.2 (`.nvmrc`) and npm 11.6.2. From this directory:
 
 ```sh
@@ -23,6 +32,7 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_public_token
 ```
 
 Allow `http://localhost:5176/*` and `http://127.0.0.1:5176/*` in your token restrictions.
+Also allow ports 5177 and 5178 when using the root launcher.
 Then `npm run dev` and open [localhost:5176](http://localhost:5176).
 The body model is included locally; the real 3D basemap needs internet, WebGL and a valid token.
 The rest of the demonstration remains usable if the map is unavailable.
@@ -62,9 +72,9 @@ npm start
 Stop development before using production on the same port. A different port can be selected
 with `npm run dev -- --port 5177`. Do not use the original map repo's ports 5173/5174.
 
-This is the independent `apps/paw-patrol` dashboard in `alex-nyan/hackmit_2026`,
-branch `codex/paw-patrol-dashboard`. The team's root app and backend remain separate
-and unchanged. Clone that branch and enter `apps/paw-patrol` before running npm commands.
+This is the shared `apps/paw-patrol` dashboard in `alex-nyan/hackmit_2026`,
+branch `codex/paw-patrol-dashboard`. The original map and triage backend are separate.
+Run dashboard build/check commands here; run the multi-server launcher at the root.
 For Vercel, select `apps/paw-patrol` as the root directory, Node 22, and configure `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`
 before building; permit the deployed domain in Mapbox. Public tokens are embedded at build time.
 Do not upload private device data or server secrets. No hosted deployment has been created.

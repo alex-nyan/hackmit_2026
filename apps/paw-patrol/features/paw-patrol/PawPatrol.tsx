@@ -48,6 +48,7 @@ import { vehicleAt } from "./vehicles/vehicleMotion";
 import { useDemoTools } from "./useDemoTools";
 import { sceneAt, emsStatus, type MistRecord } from "./consult";
 import { SceneCoordination, TacticalBrief, MistHandoff, emptyTactical } from "./ConsultPanels";
+import { WORKSPACE_LABELS, WORKSPACE_VIEWS, type Workspace } from "./workspace";
 
 const AnatomyViewer = dynamic(() => import("../anatomy/AnatomyViewer"), {
   ssr: false,
@@ -95,12 +96,17 @@ function HeartChart({ time, id }: { time: number; id: string }) {
   );
 }
 
-export function PawPatrol() {
+export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }) {
   const { time, running, readClock, dispatch, sceneOverride, panics, audit } = useScenario();
   const [records, setRecords] = useState<Record<string, MistRecord>>({});
   const [session, setSession] = useState(0);
   const [tactical, setTactical] = useState(emptyTactical);
-  const [view, setView] = useState<View>("command");
+  const fixedView = workspace ? WORKSPACE_VIEWS[workspace] : undefined;
+  const [selectedView, setSelectedView] = useState<View>("command");
+  const view = fixedView ?? selectedView;
+  function setView(nextView: View) {
+    if (!fixedView) setSelectedView(nextView);
+  }
   const [selectedId, setSelectedId] = useState<string>("P-01");
   const [focus, setFocus] = useState<MapFocus>("mit");
   const [theme, setTheme] = useState<MapTheme>("light");
@@ -131,7 +137,7 @@ export function PawPatrol() {
     if (complete) { setRecords({}); setTactical(emptyTactical); setSession(s => s + 1); }
     dispatch({ type: "play" });
   }
-  useDemoTools({ view, selectedId, time, running, setView, setSelectedId, dispatch, reset, play });
+  useDemoTools({ view, fixedView, selectedId, time, running, setView, setSelectedId, dispatch, reset, play });
   function inspect(p: Person) {
     setSelectedId(p.id);
     setView("officer");
@@ -236,7 +242,12 @@ export function PawPatrol() {
           </span>
         </Link>
         <nav aria-label="Workspace">
-          {(["command", "officer", "hospital"] as const).map((v) => (
+          {workspace ? (
+            <span className="nav-item active" aria-current="page">
+              {fixedView === "command" ? <Radio /> : fixedView === "officer" ? <Shield /> : <HeartPulse />}
+              {WORKSPACE_LABELS[workspace]}
+            </span>
+          ) : (["command", "officer", "hospital"] as const).map((v) => (
             <button
               key={v}
               className={`nav-item ${view === v ? "active" : ""}`}
@@ -429,9 +440,11 @@ export function PawPatrol() {
                   </span>
                   <HeartPulse size={21} />
                 </div>
-                <button className="text-button" onClick={() => inspect(person)}>
-                  Open officer & body view <ArrowUpRight size={15} />
-                </button>
+                {!workspace && (
+                  <button className="text-button" onClick={() => inspect(person)}>
+                    Open officer & body view <ArrowUpRight size={15} />
+                  </button>
+                )}
               </div>
             </aside>
             {map}
@@ -513,7 +526,7 @@ export function PawPatrol() {
                   Audio
                 </button>
               </div>
-              <button
+              {!workspace && <button
                 className="text-button"
                 onClick={() => {
                   setSelectedId("P-01");
@@ -521,7 +534,7 @@ export function PawPatrol() {
                 }}
               >
                 View hospital handoff <ArrowRight size={15} />
-              </button>
+              </button>}
             </aside>
           </div>
         )}
