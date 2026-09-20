@@ -187,6 +187,7 @@ export function OfficerDashboard({
   const [leftWidth, setLeftWidth] = useState(40);
   const [resizing, setResizing] = useState(false);
   const layout = useRef<HTMLDivElement>(null);
+  const informationPane = useRef<HTMLElement>(null);
   const gesture = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null);
   const device = heartRate.mode === "device";
   const watchConnected =
@@ -205,6 +206,9 @@ export function OfficerDashboard({
   }
   const previewEnabled = previewDemo && !ready;
   const briefing = (ready || hadVerifiedSignals || previewDemo) && !setupOpen;
+  useEffect(() => {
+    informationPane.current?.scrollTo({ top: 0, behavior: "instant" });
+  }, [briefing]);
   const bpm = device ? (watchConnected ? heartRate.bpm : null) : sampleHeartRate(person.id, time);
   const vehicle = vehicleAt(person.id, time);
   const watchLabel = watchConnected
@@ -302,6 +306,7 @@ export function OfficerDashboard({
         >
           <section
             id={`${id}-information`}
+            ref={informationPane}
             className={styles.information}
             aria-labelledby={`${id}-information-title`}
           >

@@ -457,6 +457,7 @@
 }
 .heartFace strong {
   position: absolute;
+  z-index: 1;
   inset: 0 0 7px;
   display: grid;
   place-items: center;
@@ -739,7 +740,7 @@
 .mapProfile .profileIdentity > div:nth-child(2) {
   flex: 1;
 }
-.mapProfile .profileIdentity strong {
+.mapProfile .profileIdentity > div:nth-child(2) > strong {
   display: block;
   font-size: 14px;
   line-height: 1.2;
