@@ -16,7 +16,7 @@ safety net around it.
   `pnpm run check` (which runs the suite as its last step).
 - **Do not repair existing tests** that fail only on an assertion. Leave them
   red and say so in one line. The exception is a test that no longer
-  *compiles* — a renamed type or export breaks `typecheck` for the whole
+  _compiles_ — a renamed type or export breaks `typecheck` for the whole
   project, so fix the reference, not the expectation.
 
 ## Still do
