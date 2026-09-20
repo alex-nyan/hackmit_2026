@@ -1,4 +1,8 @@
 .page {
+  --landing-blue: #9bbaff;
+  --landing-amber: #e2bd7b;
+  --landing-violet: #c2b0f2;
+  --focus: var(--landing-blue);
   min-height: 100dvh;
   background: var(--ops-bg);
   color: var(--ops-text);
@@ -25,9 +29,9 @@
   place-items: center;
   width: 38px;
   height: 42px;
-  color: var(--ops-accent);
-  background: #eeeeee11;
-  border: 1px solid #eeeeee33;
+  color: var(--landing-blue);
+  background: #9bbaff0d;
+  border: 1px solid #9bbaff38;
   border-radius: 12px;
 }
 .product {
@@ -46,7 +50,7 @@
   font-size: 13px;
 }
 .signIn:hover {
-  color: var(--ops-accent);
+  color: var(--landing-blue);
 }
 .main {
   width: min(1280px, calc(100% - 48px));
@@ -69,6 +73,9 @@
   letter-spacing: 0.16em;
   font-weight: 650;
   color: var(--ops-accent);
+}
+.heroCopy .eyebrow {
+  color: var(--landing-blue);
 }
 .eyebrow > span {
   width: 6px;
@@ -111,18 +118,18 @@
   border-radius: 8px;
 }
 .primary {
-  background: var(--ops-accent);
-  color: #111111;
+  background: #355bd6;
+  color: #ffffff;
   padding: 12px 18px;
 }
 .primary:hover {
-  background: #dddddd;
+  background: #294bbd;
 }
 .secondary {
   color: var(--ops-text);
 }
 .secondary:hover {
-  color: var(--ops-accent);
+  color: var(--landing-blue);
 }
 .demoNote {
   margin-top: 20px;
@@ -193,13 +200,13 @@
   gap: 8px;
   width: 180px;
   padding: 20px 10px;
-  border: 1px solid #eeeeee4a;
+  border: 1px solid #9bbaff55;
   border-radius: 16px;
-  background: #252525;
-  box-shadow: 0 0 60px #eeeeee0c;
+  background: #202634;
+  box-shadow: 0 0 60px #9bbaff0a;
 }
 .hub svg {
-  color: var(--ops-accent);
+  color: var(--landing-blue);
   margin-bottom: 4px;
 }
 .hub strong {
@@ -275,6 +282,7 @@
   gap: 18px;
 }
 .card {
+  --role-accent: var(--landing-blue);
   display: flex;
   flex-direction: column;
   padding: 28px;
@@ -286,9 +294,15 @@
     background-color 160ms,
     transform 160ms;
 }
+.card:nth-child(2) {
+  --role-accent: var(--landing-amber);
+}
+.card:nth-child(3) {
+  --role-accent: var(--landing-violet);
+}
 .card:hover {
   background: var(--ops-raised);
-  border-color: #eeeeee66;
+  border-color: var(--role-accent);
   transform: translateY(-3px);
 }
 .cardTop {
@@ -308,9 +322,9 @@
   place-items: center;
   width: 48px;
   height: 48px;
-  background: #eeeeee0d;
-  color: var(--ops-accent);
-  border: 1px solid #eeeeee24;
+  background: color-mix(in srgb, var(--role-accent) 8%, transparent);
+  color: var(--role-accent);
+  border: 1px solid color-mix(in srgb, var(--role-accent) 24%, transparent);
   border-radius: 12px;
 }
 .role {
@@ -466,5 +480,194 @@
   }
   .card:hover {
     transform: none;
+  }
+}
+
+/* Match the role accents in the illustration to the workspace cards. */
+.dispatch > svg {
+  color: var(--landing-blue);
+}
+.field > svg {
+  color: var(--landing-amber);
+}
+.hospital > svg {
+  color: var(--landing-violet);
+}
+.cardAction > svg {
+  color: var(--role-accent);
+}
+
+/* Illustrative signals move between labeled roles; camera data is unaffected. */
+.network {
+  isolation: isolate;
+  background-color: #151922;
+}
+.signalPaths {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.signalPaths path {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 6;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.55;
+}
+.fieldPath {
+  stroke: var(--landing-amber);
+}
+.dispatchPath {
+  stroke: var(--landing-blue);
+}
+.hospitalPath {
+  stroke: var(--landing-violet);
+}
+.fieldSignal {
+  fill: var(--landing-amber);
+  animation: fieldSignal 4s linear infinite;
+}
+.dispatchSignal {
+  fill: var(--landing-blue);
+  animation: dispatchSignal 4s linear infinite;
+  animation-delay: -2s;
+}
+.hospitalSignal {
+  fill: var(--landing-violet);
+  animation: hospitalSignal 4s linear infinite;
+  animation-delay: -1s;
+}
+.signalRing {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190px;
+  height: 190px;
+  border: 1px solid #9bbaff66;
+  border-radius: 50%;
+  animation: signalRipple 4s ease-out infinite;
+  pointer-events: none;
+}
+.field {
+  background: #2b261d;
+  border-color: #e2bd7b66;
+}
+.dispatch {
+  background: #1c2940;
+  border-color: #9bbaff66;
+}
+.hospital {
+  background: #2a2238;
+  border-color: #c2b0f266;
+}
+.hub {
+  background: #202d46;
+  border-color: #9bbaff88;
+}
+.orbit,
+.orbitInner {
+  border-color: #9bbaff20;
+}
+.networkControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.networkControls > span {
+  color: var(--ops-muted);
+}
+.motionControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 10px;
+  background: #9bbaff0d;
+  border: 1px solid #9bbaff38;
+  border-radius: 6px;
+  color: var(--landing-blue);
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+.motionControl:hover {
+  background: #9bbaff20;
+  border-color: var(--landing-blue);
+}
+.diagram[data-paused="true"] :is(.fieldSignal, .dispatchSignal, .hospitalSignal, .signalRing) {
+  animation-play-state: paused;
+}
+@keyframes fieldSignal {
+  0% {
+    transform: translate(100px, 55px);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  72%,
+  100% {
+    transform: translate(250px, 155px);
+    opacity: 0;
+  }
+}
+@keyframes dispatchSignal {
+  0% {
+    transform: translate(400px, 65px);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  72%,
+  100% {
+    transform: translate(250px, 155px);
+    opacity: 0;
+  }
+}
+@keyframes hospitalSignal {
+  0%,
+  20% {
+    transform: translate(250px, 155px);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  90%,
+  100% {
+    transform: translate(250px, 265px);
+    opacity: 0;
+  }
+}
+@keyframes signalRipple {
+  0% {
+    transform: translate(-50%, -50%) scale(0.7);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.65);
+    opacity: 0;
+  }
+}
+@media (max-width: 380px) {
+  .networkControls > span {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signalPaths g,
+  .signalRing {
+    animation: none;
+    display: none;
+  }
+  .motionControl {
+    display: none;
   }
 }
