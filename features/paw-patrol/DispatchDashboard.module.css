@@ -240,6 +240,25 @@
   align-items: center;
   gap: 20px;
 }
+.clockControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.themeControl {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--bento-border);
+  border-radius: 8px;
+  background: var(--bento-card);
+  cursor: pointer;
+}
+.themeControl:hover {
+  background: var(--bento-raised);
+  border-color: var(--bento-accent);
+}
 .clock {
   display: grid;
   grid-template-columns: 7px auto;
@@ -287,45 +306,12 @@
 .primary:hover {
   filter: brightness(1.1);
 }
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.dashboard .metric {
-  gap: 0;
-  padding: 11px 14px;
-  border-radius: 10px;
-}
-.metricValue {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  margin: 2px 0 3px;
-  line-height: 1;
-}
-.metricValue > :first-child {
-  font-size: 35px;
-  font-variant-numeric: tabular-nums;
-}
-.metricValue > span:last-child {
-  font-size: 11px;
-  color: var(--bento-muted);
-}
-.metricValue[data-attention="true"] {
-  color: var(--bento-accent);
-}
-.metric > p {
-  color: var(--bento-muted);
-  font-size: 9px;
-}
 .grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-template-rows:
-    minmax(275px, calc((100dvh - 495px) * 0.7)) minmax(145px, calc((100dvh - 495px) * 0.3))
-    207px auto;
+    minmax(300px, calc((100dvh - 170px) * 0.68)) minmax(200px, calc((100dvh - 170px) * 0.32))
+    minmax(207px, auto);
   gap: 8px;
 }
 .grid > section {
@@ -361,13 +347,16 @@
   white-space: nowrap;
 }
 .mapCell {
-  grid-column: 1 / 10;
+  grid-column: 1 / 9;
   grid-row: 1 / 3;
   display: flex;
   flex-direction: column;
 }
 .mapCell .cardHeading {
-  margin: 0 0 9px;
+  margin: 0 0 7px;
+}
+.mapCell .cardHeading h2 {
+  margin: 0;
 }
 .mapFrame {
   position: relative;
@@ -414,51 +403,6 @@
   min-height: 0;
   border: 0;
 }
-.mapFrame :global(.map-heading) {
-  position: absolute;
-  z-index: 5;
-  top: 8px;
-  left: 8px;
-  right: 8px;
-  min-height: 37px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 4px;
-  padding: 4px 6px;
-  border: 1px solid var(--bento-border);
-  border-radius: 6px;
-  background: var(--bento-card);
-  color: var(--bento-text);
-}
-.mapFrame :global(.map-heading > span) {
-  font-size: 10px;
-  gap: 5px;
-}
-.mapFrame :global(.map-actions) {
-  display: flex;
-  gap: 3px;
-}
-.mapFrame :global(.map-actions button) {
-  min-height: 29px;
-  padding: 4px 7px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  border-radius: 4px;
-  border: 1px solid transparent;
-  color: var(--bento-text);
-  background: var(--bento-raised);
-  font-size: 10px;
-}
-.mapFrame :global(.map-actions button:hover) {
-  border-color: var(--bento-accent);
-}
-.mapFrame :global(.map-actions button[aria-pressed="true"]) {
-  color: var(--bento-accent);
-  border-color: var(--bento-accent);
-}
 .mapFrame :global(.campus-switch) {
   top: auto;
   left: 8px;
@@ -482,11 +426,11 @@
   color: var(--bento-accent);
 }
 .mapFrame :global(.map-overlay) {
-  top: 60px;
+  top: 8px;
   bottom: auto;
   left: 8px;
   width: min(290px, calc(100% - 60px));
-  max-height: calc(100% - 113px);
+  max-height: calc(100% - 61px);
 }
 .mapFrame :global(.map-overlay > *) {
   background: var(--bento-card);
@@ -495,8 +439,10 @@
   backdrop-filter: none;
 }
 .rosterCell {
-  grid-column: 10 / 13;
-  grid-row: 1;
+  --roster-columns: 36px minmax(88px, 1fr) 40px 58px 52px;
+  --roster-column-gap: 6px;
+  grid-column: 9 / 13;
+  grid-row: 1 / 3;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -572,8 +518,10 @@
   border-color: var(--bento-accent);
 }
 .rosterColumns {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: var(--roster-columns);
+  gap: var(--roster-column-gap);
+  align-items: end;
   color: var(--bento-muted);
   font:
     8px/1.4 ui-monospace,
@@ -581,23 +529,34 @@
     Consolas,
     monospace;
   letter-spacing: 0.06em;
-  padding: 7px 1px 5px;
+  padding: 7px 7px 5px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+.rosterColumns > span:first-child {
+  grid-column: 1 / 3;
+}
+.rosterColumns > span:last-child {
+  text-align: center;
 }
 .roster {
   list-style: none;
-  padding: 0 3px 0 0;
+  padding: 0;
   margin: 0;
   overflow-y: auto;
   scrollbar-width: thin;
+  scrollbar-gutter: stable;
   scrollbar-color: var(--bento-border) transparent;
   flex: 1;
   min-height: 40px;
 }
 .officerRow {
   width: 100%;
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--roster-columns);
   align-items: center;
-  gap: 8px;
+  gap: var(--roster-column-gap);
   text-align: left;
   background: transparent;
   border: 1px solid transparent;
@@ -611,13 +570,13 @@
   background: var(--bento-raised);
   border-color: var(--bento-accent);
 }
-.avatar,
-.profileAvatar {
+.avatar {
   flex-shrink: 0;
-  width: 28px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
+  overflow: hidden;
   border: 1px solid var(--bento-border);
   border-radius: 6px;
   color: var(--bento-muted);
@@ -626,6 +585,13 @@
     SFMono-Regular,
     Consolas,
     monospace;
+}
+.avatarImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
 }
 .officerIdentity {
   display: flex;
@@ -640,6 +606,27 @@
   font-size: 9px;
   color: var(--bento-muted);
 }
+.officerSpeed,
+.officerArea {
+  min-width: 0;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.officerSpeed {
+  font-variant-numeric: tabular-nums;
+}
+.officerSpeed strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.officerSpeed small {
+  display: block;
+  color: var(--bento-muted);
+  font-size: 8px;
+}
+.officerArea {
+  overflow-wrap: anywhere;
+}
 .officerStatus {
   color: var(--bento-good);
   font-size: 9px;
@@ -647,20 +634,95 @@
 .officerStatus[data-attention="true"] {
   color: var(--bento-accent);
 }
+.officerStatusLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px 7px;
+}
+.deviceSignals {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 4px;
+  color: var(--bento-muted);
+}
+.deviceSignals > span {
+  display: inline-flex;
+  align-items: center;
+}
+.deviceSignals [data-signal="receiving"] {
+  color: var(--bento-good);
+}
+.deviceSignals [data-signal="waiting"] {
+  color: var(--bento-accent);
+}
 .rosterBpm {
-  margin-left: auto;
+  justify-self: center;
+  text-align: center;
+}
+.pixelHeart {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  width: 48px;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.pixelHeartFace {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 40px;
+}
+.pixelHeartShape {
+  display: block;
+  width: 48px;
+  height: 40px;
+  fill: #58616c;
+  shape-rendering: crispEdges;
+  transform-origin: center;
+}
+.pixelHeart[data-active="true"] .pixelHeartShape {
+  fill: #a83d4e;
+  animation: heartSignal 1s steps(1, end) infinite;
+}
+.pixelHeartNumber {
+  position: absolute;
+  top: 12px;
+  right: 0;
+  left: 0;
+  color: #fff;
+  text-align: center;
   font:
-    15px/1 ui-monospace,
+    700 14px/18px ui-monospace,
     SFMono-Regular,
     Consolas,
     monospace;
-  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
-.rosterBpm small {
-  display: block;
+.pixelHeartSource {
   color: var(--bento-muted);
-  font-size: 8px;
-  margin-top: 3px;
+  white-space: nowrap;
+  font:
+    8px/1.3 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+}
+@keyframes heartSignal {
+  0%,
+  60%,
+  100% {
+    opacity: 0.9;
+    transform: scale(0.97);
+  }
+  20%,
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .footnote {
   color: var(--bento-muted);
@@ -688,12 +750,6 @@
   background: transparent;
   color: var(--bento-accent);
 }
-.selectedCell {
-  grid-column: 10 / 13;
-  grid-row: 2;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
 .textButton {
   display: inline-flex;
   align-items: center;
@@ -708,88 +764,6 @@
 .textButton:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
-}
-.selectedCell .cardHeading {
-  margin-bottom: 5px;
-  flex-wrap: wrap;
-}
-.selectedGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px 10px;
-}
-.profile {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  grid-column: 1;
-}
-.profileAvatar {
-  width: 32px;
-  height: 34px;
-  color: var(--bento-accent);
-}
-.profile h2 {
-  margin: 0;
-  font-size: 15px;
-}
-.profile p {
-  color: var(--bento-muted);
-  font-size: 9px;
-}
-.profile .officerStatus {
-  display: inline-block;
-  margin-top: 1px;
-}
-.facts {
-  grid-column: 1;
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 15px;
-}
-.facts dt {
-  color: var(--bento-muted);
-  font-size: 9px;
-}
-.facts dd {
-  margin: 1px 0 0;
-  font-size: 11px;
-}
-.selectedVital {
-  grid-column: 2;
-  grid-row: 1 / 3;
-  position: relative;
-  border-left: 1px solid var(--bento-border);
-  padding-left: 10px;
-}
-.selectedVital > span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--bento-muted);
-  font-size: 9px;
-}
-.selectedVital > strong {
-  font:
-    26px/1.1 var(--font-prose),
-    Georgia,
-    serif;
-}
-.selectedVital strong small {
-  color: var(--bento-muted);
-  font:
-    9px Arial,
-    sans-serif;
-  margin-left: 4px;
-}
-.selectedVital > svg {
-  height: 18px;
-}
-.selectedVital > small {
-  display: block;
-  color: var(--bento-muted);
-  font-size: 8px;
 }
 .readinessCell {
   grid-column: 1 / 4;
@@ -1058,37 +1032,6 @@
   background: #fff;
   padding: 12px;
 }
-.reservedCell {
-  grid-column: 1 / 13;
-  grid-row: 4;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 16px !important;
-  padding: 8px 12px !important;
-  color: var(--bento-muted);
-}
-.reservedCell h2 {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 500;
-}
-.reserved {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-left: auto;
-  font-size: 9px;
-}
-.reserved > span {
-  border: 1px dashed var(--bento-border);
-  border-radius: 4px;
-  padding: 3px 7px;
-  white-space: nowrap;
-}
-.reserved br {
-  display: none;
-}
 .footer {
   display: flex;
   justify-content: space-between;
@@ -1112,17 +1055,6 @@
   .main {
     padding-inline: 20px;
   }
-  .metric {
-    padding: 12px 16px;
-  }
-  .grid {
-    grid-template-rows:
-      minmax(275px, calc((100dvh - 495px) * 0.7)) minmax(145px, calc((100dvh - 495px) * 0.3))
-      205px auto;
-  }
-  .selectedGrid {
-    gap: 10px;
-  }
   .grid h2 {
     font-size: 18px;
   }
@@ -1135,7 +1067,9 @@
 }
 @media (max-width: 1100px) {
   .grid {
-    grid-template-rows: 300px 187px 215px 215px auto;
+    grid-template-rows:
+      minmax(300px, calc((100dvh - 170px) * 0.68)) minmax(200px, calc((100dvh - 170px) * 0.32))
+      minmax(215px, auto) minmax(215px, auto);
   }
   .readinessCell {
     grid-column: 1 / 7;
@@ -1151,25 +1085,18 @@
     grid-column: 7 / 13;
     grid-row: 4;
   }
-  .reservedCell {
-    grid-row: 5;
-  }
   .mapCell {
     grid-column: 1 / 8;
   }
-  .rosterCell,
-  .selectedCell {
+  .rosterCell {
     grid-column: 8 / 13;
-  }
-  .mapFrame :global(.map-heading > span) {
-    display: none;
   }
   .disposition {
     justify-content: flex-start;
     gap: 20px;
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .header {
     padding: 8px 12px;
     gap: 12px;
@@ -1199,50 +1126,17 @@
   .clock small {
     display: none;
   }
-  .metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .metric {
-    padding: 10px 12px;
-  }
-  .metricValue > :first-child {
-    font-size: 32px;
-  }
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: 425px 330px auto auto auto auto;
+    grid-template-rows: 425px 330px auto auto;
   }
   .mapCell {
     grid-column: 1 / 3;
     grid-row: 1;
   }
   .rosterCell {
-    grid-column: 1;
+    grid-column: 1 / 3;
     grid-row: 2;
-  }
-  .selectedCell {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  .selectedGrid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  .profile {
-    grid-column: 1;
-  }
-  .selectedVital {
-    grid-column: 1;
-    grid-row: auto;
-    border-left: 0;
-    border-top: 1px solid var(--bento-border);
-    padding: 8px 0 0;
-  }
-  .selectedVital > svg {
-    height: 30px;
-  }
-  .selectedCell .cardHeading {
-    gap: 2px;
   }
   .readinessCell {
     grid-column: 1;
@@ -1263,16 +1157,6 @@
     grid-column: 2;
     grid-row: 4;
     max-height: 350px;
-  }
-  .reservedCell {
-    grid-column: 1 / 3;
-    grid-row: 5;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .reserved {
-    margin-left: 0;
-    flex-wrap: wrap;
   }
   .disposition {
     gap: 8px;
@@ -1310,12 +1194,6 @@
     font-size: 11px !important;
     padding: 7px 9px;
   }
-  .metricValue {
-    gap: 5px;
-  }
-  .metricValue > span:last-child {
-    font-size: 9px;
-  }
   .grid {
     display: flex;
     flex-direction: column;
@@ -1335,19 +1213,6 @@
   .rosterFilters label {
     flex-basis: auto;
   }
-  .selectedGrid {
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .profile {
-    grid-column: 1 / 3;
-  }
-  .selectedVital {
-    grid-column: 2;
-    border-top: 0;
-    border-left: 1px solid var(--bento-border);
-    padding: 0 0 0 10px;
-  }
   .readinessCell {
     min-height: 185px;
   }
@@ -1364,16 +1229,38 @@
     justify-content: space-between;
     gap: 24px;
   }
-  .reservedCell {
-    align-items: flex-start;
+}
+@media (max-width: 380px) {
+  .rosterCell {
+    --roster-columns: 36px minmax(64px, 1fr) 34px 50px 48px;
+    --roster-column-gap: 4px;
+  }
+  .officerIdentity strong,
+  .officerArea {
+    font-size: 10px;
+  }
+  .rosterColumns {
+    font-size: 7px;
+    letter-spacing: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .pixelHeart[data-active="true"] .pixelHeartShape {
+    animation: none;
+  }
   .pulseDot[data-running="true"] {
     animation: none;
   }
 }
 @media (forced-colors: active) {
+  .pixelHeartShape,
+  .pixelHeart[data-active="true"] .pixelHeartShape {
+    fill: CanvasText;
+    animation: none;
+  }
+  .pixelHeartNumber {
+    color: Canvas;
+  }
   .dashboard {
     --bento-bg: Canvas;
     --bento-card: Canvas;

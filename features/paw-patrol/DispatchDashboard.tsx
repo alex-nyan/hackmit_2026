@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   Activity,
-  ArrowUpRight,
   ChevronDown,
   HeartPulse,
-  LocateFixed,
   MapPin,
+  Moon,
   Pause,
   Play,
   Radio,
@@ -16,18 +16,16 @@ import {
   Shield,
   Signal,
   SlidersHorizontal,
+  Smartphone,
+  Sun,
   Users,
+  Watch,
   X,
 } from "lucide-react";
-import {
-  BentoCell,
-  BentoLabel,
-  BentoNumber,
-  BentoRing,
-  BentoSparkline,
-} from "@/components/ui/builder-os-bento";
+import { BentoCell, BentoLabel, BentoRing } from "@/components/ui/builder-os-bento";
 import type { MapTheme } from "../boston-map/types";
 import type { LiveTrackState } from "../live-track/types";
+import type { HeartRateConnection } from "../heart-rate/useHeartRate";
 import { PEOPLE, sampleHeartRate, stamp, type View } from "./scenario";
 import { vehicleAt } from "./vehicles/vehicleMotion";
 import { describeOrigin, type IncidentEvent } from "./incidents";
@@ -40,20 +38,130 @@ interface Props {
   onViewChange: (view: View) => void;
   selectedId: string;
   onSelect: (id: string) => void;
-  onCenter: () => void;
   time: number;
   running: boolean;
   onTogglePlayback: () => void;
   theme: MapTheme;
+  onToggleTheme: () => void;
   map: ReactNode;
   liveTrack: LiveTrackState;
+  trackingEnabled: boolean;
+  onToggleTracking: () => void;
   trackingPanel: ReactNode;
   joinPanel: ReactNode;
   events: IncidentEvent[];
   busStatus: BusStatus;
+  localHeartRate: {
+    personId: string;
+    connection: Pick<HeartRateConnection, "mode" | "status" | "bpm" | "receivedAt">;
+  };
 }
 
 const AREAS = [...new Set(PEOPLE.map((person) => person.area))];
+
+function currentDeviceBpm(connection: Props["localHeartRate"]["connection"]): number | null {
+  return connection.status === "receiving" &&
+    connection.receivedAt !== null &&
+    connection.bpm !== null &&
+    Number.isFinite(connection.bpm) &&
+    connection.bpm > 0
+    ? connection.bpm
+    : null;
+}
+
+function PixelHeartReadout({ bpm, source }: { bpm: number | null; source: "demo" | "device" }) {
+  const active = bpm !== null && Number.isFinite(bpm) && bpm > 0;
+  const sourceLabel = source === "demo" ? "demo" : active ? "device" : "no data";
+  const description = active
+    ? `${bpm} bpm · ${source === "demo" ? "synthetic demo" : "device reading in this tab"}`
+    : "Heart rate unavailable · no current device reading";
+
+  return (
+    <span
+      className={styles.pixelHeart}
+      data-active={active}
+      role="img"
+      aria-label={description}
+      title={`${description}. Animation indicates data availability, not heartbeat timing.`}
+    >
+      <span className={styles.pixelHeartFace} aria-hidden="true">
+        <svg viewBox="0 0 48 40" width="48" height="40" className={styles.pixelHeartShape}>
+          <path d="M8 0H16V4H20V8H28V4H32V0H40V4H44V8H48V20H44V24H40V28H36V32H32V36H28V40H20V36H16V32H12V28H8V24H4V20H0V8H4V4H8Z" />
+        </svg>
+        <span className={styles.pixelHeartNumber}>{active ? bpm : "--"}</span>
+      </span>
+      <span className={styles.pixelHeartSource} aria-hidden="true">
+        bpm · {sourceLabel}
+      </span>
+    </span>
+  );
+}
+
+function OfficerSignals({
+  officerId,
+  heartRate,
+}: {
+  officerId: string;
+  heartRate: Props["localHeartRate"];
+}) {
+  const connection = heartRate.personId === officerId ? heartRate.connection : null;
+  let watchState: "unknown" | "receiving" | "waiting" = "unknown";
+  let watchLabel = "Watch / heart-rate sensor · no verified connection for this profile";
+  if (connection?.mode === "device") {
+    if (currentDeviceBpm(connection) !== null) {
+      watchState = "receiving";
+      watchLabel =
+        "Watch / heart-rate sensor · receiving in this tab; manually assigned to this profile, wearer identity not verified.";
+    } else if (connection.status === "stale") {
+      watchState = "waiting";
+      watchLabel = "Watch / heart-rate sensor · signal stale; no usable reading for 30 seconds";
+    } else if (connection.status === "waiting") {
+      watchState = "waiting";
+      watchLabel = "Watch / heart-rate sensor · connected, waiting for a usable signal";
+    } else if (connection.status === "requesting" || connection.status === "connecting") {
+      watchState = "waiting";
+      watchLabel = "Watch / heart-rate sensor · connection pending; no verified signal";
+    } else if (connection.status === "disconnected") {
+      watchLabel = "Watch / heart-rate sensor · disconnected from this tab";
+    } else if (connection.status === "error") {
+      watchLabel = "Watch / heart-rate sensor · connection failed; no verified signal";
+    }
+  }
+  const phoneLabel = "Phone · no verified connection for this profile";
+
+  return (
+    <span className={styles.deviceSignals}>
+      <span role="img" aria-label={watchLabel} title={watchLabel} data-signal={watchState}>
+        <Watch size={13} aria-hidden="true" />
+      </span>
+      <span role="img" aria-label={phoneLabel} title={phoneLabel} data-signal="unknown">
+        <Smartphone size={13} aria-hidden="true" />
+      </span>
+    </span>
+  );
+}
+
+function OfficerAvatar({ id, initials }: { id: string; initials: string }) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <span className={styles.avatar} aria-hidden="true">
+      {failed ? (
+        initials
+      ) : (
+        <Image
+          src={`/demo-officers/${id.toLowerCase()}.webp`}
+          alt=""
+          width={36}
+          height={36}
+          className={styles.avatarImage}
+          unoptimized
+          onError={() => setFailed(true)}
+        />
+      )}
+    </span>
+  );
+}
 
 function WorkspaceSwitcher({ onViewChange }: { onViewChange: (view: View) => void }) {
   const [open, setOpen] = useState(false);
@@ -135,24 +243,31 @@ export function DispatchDashboard({
   onViewChange,
   selectedId,
   onSelect,
-  onCenter,
   time,
   running,
   onTogglePlayback,
   theme,
+  onToggleTheme,
   map,
   liveTrack,
+  trackingEnabled,
+  onToggleTracking,
   trackingPanel,
   joinPanel,
   events,
   busStatus,
+  localHeartRate,
 }: Props) {
   const [query, setQuery] = useState("");
   const [area, setArea] = useState("all");
   const [filter, setFilter] = useState<"all" | "requests">("all");
   const [showAllEvents, setShowAllEvents] = useState(false);
   const person = PEOPLE.find((officer) => officer.id === selectedId) ?? PEOPLE[0];
-  const vehicle = vehicleAt(person.id, time);
+  const selectedDeviceMode =
+    localHeartRate.personId === person.id && localHeartRate.connection.mode === "device";
+  const selectedBpm = selectedDeviceMode
+    ? currentDeviceBpm(localHeartRate.connection)
+    : sampleHeartRate(person.id, time);
   const requestStates = useMemo(() => {
     const states = new Map<string, "requested" | "acknowledged">();
     // Acknowledged means seen, never resolved or returned to patrol.
@@ -181,9 +296,6 @@ export function DispatchDashboard({
       (filter === "all" || pending.has(officer.id))
     );
   });
-  const meanHeartRate = Math.round(
-    PEOPLE.reduce((sum, officer) => sum + sampleHeartRate(officer.id, time), 0) / PEOPLE.length,
-  );
   const newest = useMemo(() => [...events].sort((a, b) => b.seq - a.seq), [events]);
   const liveCount =
     liveTrack.state === "tracking"
@@ -248,11 +360,26 @@ export function DispatchDashboard({
             <h1>Command centre</h1>
           </div>
           <div className={styles.playback}>
-            <span className={styles.clock}>
-              <span className={styles.pulseDot} data-running={running} aria-hidden="true" />
-              {stamp(time)}
-              <small>DEMO CLOCK</small>
-            </span>
+            <div className={styles.clockControls}>
+              <button
+                type="button"
+                className={styles.themeControl}
+                onClick={onToggleTheme}
+                aria-label="Toggle map theme"
+                title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+              >
+                {theme === "dark" ? (
+                  <Sun size={19} aria-hidden="true" />
+                ) : (
+                  <Moon size={19} aria-hidden="true" />
+                )}
+              </button>
+              <span className={styles.clock}>
+                <span className={styles.pulseDot} data-running={running} aria-hidden="true" />
+                {stamp(time)}
+                <small>DEMO CLOCK</small>
+              </span>
+            </div>
             <button type="button" className={styles.primary} onClick={onTogglePlayback}>
               {running ? <Pause size={15} /> : <Play size={15} />}
               {running ? "Pause demo" : time > 0 ? "Resume demo" : "Run demo"}
@@ -260,59 +387,10 @@ export function DispatchDashboard({
           </div>
         </div>
 
-        <div className={styles.metrics} aria-label="Demo fleet statistics">
-          <BentoCell className={styles.metric}>
-            <BentoLabel icon={Users}>Roster strength</BentoLabel>
-            <div className={styles.metricValue}>
-              <BentoNumber value={PEOPLE.length} />
-              <span>officers</span>
-            </div>
-            <p>Fictional patrol roster · {AREAS.length} areas</p>
-          </BentoCell>
-          <BentoCell className={styles.metric}>
-            <BentoLabel icon={Shield}>On patrol</BentoLabel>
-            <div className={styles.metricValue}>
-              <BentoNumber value={onPatrol} />
-              <span>of {PEOPLE.length}</span>
-            </div>
-            <p>
-              Demo status
-              {busStatus !== "live" ? " · reports not current" : " · excludes assistance requests"}
-            </p>
-          </BentoCell>
-          <BentoCell className={styles.metric}>
-            <BentoLabel icon={Radio}>Assistance requests</BentoLabel>
-            <div className={styles.metricValue} data-attention={pending.size > 0}>
-              {busStatus === "live" ? (
-                <BentoNumber value={pending.size} />
-              ) : (
-                <span className={styles.unknown}>—</span>
-              )}
-              <span>unacknowledged</span>
-            </div>
-            <p>
-              {busStatus === "live"
-                ? "From this deployment’s incident log"
-                : "Log unavailable · not an all-clear"}
-            </p>
-          </BentoCell>
-          <BentoCell className={styles.metric}>
-            <BentoLabel icon={HeartPulse}>Mean demo heart rate</BentoLabel>
-            <div className={styles.metricValue}>
-              <BentoNumber value={meanHeartRate} />
-              <span>bpm</span>
-            </div>
-            <p>{PEOPLE.length} synthetic samples · no device data</p>
-          </BentoCell>
-        </div>
-
         <div className={styles.grid}>
           <BentoCell className={styles.mapCell} labelledBy="dispatch-map-title">
             <div className={styles.cardHeading}>
-              <div>
-                <BentoLabel icon={MapPin}>Operational picture</BentoLabel>
-                <h2 id="dispatch-map-title">Patrol map</h2>
-              </div>
+              <h2 id="dispatch-map-title">Patrol map</h2>
               <span className={styles.smallBadge}>{PEOPLE.length} demo units</span>
             </div>
             <div className={styles.mapFrame}>{map}</div>
@@ -364,8 +442,10 @@ export function DispatchDashboard({
               </button>
             </div>
             <div className={styles.rosterColumns} aria-hidden="true">
-              <span>OFFICER / AREA</span>
-              <span>DEMO BPM</span>
+              <span>OFFICER</span>
+              <span>SPEED</span>
+              <span>PATROL AREA</span>
+              <span>BPM / SOURCE</span>
             </div>
             <ul className={styles.roster} aria-label="Dispatch officer roster">
               {visible.map((officer) => (
@@ -376,22 +456,36 @@ export function DispatchDashboard({
                     aria-pressed={officer.id === selectedId}
                     onClick={() => onSelect(officer.id)}
                   >
-                    <span className={styles.avatar}>{officer.initials}</span>
+                    <OfficerAvatar key={officer.id} id={officer.id} initials={officer.initials} />
                     <span className={styles.officerIdentity}>
                       <strong>{officer.name}</strong>
-                      <small>
-                        {officer.id} · {officer.area}
-                      </small>
-                      <span
-                        className={styles.officerStatus}
-                        data-attention={requestStates.has(officer.id)}
-                      >
-                        {officerStatus(officer.id)}
+                      <small>{officer.id}</small>
+                      <span className={styles.officerStatusLine}>
+                        <span
+                          className={styles.officerStatus}
+                          data-attention={requestStates.has(officer.id)}
+                        >
+                          {officerStatus(officer.id)}
+                        </span>
+                        <OfficerSignals officerId={officer.id} heartRate={localHeartRate} />
                       </span>
                     </span>
+                    <span className={styles.officerSpeed} title="Simulated patrol speed · demo">
+                      <span className="sr-only">Demo speed: </span>
+                      <strong>{Math.round(vehicleAt(officer.id, time).speedMps * 3.6)}</strong>
+                      <small>km/h</small>
+                    </span>
+                    <span className={styles.officerArea} title="Assigned patrol area · demo">
+                      <span className="sr-only">Demo patrol area: </span>
+                      {officer.area}
+                    </span>
                     <span className={styles.rosterBpm}>
-                      {sampleHeartRate(officer.id, time)}
-                      <small>bpm</small>
+                      <PixelHeartReadout
+                        bpm={
+                          officer.id === person.id ? selectedBpm : sampleHeartRate(officer.id, time)
+                        }
+                        source={officer.id === person.id && selectedDeviceMode ? "device" : "demo"}
+                      />
                     </span>
                   </button>
                 </li>
@@ -408,60 +502,6 @@ export function DispatchDashboard({
               </div>
             )}
             <p className={styles.footnote}>Roster filters do not hide units on the map.</p>
-          </BentoCell>
-
-          <BentoCell className={styles.selectedCell} labelledBy="dispatch-selected-title">
-            <div className={styles.cardHeading}>
-              <BentoLabel icon={LocateFixed}>Selected officer / demo</BentoLabel>
-              <button type="button" className={styles.textButton} onClick={onCenter}>
-                Locate on map <ArrowUpRight size={15} />
-              </button>
-            </div>
-            <div className={styles.selectedGrid}>
-              <div className={styles.profile}>
-                <span className={styles.profileAvatar}>{person.initials}</span>
-                <div>
-                  <h2 id="dispatch-selected-title">{person.name}</h2>
-                  <p>
-                    {person.id} · {person.role}
-                  </p>
-                  <span
-                    className={styles.officerStatus}
-                    data-attention={requestStates.has(person.id)}
-                  >
-                    {officerStatus(person.id)}
-                  </span>
-                </div>
-              </div>
-              <dl className={styles.facts}>
-                <div>
-                  <dt>Patrol area</dt>
-                  <dd>{person.area}</dd>
-                </div>
-                <div>
-                  <dt>Simulated speed</dt>
-                  <dd>
-                    {vehicle.routeId ? `${Math.round(vehicle.speedMps * 3.6)} km/h` : "Unavailable"}
-                  </dd>
-                </div>
-              </dl>
-              <div className={styles.selectedVital}>
-                <span>
-                  <HeartPulse size={14} /> Synthetic heart rate
-                </span>
-                <strong>
-                  {sampleHeartRate(person.id, time)}
-                  <small>bpm</small>
-                </strong>
-                <BentoSparkline
-                  values={Array.from({ length: 12 }, (_, i) =>
-                    sampleHeartRate(person.id, Math.max(0, time - (11 - i) * 2)),
-                  )}
-                  label="Synthetic BPM samples, not a measured ECG"
-                />
-                <small>Demo values · not a measured ECG</small>
-              </div>
-            </div>
           </BentoCell>
 
           <BentoCell className={styles.readinessCell} labelledBy="dispatch-status-title">
@@ -633,26 +673,22 @@ export function DispatchDashboard({
                 Tracking & device setup <ChevronDown size={15} aria-hidden="true" />
               </summary>
               <div>
+                <button
+                  type="button"
+                  className={styles.textButton}
+                  aria-pressed={trackingEnabled}
+                  onClick={onToggleTracking}
+                >
+                  <Signal size={13} aria-hidden="true" />
+                  {trackingEnabled ? "Pause GPS tracking" : "Resume GPS tracking"}
+                </button>
                 {trackingPanel}
                 {liveTrack.state === "idle" && (
-                  <p>Tracking is paused. Use the map’s tracking control to resume.</p>
+                  <p>Tracking is paused. Resume to receive positions again.</p>
                 )}
                 {joinPanel}
               </div>
             </details>
-          </BentoCell>
-
-          <BentoCell className={styles.reservedCell} labelledBy="dispatch-tools-title">
-            <BentoLabel icon={SlidersHorizontal}>Workspace extension</BentoLabel>
-            <h2 id="dispatch-tools-title">Incident tools</h2>
-            <div className={styles.reserved}>
-              <span>Not configured</span>
-              <p>
-                Reserved for your next workflow.
-                <br />
-                No dispatch actions connected.
-              </p>
-            </div>
           </BentoCell>
         </div>
         <footer className={styles.footer}>

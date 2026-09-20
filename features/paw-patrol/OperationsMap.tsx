@@ -37,6 +37,8 @@ export interface OperationsMapProps {
   selectedId: string;
   onSelect: (id: string) => void;
   focus: MapFocus;
+  /** Optional nonce so choosing the same area can restore its overview. */
+  areaFocusKey?: number;
   theme: MapTheme;
   recenterKey: number;
   following: boolean;
@@ -68,11 +70,20 @@ type UnitMarker = {
 const LOAD_TIMEOUT_MS = 20000;
 
 export function OperationsMap(props: OperationsMapProps) {
-  const { time, running, selectedId, focus, theme, recenterKey, following } = props;
+  const {
+    time,
+    running,
+    selectedId,
+    focus,
+    areaFocusKey = 0,
+    theme,
+    recenterKey,
+    following,
+  } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<Runtime | null>(null);
   const latestRef = useRef(props);
-  const previousCamera = useRef({ focus, recenterKey, following, selectedId });
+  const previousCamera = useRef({ focus, areaFocusKey, recenterKey, following, selectedId });
   const [attempt, setAttempt] = useState(0);
   const [feedback, setFeedback] = useState({
     status: "loading" as MapStatus,
@@ -83,14 +94,15 @@ export function OperationsMap(props: OperationsMapProps) {
   }, [props]);
   useEffect(() => {
     const previous = previousCamera.current;
-    if (previous.focus !== focus) runtimeRef.current?.moveCamera(false);
+    if (previous.focus !== focus || previous.areaFocusKey !== areaFocusKey)
+      runtimeRef.current?.moveCamera(false);
     else if (
       previous.recenterKey !== recenterKey ||
       (following && (!previous.following || previous.selectedId !== selectedId))
     )
       runtimeRef.current?.moveCamera(true);
-    previousCamera.current = { focus, recenterKey, following, selectedId };
-  }, [focus, recenterKey, following, selectedId]);
+    previousCamera.current = { focus, areaFocusKey, recenterKey, following, selectedId };
+  }, [focus, areaFocusKey, recenterKey, following, selectedId]);
   useEffect(() => {
     runtimeRef.current?.updateScene();
   }, [time, running, selectedId, following]);

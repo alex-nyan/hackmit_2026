@@ -191,6 +191,7 @@ export function PawPatrol({
   const dispatchDashboard = view === "command" && presentation === "map";
   const mapTheme = dispatchDashboard ? dispatchTheme : theme;
   const [recenterKey, setRecenterKey] = useState(0);
+  const [dispatchAreaFocusKey, setDispatchAreaFocusKey] = useState(0);
   const [following, setFollowing] = useState(false);
   const [hardware, setHardware] = useState(false);
   const [evidence, setEvidence] = useState<"camera" | "audio" | null>(null);
@@ -355,61 +356,64 @@ export function PawPatrol({
     setSelectedId(p.id);
     setView("officer");
   }
+  function selectCommandOfficer(id: string) {
+    setSelectedId(id);
+    setFollowing(true);
+    setRecenterKey((key) => key + 1);
+  }
   const map = (
     <section className="map-panel" aria-label="Operations map">
-      <div className={`map-heading ${view === "officer" ? glassStyles.bubble : ""}`}>
-        {view === "officer" && <GlassEffect />}
-        <span>
-          <MapPin size={16} />
-          Boston & Cambridge
-        </span>
-        <div className="map-actions">
-          <button
-            className="follow-control"
-            disabled={!vehicle.routeId}
-            aria-pressed={following}
-            title={
-              following
-                ? "Stop following. You can also drag the map."
-                : "Keep the selected patrol vehicle centred"
-            }
-            onClick={() => setFollowing((value) => !value)}
-          >
-            <LocateFixed size={14} aria-hidden="true" />
-            {following ? "Stop following" : `Follow ${person.id}`}
-          </button>
-          <button
-            className="icon-control"
-            title="Centre selected officer"
-            aria-label="Centre selected officer"
-            onClick={() => setRecenterKey((k) => k + 1)}
-          >
-            <LocateFixed size={17} />
-          </button>
-          <button
-            className="icon-control"
-            data-on={tracking ? "true" : undefined}
-            aria-pressed={tracking}
-            title={tracking ? "Stop live tracking" : "Show real tracked units"}
-            aria-label={tracking ? "Stop live tracking" : "Show real tracked units"}
-            onClick={() => setTracking((value) => !value)}
-          >
-            {tracking ? <LocateFixed size={17} /> : <WifiOff size={17} />}
-          </button>
-          <button
-            className="icon-control"
-            title="Toggle map theme"
-            aria-label="Toggle map theme"
-            onClick={() => {
-              const toggle = (current: MapTheme) => (current === "light" ? "dark" : "light");
-              if (dispatchDashboard) setDispatchTheme(toggle);
-              else setTheme(toggle);
-            }}
-          >
-            {mapTheme === "light" ? <Moon size={17} /> : <Sun size={17} />}
-          </button>
+      {!dispatchDashboard && (
+        <div className={`map-heading ${view === "officer" ? glassStyles.bubble : ""}`}>
+          {view === "officer" && <GlassEffect />}
+          <span>
+            <MapPin size={16} />
+            Boston & Cambridge
+          </span>
+          <div className="map-actions">
+            <button
+              className="follow-control"
+              disabled={!vehicle.routeId}
+              aria-pressed={following}
+              title={
+                following
+                  ? "Stop following. You can also drag the map."
+                  : "Keep the selected patrol vehicle centred"
+              }
+              onClick={() => setFollowing((value) => !value)}
+            >
+              <LocateFixed size={14} aria-hidden="true" />
+              {following ? "Stop following" : `Follow ${person.id}`}
+            </button>
+            <button
+              className="icon-control"
+              title="Centre selected officer"
+              aria-label="Centre selected officer"
+              onClick={() => setRecenterKey((k) => k + 1)}
+            >
+              <LocateFixed size={17} />
+            </button>
+            <button
+              className="icon-control"
+              data-on={tracking ? "true" : undefined}
+              aria-pressed={tracking}
+              title={tracking ? "Stop live tracking" : "Show real tracked units"}
+              aria-label={tracking ? "Stop live tracking" : "Show real tracked units"}
+              onClick={() => setTracking((value) => !value)}
+            >
+              {tracking ? <LocateFixed size={17} /> : <WifiOff size={17} />}
+            </button>
+            <button
+              className="icon-control"
+              title="Toggle map theme"
+              aria-label="Toggle map theme"
+              onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+            >
+              {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
       <div className="map-wrapper">
         <OperationsMap
           appearance={view === "officer" ? "glass" : "default"}
@@ -417,8 +421,9 @@ export function PawPatrol({
           running={running}
           readClock={readClock}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={dispatchDashboard ? selectCommandOfficer : setSelectedId}
           focus={focus}
+          areaFocusKey={dispatchDashboard ? dispatchAreaFocusKey : 0}
           theme={mapTheme}
           recenterKey={recenterKey}
           following={following}
@@ -456,6 +461,7 @@ export function PawPatrol({
               onClick={() => {
                 setFollowing(false);
                 setFocus(key as MapFocus);
+                if (dispatchDashboard) setDispatchAreaFocusKey((value) => value + 1);
               }}
             >
               {target.label}
@@ -499,18 +505,23 @@ export function PawPatrol({
         workspace={workspace}
         onViewChange={setView}
         selectedId={selectedId}
-        onSelect={setSelectedId}
-        onCenter={() => setRecenterKey((key) => key + 1)}
+        onSelect={selectCommandOfficer}
         time={time}
         running={running}
         onTogglePlayback={() => (running ? dispatch({ type: "pause" }) : play())}
         theme={dispatchTheme}
+        onToggleTheme={() =>
+          setDispatchTheme((current) => (current === "light" ? "dark" : "light"))
+        }
         map={map}
         liveTrack={liveTrack}
+        trackingEnabled={tracking}
+        onToggleTracking={() => setTracking((value) => !value)}
         trackingPanel={<LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />}
         joinPanel={<JoinCard join={join} />}
         events={bus.events}
         busStatus={bus.status}
+        localHeartRate={{ personId: person.id, connection: heartRate }}
       />
     );
   }
