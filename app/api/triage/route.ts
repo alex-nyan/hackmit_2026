@@ -1,4 +1,9 @@
-import { forwardFrame, readTriageSettings } from "@/features/camera-triage/triageProxy";
+import { readFrameBody } from "@/features/camera-triage/readFrameBody";
+import {
+  forwardFrame,
+  MAX_BODY_BYTES,
+  readTriageSettings,
+} from "@/features/camera-triage/triageProxy";
 
 /**
  * Server-side bridge to the triage service. The service's bearer token is read
@@ -15,10 +20,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const frame = await readFrameBody(request, MAX_BODY_BYTES);
+  if (!frame.ok) {
+    return Response.json(
+      { error: frame.error },
+      { status: frame.status, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   const outcome = await forwardFrame(
     settings,
     request.headers.get("idempotency-key") ?? "",
-    await request.text(),
+    frame.body,
   );
 
   return new Response(outcome.body, {

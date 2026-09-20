@@ -125,13 +125,20 @@ and no location history is kept by the dashboard.
 triage service in `services/triage`. Add to `.env.local`:
 
 ```dotenv
-TRIAGE_URL=http://127.0.0.1:8099
+TRIAGE_URL=http://127.0.0.1:8090
 TRIAGE_API_TOKEN=your_triage_bearer_token
+TRIAGE_TIMEOUT_SECONDS=240
 ```
 
 Server-side only. **Never prefix these with `NEXT_PUBLIC_`** — the bearer token
 would otherwise reach every visitor. The browser posts to `/api/triage`, which
 attaches the token and forwards to `/v1/triage`.
+
+The timeout covers the service's default inference deadlines plus overhead.
+Increase it if the service uses a longer provider timeout (maximum 3600 seconds).
+The dashboard has no user login: anyone who can reach `/api/triage` can submit a
+frame using the configured service credential. Keep this demo on a trusted LAN,
+or put authenticated access in front of the dashboard before exposing it publicly.
 
 ### Camera access needs HTTPS
 

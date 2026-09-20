@@ -24,7 +24,7 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
   const [state, setState] = useState<CaptureState>({ state: "idle" });
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const runningRef = useRef(false);
+  const sessionRef = useRef<symbol | null>(null);
   const optionsRef = useRef({ sourceId, incidentId });
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
   }, [sourceId, incidentId]);
 
   const stop = useCallback(() => {
-    runningRef.current = false;
+    sessionRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -40,7 +40,7 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
   }, []);
 
   const start = useCallback(async () => {
-    if (runningRef.current) return;
+    if (sessionRef.current) return;
 
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       // Safari exposes mediaDevices only in a secure context, so this is the
@@ -52,20 +52,34 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
       return;
     }
 
+    // Reserve the session before awaiting permission so repeated starts cannot
+    // open extra streams. Stop also invalidates pending acquisition/playback.
+    const session = Symbol();
+    sessionRef.current = session;
     setState({ state: "requesting-camera" });
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: CAPTURE_WIDTH } },
         audio: false,
       });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => undefined);
+      if (sessionRef.current !== session) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
       }
-      runningRef.current = true;
+      streamRef.current = stream;
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        await video.play().catch(() => undefined);
+      }
+      if (sessionRef.current !== session) return;
       setState({ state: "running", lastResult: null, lastError: null });
     } catch (error) {
+      if (sessionRef.current !== session) return;
+      sessionRef.current = null;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
       const name = error instanceof Error ? error.name : "";
       setState({
         state: "denied",
@@ -170,7 +184,16 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
     // Restarting the loop on every result would cancel the request in flight.
   }, [state.state]);
 
-  useEffect(() => stop, [stop]);
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.hidden && sessionRef.current) stop();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      stop();
+    };
+  }, [stop]);
 
   return { state, videoRef, start, stop };
 }

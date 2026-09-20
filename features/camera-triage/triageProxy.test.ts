@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { forwardFrame, readTriageSettings, type TriageSettings } from "./triageProxy";
 
 const SETTINGS: TriageSettings = {
-  baseUrl: "http://127.0.0.1:8099",
+  baseUrl: "http://127.0.0.1:8090",
   token: "a".repeat(32),
 };
 
@@ -19,9 +19,32 @@ function upstream(status: number, body: string) {
 describe("settings", () => {
   it("reads a complete configuration and trims the trailing slash", () => {
     expect(
-      readTriageSettings({ TRIAGE_URL: "http://127.0.0.1:8099/", TRIAGE_API_TOKEN: "t" }),
-    ).toEqual({ baseUrl: "http://127.0.0.1:8099", token: "t" });
+      readTriageSettings({ TRIAGE_URL: "http://127.0.0.1:8090/", TRIAGE_API_TOKEN: "t" }),
+    ).toEqual({ baseUrl: "http://127.0.0.1:8090", token: "t", timeoutMs: 240_000 });
   });
+
+  it("allows a longer inference deadline for slower providers", () => {
+    expect(
+      readTriageSettings({
+        TRIAGE_URL: SETTINGS.baseUrl,
+        TRIAGE_API_TOKEN: SETTINGS.token,
+        TRIAGE_TIMEOUT_SECONDS: "660",
+      })?.timeoutMs,
+    ).toBe(660_000);
+  });
+
+  it.each(["0", "-1", "Infinity", "invalid", "3601"])(
+    "rejects an invalid timeout %s",
+    (timeout) => {
+      expect(
+        readTriageSettings({
+          TRIAGE_URL: SETTINGS.baseUrl,
+          TRIAGE_API_TOKEN: SETTINGS.token,
+          TRIAGE_TIMEOUT_SECONDS: timeout,
+        }),
+      ).toBeNull();
+    },
+  );
 
   it("treats an incomplete configuration as unconfigured", () => {
     expect(readTriageSettings({ TRIAGE_URL: "http://x" })).toBeNull();
@@ -32,12 +55,35 @@ describe("settings", () => {
 });
 
 describe("forwarding a frame", () => {
+  it("allows normal inference to finish after the old 30-second deadline", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(AbortSignal, "timeout").mockImplementation((delay) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), delay);
+      return controller.signal;
+    });
+    try {
+      const pending = forwardFrame(SETTINGS, KEY, BODY, async (_url, init) => {
+        return new Promise<Response>((resolve, reject) => {
+          setTimeout(() => resolve(new Response('{"request_id":"slow-result"}')), 31_000);
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
+            once: true,
+          });
+        });
+      });
+      await vi.advanceTimersByTimeAsync(31_000);
+      expect(await pending).toMatchObject({ status: 200, body: '{"request_id":"slow-result"}' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("attaches the bearer token and the idempotency key", async () => {
     const fetchMock = upstream(200, '{"request_id":"r1"}');
     await forwardFrame(SETTINGS, KEY, BODY, fetchMock as unknown as typeof fetch);
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("http://127.0.0.1:8099/v1/triage");
+    expect(url).toBe("http://127.0.0.1:8090/v1/triage");
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization).toBe(`Bearer ${SETTINGS.token}`);
     expect(headers["Idempotency-Key"]).toBe(KEY);
@@ -73,6 +119,18 @@ describe("forwarding a frame", () => {
       SETTINGS,
       KEY,
       "x".repeat(11_300_001),
+      fetchMock as unknown as typeof fetch,
+    );
+    expect(outcome.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("counts UTF-8 bytes instead of string characters toward the body limit", async () => {
+    const fetchMock = upstream(200, "{}");
+    const outcome = await forwardFrame(
+      SETTINGS,
+      KEY,
+      "é".repeat(5_650_001),
       fetchMock as unknown as typeof fetch,
     );
     expect(outcome.status).toBe(413);

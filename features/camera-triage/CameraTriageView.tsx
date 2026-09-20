@@ -9,6 +9,7 @@ export function CameraTriageView() {
   const [sourceId, setSourceId] = useState("unit-01");
   const { state, videoRef, start, stop } = useCameraTriage({ sourceId });
   const running = state.state === "running";
+  const active = running || state.state === "requesting-camera";
 
   return (
     <main className={styles.root}>
@@ -24,15 +25,15 @@ export function CameraTriageView() {
             onChange={(event) => setSourceId(event.target.value)}
             placeholder="Unit name"
             aria-label="Unit name"
-            disabled={running}
+            disabled={active}
           />
           <button
             type="button"
             className={styles.button}
-            data-stop={running ? "true" : undefined}
-            onClick={() => (running ? stop() : void start())}
+            data-stop={active ? "true" : undefined}
+            onClick={() => (active ? stop() : void start())}
           >
-            {running ? "Stop" : "Start"}
+            {active ? "Stop" : "Start"}
           </button>
         </div>
 
