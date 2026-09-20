@@ -1,11 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-
 import { describeTranscript } from "./audio";
-import { NO_DEVICES, findContinuityDevice, splitDevices, type CaptureDevices } from "./devices";
 import { useAudioTranscription } from "./useAudioTranscription";
 import { useCameraTriage } from "./useCameraTriage";
+import { useCaptureDevices } from "./useCaptureDevices";
 
 interface CapturePanelProps {
   sourceId: string;
@@ -17,32 +15,21 @@ interface CapturePanelProps {
  * Camera is actually used: phone as the lens, laptop as the console.
  */
 export function CapturePanel({ sourceId }: CapturePanelProps) {
-  const [devices, setDevices] = useState<CaptureDevices>(NO_DEVICES);
-  const [cameraId, setCameraId] = useState<string | null>(null);
+  const { devices, cameraId, setCameraId, refreshDevices } = useCaptureDevices();
 
   const { state, videoRef, start, stop } = useCameraTriage({ sourceId, cameraId });
   const audio = useAudioTranscription(sourceId);
   const running = state.state === "running";
   const busy = running || state.state === "requesting-camera";
+  const listening =
+    audio.state.state === "recording" || audio.state.state === "requesting-microphone";
 
-  const refreshDevices = useCallback(async () => {
-    if (!navigator?.mediaDevices?.enumerateDevices) return;
-    const found = splitDevices(await navigator.mediaDevices.enumerateDevices());
-    setDevices(found);
-    // A Continuity Camera is almost always the one worth using here.
-    setCameraId((current) => current ?? findContinuityDevice(found.cameras)?.deviceId ?? null);
-  }, []);
-
-  useEffect(() => {
-    if (!navigator?.mediaDevices) return;
-    const onChange = () => void refreshDevices();
-    navigator.mediaDevices.addEventListener("devicechange", onChange);
-    const initial = setTimeout(onChange, 0);
-    return () => {
-      clearTimeout(initial);
-      navigator.mediaDevices.removeEventListener("devicechange", onChange);
-    };
-  }, [refreshDevices]);
+  async function startCamera() {
+    // Freeze the choice before permission reveals more device names.
+    setCameraId(cameraId);
+    await start();
+    await refreshDevices();
+  }
 
   const selected = devices.cameras.find((device) => device.deviceId === cameraId);
 
@@ -81,21 +68,25 @@ export function CapturePanel({ sourceId }: CapturePanelProps) {
           type="button"
           className="capture-card__button"
           data-stop={busy ? "true" : undefined}
-          onClick={() => (busy ? stop() : void start())}
+          onClick={() => (busy ? stop() : void startCamera())}
         >
           {busy ? "Stop" : "Start"}
         </button>
         <button
           type="button"
           className="capture-card__button capture-card__button--quiet"
-          data-on={audio.state.state === "recording" ? "true" : undefined}
-          onClick={() => (audio.state.state === "recording" ? audio.stop() : void audio.start())}
+          data-on={listening ? "true" : undefined}
+          onClick={() => (listening ? audio.stop() : void audio.start())}
         >
-          {audio.state.state === "recording" ? "Mute" : "Listen"}
+          {listening ? "Mute" : "Listen"}
         </button>
       </div>
 
-      {selected && <p className="capture-card__note">Using {selected.label}</p>}
+      {!busy && selected && <p className="capture-card__note">Selected: {selected.label}</p>}
+
+      {audio.state.state === "requesting-microphone" && (
+        <p className="capture-card__note">Waiting for microphone permission…</p>
+      )}
 
       {state.state === "unsupported" && <p className="capture-card__error">{state.reason}</p>}
       {state.state === "denied" && <p className="capture-card__error">{state.reason}</p>}

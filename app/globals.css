@@ -245,12 +245,16 @@ button:focus-visible {
   bottom: 16px;
   display: flex;
   width: min(300px, calc(100vw - 32px));
+  max-height: calc(100dvh - 88px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   flex-direction: column;
   gap: 8px;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .map-panels > * {
+  flex-shrink: 0;
   padding: 12px 14px;
   pointer-events: auto;
 }
@@ -449,6 +453,7 @@ button:focus-visible {
   .map-panels {
     left: 12px;
     bottom: 12px;
+    max-height: calc(100dvh - 132px);
   }
 
   .mapboxgl-ctrl-bottom-right {

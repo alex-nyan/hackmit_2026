@@ -3,16 +3,39 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { RECORDER_MIME_CANDIDATES, pickRecorderMimeType, toServiceMediaType } from "./audio";
-import {
-  NO_DEVICES,
-  findContinuityDevice,
-  splitDevices,
-  trackConstraint,
-  type CaptureDevices,
-} from "./devices";
+import { trackConstraint } from "./devices";
+import { useCaptureDevices } from "./useCaptureDevices";
 import styles from "./CaptureCheck.module.css";
 
 const CLIP_MS = 5000;
+
+interface CheckSession {
+  stream: MediaStream | null;
+  context: AudioContext | null;
+  frame: number | null;
+  recorder: MediaRecorder | null;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
+function releaseSession(session: CheckSession) {
+  if (session.timer !== null) clearTimeout(session.timer);
+  if (session.frame !== null) cancelAnimationFrame(session.frame);
+  if (session.recorder) {
+    session.recorder.ondataavailable = null;
+    session.recorder.onstop = null;
+    session.recorder.onerror = null;
+    try {
+      if (session.recorder.state !== "inactive") session.recorder.stop();
+    } catch {
+      // A failed recorder must not prevent releasing the capture devices.
+    }
+  }
+  void session.context?.close().catch(() => undefined);
+  session.stream?.getTracks().forEach((track) => {
+    track.onended = null;
+    track.stop();
+  });
+}
 
 /** What this browser can do, before anyone is asked for permission. */
 interface Capabilities {
@@ -91,56 +114,59 @@ export function CaptureCheck() {
   const [running, setRunning] = useState(false);
   const [level, setLevel] = useState(0);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
-  const [devices, setDevices] = useState<CaptureDevices>(NO_DEVICES);
-  const [cameraId, setCameraId] = useState<string | null>(null);
-  const [microphoneId, setMicrophoneId] = useState<string | null>(null);
+  const { devices, cameraId, microphoneId, setCameraId, setMicrophoneId, refreshDevices } =
+    useCaptureDevices();
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const frameRef = useRef<number | null>(null);
-
-  /**
-   * Re-reads the device list. Continuity Camera appears and disappears as the
-   * phone becomes eligible, so this is deliberately callable at any time.
-   */
-  const refreshDevices = useCallback(async () => {
-    if (!navigator?.mediaDevices?.enumerateDevices) return NO_DEVICES;
-    const found = splitDevices(await navigator.mediaDevices.enumerateDevices());
-    setDevices(found);
-    // Prefer the phone when it is there; the built-in webcam wins otherwise.
-    setCameraId((current) => current ?? findContinuityDevice(found.cameras)?.deviceId ?? null);
-    setMicrophoneId(
-      (current) => current ?? findContinuityDevice(found.microphones)?.deviceId ?? null,
-    );
-    return found;
-  }, []);
+  const sessionRef = useRef<CheckSession | null>(null);
 
   const stop = useCallback(() => {
-    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-    frameRef.current = null;
-    void audioContextRef.current?.close();
-    audioContextRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
+    const session = sessionRef.current;
+    sessionRef.current = null;
+    if (session) releaseSession(session);
     if (videoRef.current) videoRef.current.srcObject = null;
     setRunning(false);
     setLevel(0);
   }, []);
 
   const start = useCallback(async () => {
-    setFindings((current) => ({ ...current, error: null, clipBytes: null, clipType: null }));
+    if (sessionRef.current) return;
+    // Reserve the session before permission so Stop can cancel a pending grant.
+    const session: CheckSession = {
+      stream: null,
+      context: null,
+      frame: null,
+      recorder: null,
+      timer: null,
+    };
+    sessionRef.current = session;
+    setRunning(true);
+    // Keep the selectors aligned with this acquisition when permission reveals labels.
+    setCameraId(cameraId);
+    setMicrophoneId(microphoneId);
+    setFindings(EMPTY);
     setPlaybackUrl(null);
+    const fail = (error: string) => {
+      if (sessionRef.current !== session) return;
+      stop();
+      setFindings((current) => ({ ...current, error }));
+    };
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: trackConstraint(cameraId),
         audio: trackConstraint(microphoneId),
       });
+      if (sessionRef.current !== session) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      session.stream = stream;
+      stream.getTracks().forEach((track) => {
+        track.onended = () => fail("Camera or microphone capture ended. Test again to reconnect.");
+      });
       // Labels are only exposed after permission is granted, so list again now.
       void refreshDevices();
-      streamRef.current = stream;
-      setRunning(true);
 
       const [video] = stream.getVideoTracks();
       const [audio] = stream.getAudioTracks();
@@ -154,36 +180,49 @@ export function CaptureCheck() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => undefined);
       }
+      if (sessionRef.current !== session) return;
 
       // A live level meter is the only way to tell a working mic from a muted
       // one; permission being granted says nothing about audio actually flowing.
       const context = new AudioContext();
-      audioContextRef.current = context;
+      session.context = context;
       const analyser = context.createAnalyser();
       analyser.fftSize = 512;
       context.createMediaStreamSource(stream).connect(analyser);
       const samples = new Uint8Array(analyser.frequencyBinCount);
 
       const tick = () => {
+        if (sessionRef.current !== session) return;
         analyser.getByteTimeDomainData(samples);
         let peak = 0;
         for (const sample of samples) peak = Math.max(peak, Math.abs(sample - 128));
         setLevel(Math.min(1, peak / 96));
-        frameRef.current = requestAnimationFrame(tick);
+        session.frame = requestAnimationFrame(tick);
       };
       tick();
 
       // Record a short clip and play it back locally, so the test covers
       // recording and not merely permission.
-      const mimeType = pickRecorderMimeType((candidate) =>
-        MediaRecorder.isTypeSupported(candidate),
-      );
+      const mimeType =
+        typeof MediaRecorder === "undefined"
+          ? null
+          : pickRecorderMimeType((candidate) => MediaRecorder.isTypeSupported(candidate));
       if (mimeType) {
-        const recorder = new MediaRecorder(stream, { mimeType });
+        // The formats above are audio containers; do not include the video track.
+        const recorder = new MediaRecorder(new MediaStream(stream.getAudioTracks()), { mimeType });
+        session.recorder = recorder;
         const chunks: BlobPart[] = [];
-        recorder.ondataavailable = (event) => chunks.push(event.data);
+        recorder.ondataavailable = (event) => {
+          if (sessionRef.current === session && event.data.size > 0) chunks.push(event.data);
+        };
+        recorder.onerror = () => fail("Audio recording failed. Test again to retry.");
         recorder.onstop = () => {
-          const blob = new Blob(chunks, { type: mimeType });
+          if (sessionRef.current !== session) return;
+          session.recorder = null;
+          recorder.ondataavailable = null;
+          recorder.onstop = null;
+          recorder.onerror = null;
+          const blob = new Blob(chunks, { type: recorder.mimeType || mimeType });
           setFindings((current) => ({
             ...current,
             clipBytes: blob.size,
@@ -192,39 +231,44 @@ export function CaptureCheck() {
           setPlaybackUrl(URL.createObjectURL(blob));
         };
         recorder.start();
-        setTimeout(() => {
-          if (recorder.state !== "inactive") recorder.stop();
+        session.timer = setTimeout(() => {
+          session.timer = null;
+          if (sessionRef.current !== session) return;
+          try {
+            if (recorder.state !== "inactive") recorder.stop();
+          } catch {
+            fail("Audio recording failed. Test again to retry.");
+          }
         }, CLIP_MS);
       }
     } catch (error) {
       const name = error instanceof Error ? error.name : "";
-      setFindings((current) => ({
-        ...current,
-        error:
-          name === "NotAllowedError"
-            ? "Permission was declined for the camera or microphone."
-            : name === "NotFoundError"
-              ? "No camera or microphone was found."
-              : `Capture failed (${name || "unknown error"}).`,
-      }));
-      setRunning(false);
+      fail(
+        name === "NotAllowedError"
+          ? "Permission was declined for the camera or microphone."
+          : name === "NotFoundError"
+            ? "No camera or microphone was found."
+            : `Capture failed (${name || "unknown error"}).`,
+      );
     }
-  }, [cameraId, microphoneId, refreshDevices]);
+  }, [cameraId, microphoneId, refreshDevices, setCameraId, setMicrophoneId, stop]);
 
   useEffect(() => {
-    if (!navigator?.mediaDevices) return;
-    const onChange = () => void refreshDevices();
-    navigator.mediaDevices.addEventListener("devicechange", onChange);
-    // The first read is deferred so the effect body itself does not set state;
-    // the subscription is what keeps the list current afterwards.
-    const initial = setTimeout(onChange, 0);
-    return () => {
-      clearTimeout(initial);
-      navigator.mediaDevices.removeEventListener("devicechange", onChange);
+    const onVisibilityChange = () => {
+      if (document.hidden) stop();
     };
-  }, [refreshDevices]);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      stop();
+    };
+  }, [stop]);
 
-  useEffect(() => stop, [stop]);
+  useEffect(() => {
+    return () => {
+      if (playbackUrl) URL.revokeObjectURL(playbackUrl);
+    };
+  }, [playbackUrl]);
 
   const yes = (value: boolean) => (
     <span className={value ? styles.ok : styles.bad}>{value ? "yes" : "no"}</span>

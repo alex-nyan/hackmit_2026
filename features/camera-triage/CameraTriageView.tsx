@@ -1,43 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 
 import { describeTranscript } from "./audio";
-import { NO_DEVICES, findContinuityDevice, splitDevices, type CaptureDevices } from "./devices";
 import styles from "./CameraTriageView.module.css";
 import { useAudioTranscription } from "./useAudioTranscription";
 import { useCameraTriage } from "./useCameraTriage";
+import { useCaptureDevices } from "./useCaptureDevices";
 
 export function CameraTriageView() {
   const [sourceId, setSourceId] = useState("unit-01");
-  const [devices, setDevices] = useState<CaptureDevices>(NO_DEVICES);
-  const [cameraId, setCameraId] = useState<string | null>(null);
-
-  // Continuity Camera comes and goes as the phone becomes eligible, so the
-  // list is refreshed on every devicechange rather than read once.
-  const refreshDevices = useCallback(async () => {
-    if (!navigator?.mediaDevices?.enumerateDevices) return;
-    const found = splitDevices(await navigator.mediaDevices.enumerateDevices());
-    setDevices(found);
-    setCameraId((current) => current ?? findContinuityDevice(found.cameras)?.deviceId ?? null);
-  }, []);
-
-  useEffect(() => {
-    if (!navigator?.mediaDevices) return;
-    const onChange = () => void refreshDevices();
-    navigator.mediaDevices.addEventListener("devicechange", onChange);
-    const initial = setTimeout(onChange, 0);
-    return () => {
-      clearTimeout(initial);
-      navigator.mediaDevices.removeEventListener("devicechange", onChange);
-    };
-  }, [refreshDevices]);
+  const { devices, cameraId, setCameraId, refreshDevices } = useCaptureDevices();
   const { state, videoRef, start, stop } = useCameraTriage({ sourceId, cameraId });
   const audio = useAudioTranscription(sourceId);
   const running = state.state === "running";
   const listening =
     audio.state.state === "recording" || audio.state.state === "requesting-microphone";
   const active = running || state.state === "requesting-camera";
+
+  async function startCamera() {
+    setCameraId(cameraId);
+    await start();
+    await refreshDevices();
+  }
 
   return (
     <main className={styles.root}>
@@ -59,7 +44,7 @@ export function CameraTriageView() {
             type="button"
             className={styles.button}
             data-stop={active ? "true" : undefined}
-            onClick={() => (active ? stop() : void start())}
+            onClick={() => (active ? stop() : void startCamera())}
           >
             {active ? "Stop" : "Start"}
           </button>

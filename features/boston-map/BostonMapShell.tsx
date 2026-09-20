@@ -140,19 +140,21 @@ export function BostonMapShell() {
           </div>
         )}
 
-        {status === "ready" && (
-          <div className="map-panels">
+        <div className="map-panels">
+          {status === "ready" && (
             <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
-            {capturing && <CapturePanel sourceId="console" />}
+          )}
+          {capturing && <CapturePanel sourceId="console" />}
+          {status === "ready" && (
             <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
+          )}
 
-            {liveTrack.state === "idle" && !building && (
-              <aside className="map-hint">
-                <p>Click a building for its height and footprint. Right-drag to tilt and rotate.</p>
-              </aside>
-            )}
-          </div>
-        )}
+          {status === "ready" && liveTrack.state === "idle" && !building && (
+            <aside className="map-hint">
+              <p>Click a building for its height and footprint. Right-drag to tilt and rotate.</p>
+            </aside>
+          )}
+        </div>
       </section>
     </main>
   );
