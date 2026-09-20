@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Video } from "lucide-react";
 
 import type { Officer } from "@/features/access/roster";
 import { BodyCamWall } from "@/features/body-cam";
@@ -51,8 +53,32 @@ export function CameraTriageView({ officer }: { officer?: Officer } = {}) {
 
   return (
     <main className={styles.root}>
+      <header className={styles.header}>
+        <div>
+          <p>PAW PATROL / FIELD CAPTURE</p>
+          <h1>Share your perspective</h1>
+          <span>Camera, audio and location are controlled separately.</span>
+        </div>
+        <Link href="/officer">
+          <ArrowLeft size={16} aria-hidden="true" /> Officer workspace
+        </Link>
+      </header>
       <div className={styles.stage}>
-        <video ref={videoRef} className={styles.video} playsInline muted autoPlay />
+        <video
+          ref={videoRef}
+          className={styles.video}
+          playsInline
+          muted
+          autoPlay
+          aria-label="Your camera preview"
+        />
+        {!active && (
+          <div className={styles.stageHint}>
+            <Video size={32} aria-hidden="true" />
+            <strong>Your camera is off</strong>
+            <span>Start your camera below to share a view with your team.</span>
+          </div>
+        )}
       </div>
 
       <section className={styles.panel}>
@@ -69,7 +95,10 @@ export function CameraTriageView({ officer }: { officer?: Officer } = {}) {
               className={styles.field}
               value={typedId}
               onChange={(event) => setTypedId(event.target.value)}
-              placeholder="Unit name"
+              placeholder="e.g. unit-01…"
+              name="unit"
+              autoComplete="off"
+              spellCheck={false}
               aria-label="Unit name"
               disabled={active || listening}
             />
@@ -80,7 +109,7 @@ export function CameraTriageView({ officer }: { officer?: Officer } = {}) {
             data-stop={active ? "true" : undefined}
             onClick={() => (active ? stop() : void startCamera())}
           >
-            {active ? "Stop" : "Start"}
+            {active ? "Stop camera" : "Start camera"}
           </button>
         </div>
 

@@ -1,5 +1,4 @@
-import Link from "next/link";
-import styles from "./page.module.css";
+import { WorkspaceHome } from "@/features/workspace-home/WorkspaceHome";
 import { PawPatrol } from "@/features/paw-patrol/PawPatrol";
 import { parseWorkspace, WORKSPACE_LABELS } from "@/features/paw-patrol/workspace";
 import { connection } from "next/server";
@@ -18,22 +17,14 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ demo?: string }> }) {
   await connection();
   const workspace = parseWorkspace(process.env.PAW_PATROL_WORKSPACE);
   const mode = process.env.PAW_PATROL_DATA_MODE ?? "demo";
   if (mode !== "demo" && mode !== "live")
     throw new Error("PAW_PATROL_DATA_MODE must be demo or live.");
-  return (
-    <>
-      <nav className={styles.officerAccess} aria-label="Officer access">
-        <div>
-          <strong>Police officer access</strong>
-          <span>Sign in with your assigned officer account.</span>
-        </div>
-        <Link href="/sign-in">Sign in as a police officer</Link>
-      </nav>
-      {mode === "live" ? <LiveWorkspace /> : <PawPatrol workspace={workspace} />}
-    </>
-  );
+  if (mode === "live") return <LiveWorkspace />;
+  const { demo } = await searchParams;
+  if (workspace || demo === "1") return <PawPatrol workspace={workspace} />;
+  return <WorkspaceHome />;
 }

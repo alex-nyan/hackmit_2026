@@ -26,13 +26,18 @@ export default async function Unlock({
           className="unlock__field"
           type="password"
           name="passphrase"
-          placeholder="Passphrase"
+          placeholder="Enter shared passphrase…"
+          aria-invalid={wrong ? true : undefined}
+          aria-describedby={wrong ? "unlock-error" : undefined}
           aria-label="Passphrase"
           autoComplete="current-password"
-          autoFocus
           required
         />
-        {wrong ? <p className="unlock__error">That passphrase was not accepted.</p> : null}
+        {wrong ? (
+          <p id="unlock-error" className="unlock__error" role="alert">
+            That passphrase was not accepted. Check it and try again.
+          </p>
+        ) : null}
         <button className="unlock__button" type="submit">
           Unlock
         </button>

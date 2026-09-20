@@ -1,18 +1,127 @@
-/* Shared palette for the operational workspaces. */
+/* Shared response-console tokens, including native controls and focus states. */
 :root {
-  --ops-bg: #101818;
-  --ops-surface: #172020;
-  --ops-raised: #202d2c;
-  --ops-line: #354441;
-  --ops-text: #eff1e9;
-  --ops-muted: #a7b4ae;
-  --ops-accent: #e8c47c;
-  --ops-good: #8ec5a5;
-  --ops-light-bg: #eaece5;
-  --ops-light-surface: #f8f9f3;
-  --ops-light-raised: #e2e7dc;
-  --ops-light-line: #c5cec2;
-  --ops-light-text: #202e29;
-  --ops-light-muted: #54655b;
-  --ops-light-accent: #78551b;
+  --font-display:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-prose: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ops-bg: #101b1b;
+  --ops-surface: #172424;
+  --ops-raised: #213232;
+  --ops-line: #344646;
+  --ops-text: #f0f5f2;
+  --ops-muted: #a6bbb5;
+  --ops-accent: #a3e6c0;
+  --ops-good: #8edbb0;
+  --ops-light-bg: #f0f3ef;
+  --ops-light-surface: #ffffff;
+  --ops-light-raised: #e6ede7;
+  --ops-light-line: #ccd8cf;
+  --ops-light-text: #18372b;
+  --ops-light-muted: #536b5f;
+  --ops-light-accent: #246347;
+  --night: #173a30;
+  --ocean: #346d67;
+  --butter: #e2efd9;
+  --cream: #f5f7f2;
+  --sage: #badac4;
+  --focus: #67b98f;
+}
+body {
+  background: var(--ops-bg);
+  font-family: var(--font-prose);
+  -webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+button,
+a,
+input,
+select,
+textarea,
+summary {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: #a3e6c030;
+}
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+button,
+a,
+input,
+select,
+textarea,
+summary {
+  scroll-margin-block: 96px 24px;
+}
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+}
+::selection {
+  background: #a3e6c0;
+  color: #10231d;
+}
+.skip-link {
+  z-index: 1000;
+}
+.unlock {
+  color-scheme: dark;
+  background: var(--ops-bg);
+  color: var(--ops-text);
+}
+.unlock__card {
+  background: var(--ops-surface);
+  border: 1px solid var(--ops-line);
+  border-radius: 16px;
+  padding: clamp(24px, 5vw, 40px);
+  box-shadow: 0 24px 80px #0002;
+}
+.unlock__card h1 {
+  font-size: 32px;
+  letter-spacing: -0.04em;
+}
+.unlock__card p {
+  color: var(--ops-muted);
+  line-height: 1.7;
+}
+.unlock__field {
+  background: var(--ops-bg);
+  border: 1px solid var(--ops-line);
+  color: var(--ops-text);
+  min-height: 48px;
+  border-radius: 8px;
+}
+.unlock__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  background: var(--ops-accent);
+  color: #10231d;
+  border-radius: 8px;
+}
+.unlock__button:hover {
+  filter: brightness(1.1);
+}
+.unlock__card a.unlock__button {
+  background: transparent;
+  color: var(--ops-text);
+  border: 1px solid var(--ops-line);
+}
+.unlock__card .unlock__error {
+  color: #ffb4ae;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

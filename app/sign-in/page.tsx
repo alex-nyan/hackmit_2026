@@ -24,6 +24,9 @@ export default async function SignIn({
 
   return (
     <div className={styles.page}>
+      <a className="skip-link" href="#sign-in">
+        Skip to sign-in
+      </a>
       <header className={styles.header}>
         <Link href="/" className={styles.brand} aria-label="Paw Patrol home">
           <span>
@@ -35,7 +38,7 @@ export default async function SignIn({
           <ArrowLeft size={16} aria-hidden="true" /> Back to main page
         </Link>
       </header>
-      <main className={styles.main}>
+      <main id="sign-in" tabIndex={-1} className={styles.main}>
         <div className={styles.welcome}>
           <span>Paw Patrol / Field operations</span>
           <h2>Every unit. One picture.</h2>
@@ -48,6 +51,7 @@ export default async function SignIn({
           <div className={styles.intro}>
             <span className={styles.eyebrow}>Officer workspace</span>
             <h1 id="sign-in-title">Choose your profile</h1>
+            <p>Select your assigned officer profile to enter your field workspace.</p>
           </div>
           <form className={styles.form} method="post" action="/api/sign-in">
             <div className={styles.field}>
@@ -81,7 +85,7 @@ export default async function SignIn({
               </div>
             )}
             <button className={styles.submit} type="submit" disabled={!hasOfficers}>
-              Continue <ArrowRight size={17} aria-hidden="true" />
+              Open officer workspace <ArrowRight size={17} aria-hidden="true" />
             </button>
           </form>
         </section>

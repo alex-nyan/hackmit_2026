@@ -429,7 +429,7 @@ export function DispatchDashboard({
         </span>
       </header>
 
-      <main id="workspace" className={styles.main}>
+      <main tabIndex={-1} id="workspace" className={styles.main}>
         <div className={styles.intro}>
           <div>
             <p className={styles.sectionLabel}>Operations / Boston &amp; Cambridge</p>
@@ -444,7 +444,7 @@ export function DispatchDashboard({
                 type="button"
                 className={styles.themeControl}
                 onClick={onToggleTheme}
-                aria-label="Toggle map theme"
+                aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
                 title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
               >
                 {theme === "dark" ? (
@@ -465,6 +465,37 @@ export function DispatchDashboard({
             </button>
           </div>
         </div>
+
+        <dl className={styles.overview} aria-label="Operational summary">
+          <div>
+            <dt>Demo patrol units</dt>
+            <dd>
+              {PEOPLE.length}
+              <span>In this scenario</span>
+            </dd>
+          </div>
+          <div data-attention={knownRequests > 0 || undefined}>
+            <dt>Awaiting assistance</dt>
+            <dd>
+              {knownRequests}
+              <span>{knownRequests ? "Review requests in the roster" : "No open requests"}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Responding units</dt>
+            <dd>
+              {responding}
+              <span>Coordinated response</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Connected GPS units</dt>
+            <dd>
+              {trackingKnown ? liveCount : "—"}
+              <span>{trackingLabel}</span>
+            </dd>
+          </div>
+        </dl>
 
         <div className={styles.grid} data-placing={hotspotTools?.placing || undefined}>
           <BentoCell className={styles.mapCell} labelledBy="dispatch-map-title">

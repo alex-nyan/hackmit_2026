@@ -147,3 +147,72 @@
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* Shared response-console presentation. */
+
+.root {
+  width: min(100%, 680px);
+  max-width: 680px;
+  margin-inline: auto;
+  padding: 28px 24px calc(28px + env(safe-area-inset-bottom));
+  gap: 20px;
+  background: var(--ops-bg);
+  color: var(--ops-text);
+  color-scheme: dark;
+}
+.header {
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.eyebrow {
+  color: var(--ops-accent);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+.title {
+  font-size: 32px;
+  letter-spacing: -0.035em;
+}
+.unit,
+.stageHint,
+.fineprint {
+  color: var(--ops-muted);
+}
+.unit strong {
+  color: var(--ops-accent);
+}
+.stage {
+  border-color: var(--ops-line);
+  background: var(--ops-surface);
+  border-radius: 12px;
+}
+.primary,
+.secondary {
+  border-radius: 8px;
+  min-height: 48px;
+}
+.primary {
+  background: var(--ops-accent);
+}
+.secondary {
+  border-color: var(--ops-line);
+  background: var(--ops-surface);
+}
+.primary:hover:not(:disabled),
+.secondary:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+.status {
+  padding: 16px;
+  background: var(--ops-surface);
+  border: 1px solid var(--ops-line);
+  border-radius: 10px;
+}
+.fineprint {
+  line-height: 1.7;
+}
+@media (max-width: 420px) {
+  .root {
+    padding-inline: 16px;
+  }
+}

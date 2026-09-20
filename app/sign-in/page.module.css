@@ -236,3 +236,78 @@
     border-top: 1px solid var(--signin-border);
   }
 }
+
+/* Response-console layout and interaction refinements. */
+
+.header {
+  min-height: 76px;
+  padding-inline: 32px;
+  background: var(--signin-card);
+}
+.brand > span {
+  width: 38px;
+  height: 40px;
+  border-radius: 10px;
+}
+.brand strong {
+  font-size: 18px;
+}
+.back {
+  min-height: 44px;
+}
+.main {
+  width: min(1200px, 100%);
+  margin: auto;
+  min-height: calc(100dvh - 76px);
+}
+.card {
+  padding: 36px;
+  border: 1px solid var(--signin-border);
+  border-radius: 16px;
+  background: var(--signin-card);
+  box-shadow: 0 20px 70px #0001;
+}
+.welcome h2 {
+  color: var(--signin-text);
+}
+.welcome > span {
+  color: var(--signin-accent);
+}
+.field select,
+.submit,
+.notice,
+.error {
+  border-radius: 8px;
+}
+.submit {
+  min-height: 48px;
+}
+.submit:hover:not(:disabled) {
+  background: #c6f5da;
+}
+.field select {
+  background: var(--signin-bg);
+}
+.intro p {
+  color: var(--signin-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.welcome small {
+  padding-left: 14px;
+  border-left: 2px solid var(--signin-accent);
+}
+@media (max-width: 760px) {
+  .main {
+    padding: 32px 20px;
+  }
+  .card {
+    padding: 28px 24px;
+  }
+  .header {
+    padding-inline: 20px;
+  }
+  .welcome small {
+    margin-top: 24px;
+  }
+}

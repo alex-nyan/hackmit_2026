@@ -280,3 +280,29 @@
     bottom: 140px;
   }
 }
+
+/* Shared response-console presentation. */
+
+.map-app {
+  --radius: 10px;
+}
+.map-app--dark {
+  --surface: #172424f5;
+  --raised: #213232;
+  --line: #344646;
+  --ink: #f0f5f2;
+  --muted: #a6bbb5;
+  --accent: #a3e6c0;
+}
+.map-brand {
+  min-height: 44px;
+  padding-inline: 16px;
+}
+.icon-button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.map-brand:hover,
+.icon-button:hover {
+  border-color: var(--accent);
+}

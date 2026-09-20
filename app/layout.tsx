@@ -1,18 +1,8 @@
-import type { Metadata } from "next";
-import { Cormorant_Unicase, Cormorant_Garamond } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./operations.css";
 
-const display = Cormorant_Unicase({
-  weight: "700",
-  subsets: ["latin"],
-  variable: "--font-display",
-});
-const prose = Cormorant_Garamond({
-  weight: ["500", "600"],
-  subsets: ["latin"],
-  variable: "--font-prose",
-});
+export const viewport: Viewport = { themeColor: "#101b1b" };
 
 export const metadata: Metadata = {
   title: "Paw Patrol · Connected response",
@@ -33,9 +23,7 @@ export default function RootLayout({
     // Extensions commonly add attributes to these two elements before React
     // hydrates; that mismatch is not the app's to reconcile.
     <html lang="en" suppressHydrationWarning>
-      <body className={`${display.variable} ${prose.variable}`} suppressHydrationWarning>
-        {children}
-      </body>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

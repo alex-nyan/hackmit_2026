@@ -90,6 +90,13 @@ export function HospitalWorkspace({
   const reconnect = ["disconnected", "error"].includes(heartRate.status);
   return (
     <>
+      <div className={styles.workspaceIntro}>
+        <div>
+          <p>CONNECTED RESPONSE / HOSPITAL</p>
+          <h1>Ready for the handoff</h1>
+        </div>
+        <span>Review incoming observations and confirm scene clearance before responding.</span>
+      </div>
       <section
         className={styles.viewport}
         data-cleared={access.cleared}
