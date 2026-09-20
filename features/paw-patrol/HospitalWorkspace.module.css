@@ -264,6 +264,14 @@
   color: var(--ink);
   border-radius: 5px;
 }
+.clinicalScene .videoEmpty {
+  gap: 10px;
+  padding: 20px;
+}
+.clinicalScene .videoEmpty p {
+  font-size: 12px;
+  line-height: 1.5;
+}
 .monitorHeading {
   display: flex;
   justify-content: space-between;

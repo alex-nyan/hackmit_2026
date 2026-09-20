@@ -20,7 +20,24 @@ export interface BodyObservation {
 /** A recent report is not proof that the scene or the person is safe. */
 export const BODY_OBSERVATION_FRESH_MS = 60_000;
 
-const OBSERVATION_KINDS = new Set<IncidentEvent["kind"]>(["hazard", "transcript", "mist", "panic"]);
+const OBSERVATION_KINDS = new Set<IncidentEvent["kind"]>([
+  "hazard",
+  "observation",
+  "transcript",
+  "mist",
+  "panic",
+  "vitals",
+]);
+
+/** Same known slot aliases as liveOfficer; arbitrary source IDs are never mapped. */
+export function bodySourceIds(personId: string): string[] {
+  const slot = /^P-(\d{2})$/.exec(personId);
+  return slot ? [`unit-${slot[1]}`, personId, `officer-${personId}`] : [personId];
+}
+
+function observationTime(event: IncidentEvent): string {
+  return event.observedAt ?? event.at;
+}
 
 function sourceScore(event: IncidentEvent): number | null {
   // The transcript publisher stores language_probability, not confidence in
@@ -48,31 +65,46 @@ export function getBodyObservations(
   now: number,
 ): BodyObservation[] {
   if (!personId.trim() || !Number.isFinite(now)) return [];
+  const sources = bodySourceIds(personId);
 
   return events
     .filter((event) => {
-      if (event.personId !== personId || !OBSERVATION_KINDS.has(event.kind)) return false;
-      const recordedAt = Date.parse(event.at);
+      if (
+        !event.personId ||
+        !sources.includes(event.personId) ||
+        !OBSERVATION_KINDS.has(event.kind)
+      )
+        return false;
+      const recordedAt = Date.parse(observationTime(event));
       // Invalid and future records cannot be advertised as current observations.
       return Number.isFinite(recordedAt) && recordedAt <= now;
     })
-    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || b.seq - a.seq)
+    .sort(
+      (a, b) => Date.parse(observationTime(b)) - Date.parse(observationTime(a)) || b.seq - a.seq,
+    )
     .map((event) => ({
       id: event.id,
-      personId,
+      personId: event.personId!,
       region: null,
       title: event.title,
       detail: event.detail,
-      source: event.provenance
-        ? `${event.source} · ${event.provenance.provider}/${event.provenance.model}`
-        : event.source,
+      source: [
+        event.source,
+        event.provenance ? `${event.provenance.provider}/${event.provenance.model}` : null,
+        event.personId !== personId ? `unit-slot link · wearer unverified` : null,
+        event.kind === "vitals" ? "shared snapshot · not continuous telemetry" : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       origin: event.origin,
-      at: event.at,
+      at: observationTime(event),
       confidence: sourceScore(event),
       state:
         event.origin === "script"
           ? "sample"
-          : busStatus === "live" && now - Date.parse(event.at) <= BODY_OBSERVATION_FRESH_MS
+          : busStatus === "live" &&
+              now - Date.parse(observationTime(event)) <=
+                (event.kind === "vitals" ? 30_000 : BODY_OBSERVATION_FRESH_MS)
             ? "current"
             : "stale",
     }));

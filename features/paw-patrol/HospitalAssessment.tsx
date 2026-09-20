@@ -15,6 +15,7 @@ import {
 import { BODY_REGIONS, type BodyRegionId } from "../anatomy/bodyRegions";
 import {
   getBodyObservations,
+  bodySourceIds,
   makeDemoBodyObservations,
   type BodyObservation,
 } from "../anatomy/bodyEvidence";
@@ -65,6 +66,8 @@ function AssessmentSession({
 }: Props) {
   const personSelectId = useId();
   const noteId = useId();
+  const reportSourceId = useId();
+  const [reportSource, setReportSource] = useState<string | null>(null);
   const [region, setRegion] = useState<BodyRegionId | null>(null);
   const [demo, setDemo] = useState<BodyObservation[]>([]);
   const [notes, setNotes] = useState<BodyObservation[]>([]);
@@ -80,7 +83,11 @@ function AssessmentSession({
       clearInterval(timer);
     };
   }, []);
-  const received = now === null ? [] : getBodyObservations(events, person.id, busStatus, now);
+  const reportSources = [
+    ...new Set(events.flatMap((event) => (event.personId ? [event.personId] : []))),
+  ];
+  const received =
+    now === null ? [] : getBodyObservations(events, reportSource ?? person.id, busStatus, now);
   const observations = [...notes, ...demo, ...received];
   const highlights = useMemo(
     () => [...new Set([...notes, ...demo].flatMap((item) => (item.region ? [item.region] : [])))],
@@ -203,6 +210,28 @@ function AssessmentSession({
                 </span>
               )}
             </header>
+            <div className={styles.profilePicker}>
+              <label htmlFor={reportSourceId}>Report source</label>
+              <select
+                id={reportSourceId}
+                value={reportSource ?? ""}
+                onChange={(event) => setReportSource(event.target.value || null)}
+              >
+                <option value="">{person.id} · matching unit-slot labels</option>
+                {reportSource && !reportSources.includes(reportSource) && (
+                  <option value={reportSource}>{reportSource} · no current reports</option>
+                )}
+                {reportSources
+                  .filter(
+                    (source) => !bodySourceIds(person.id).includes(source) || source !== person.id,
+                  )
+                  .map((source) => (
+                    <option key={source} value={source}>
+                      {source} · wearer unverified
+                    </option>
+                  ))}
+              </select>
+            </div>
             {demo.length > 0 && (
               <div className={styles.demoNotice} role="status">
                 DEMO PREVIEW · fictional observations, not camera or sensor findings
