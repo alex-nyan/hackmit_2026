@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Video } from "lucide-react";
 
+import { BrandLogo } from "@/components/BrandLogo";
 import type { Officer } from "@/features/access/roster";
 import { BodyCamWall } from "@/features/body-cam";
 import { useDevicePosition } from "@/features/live-track";
@@ -55,7 +56,9 @@ export function CameraTriageView({ officer }: { officer?: Officer } = {}) {
     <main className={styles.root}>
       <header className={styles.header}>
         <div>
-          <p>PAW PATROL / FIELD CAPTURE</p>
+          <p>
+            <BrandLogo /> PAW PATROL / FIELD CAPTURE
+          </p>
           <h1>Share your perspective</h1>
           <span>Camera, audio and location are controlled separately.</span>
         </div>

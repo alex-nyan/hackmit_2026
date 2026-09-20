@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import { BrandLogo } from "@/components/BrandLogo";
 import { RECORDER_MIME_CANDIDATES, pickRecorderMimeType, toServiceMediaType } from "./audio";
 import { trackConstraint } from "./devices";
 import { useCaptureDevices } from "./useCaptureDevices";
@@ -284,7 +285,9 @@ export function CaptureCheck() {
 
   return (
     <main className={styles.root}>
-      <h1 className={styles.title}>Capture check</h1>
+      <h1 className={styles.title}>
+        <BrandLogo /> Capture check
+      </h1>
       <p className={styles.sub}>
         Tests only whether this device will hand over its camera and microphone. Nothing is
         uploaded.

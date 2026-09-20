@@ -1,17 +1,9 @@
 "use client";
 
-import {
-  LoaderCircle,
-  LocateFixed,
-  LocateOff,
-  Moon,
-  PawPrint,
-  Sun,
-  Video,
-  VideoOff,
-} from "lucide-react";
+import { LoaderCircle, LocateFixed, LocateOff, Moon, Sun, Video, VideoOff } from "lucide-react";
 import { useCallback, useState } from "react";
 
+import { BrandLogo } from "@/components/BrandLogo";
 import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, UnitCard, useLiveTrack, type LiveDevice } from "@/features/live-track";
 import { useHeartRate } from "@/features/heart-rate/useHeartRate";
@@ -65,7 +57,7 @@ export function BostonMapShell() {
     <main className={`map-app map-app--${theme}`}>
       <header className="map-header">
         <div className="map-brand">
-          <PawPrint size={17} strokeWidth={2.2} aria-hidden="true" />
+          <BrandLogo size={32} />
           Paw Patrol
         </div>
 

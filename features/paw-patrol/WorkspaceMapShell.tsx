@@ -2,7 +2,8 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { HeartPulse, Radio, Shield } from "lucide-react";
+import { HeartPulse, Radio } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
 import { PEOPLE, type View } from "./scenario";
 import type { Workspace } from "./workspace";
 import officerStyles from "./OfficerWorkspace.module.css";
@@ -45,7 +46,7 @@ export function WorkspaceMapShell({
       </a>
       <header className="topbar">
         <Link className="wordmark" href="/" aria-label="Paw Patrol home">
-          <Shield />
+          <BrandLogo size={40} />
           <span>Paw Patrol</span>
         </Link>
         <WorkspaceNav

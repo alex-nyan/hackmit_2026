@@ -1,126 +1,95 @@
 import Link from "next/link";
-import { ArrowDown, ArrowRight, HeartPulse, Map, Radio, Shield, Video } from "lucide-react";
-import styles from "./WorkspaceHome.module.css";
+import Image from "next/image";
+import { ArrowDown, ArrowRight, Map, Video } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
+import { ContainerScroll } from "@/components/ui/container-scroll-animation";
+import { LandingTheme, LandingThemeToggle } from "./LandingTheme";
 import { ResponseNetwork } from "./ResponseNetwork";
+import styles from "./WorkspaceHome.module.css";
 
 const workspaces = [
   {
-    number: "01",
     title: "Dispatch",
-    role: "COORDINATE THE RESPONSE",
-    description:
-      "See patrol coverage, review field reports and coordinate the units that need you.",
     href: "/dispatch",
-    action: "Open command centre",
-    Icon: Radio,
+    image: "dispatch-station",
+    label: "Coordinate the response",
   },
-  {
-    number: "02",
-    title: "Officer",
-    role: "STAY CONNECTED IN THE FIELD",
-    description:
-      "Keep your team in view. Share observations, check your status and request support.",
-    href: "/officer",
-    action: "Open officer workspace",
-    Icon: Shield,
-  },
-  {
-    number: "03",
-    title: "Hospital",
-    role: "PREPARE FOR THE HANDOFF",
-    description: "Review incoming observations, monitor reported vitals and follow the response.",
-    href: "/hospital",
-    action: "Open hospital workspace",
-    Icon: HeartPulse,
-  },
+  { title: "Officer", href: "/officer", image: "officers", label: "Stay connected in the field" },
+  { title: "Hospital", href: "/hospital", image: "medic", label: "Prepare for the handoff" },
 ];
 
 export function WorkspaceHome() {
   return (
-    <div className={styles.page}>
-      <a className="skip-link" href="#workspace">
+    <LandingTheme className={styles.page}>
+      <a className="skip-link" href="#workspaces">
         Skip to workspaces
       </a>
       <header className={styles.header}>
         <Link className={styles.brand} href="/" aria-label="Paw Patrol home">
-          <span>
-            <Shield size={22} aria-hidden="true" />
-          </span>
-          Paw Patrol
+          <BrandLogo /> Paw Patrol
         </Link>
-        <span className={styles.product}>CONNECTED RESPONSE</span>
-        <Link className={styles.signIn} href="/sign-in">
-          Officer sign-in <ArrowRight size={16} aria-hidden="true" />
-        </Link>
+        <nav aria-label="Landing navigation" className={styles.headerNav}>
+          <LandingThemeToggle />
+          <a href="#workspaces" className={styles.workspaceLink}>
+            Workspaces <ArrowDown size={14} aria-hidden="true" />
+          </a>
+          <Link className={styles.signIn} href="/sign-in">
+            Officer sign-in <ArrowRight size={15} aria-hidden="true" />
+          </Link>
+        </nav>
       </header>
       <main id="workspace" className={styles.main}>
-        <section className={styles.hero} aria-labelledby="home-title">
-          <div className={styles.heroCopy}>
-            <h1 id="home-title">
-              Closer together.
-              <br />
-              <span>Ready to respond.</span>
-            </h1>
-            <p className={styles.description}>
-              From the first field observation to the hospital handoff. Bring every team into the
-              same picture, when it matters most.
-            </p>
-            <div className={styles.heroActions}>
+        <ContainerScroll
+          titleComponent={
+            <div className={styles.heroCopy}>
+              <h1>
+                One shared <span>picture.</span>
+              </h1>
               <Link className={styles.primary} href="/?demo=1">
-                Explore the demo <ArrowRight size={18} aria-hidden="true" />
+                Explore the demo <ArrowRight size={17} aria-hidden="true" />
               </Link>
-              <a className={styles.secondary} href="#workspaces">
-                Choose your workspace <ArrowDown size={16} aria-hidden="true" />
-              </a>
             </div>
-          </div>
+          }
+        >
           <ResponseNetwork />
-        </section>
-        <section id="workspaces" className={styles.workspaces} aria-labelledby="workspaces-title">
-          <div className={styles.sectionHeading}>
-            <div>
-              <h2 id="workspaces-title">Where are you responding from?</h2>
-            </div>
-            <span>Three teams. One connected response.</span>
-          </div>
+        </ContainerScroll>
+        <section id="workspaces" className={styles.workspaces} aria-labelledby="workspaces-heading">
+          <h2 id="workspaces-heading" className={styles.sectionTitle}>
+            Your workspace.
+          </h2>
           <div className={styles.cards}>
-            {workspaces.map(({ number, title, role, description, href, action, Icon }) => (
+            {workspaces.map(({ title, href, image, label }) => (
               <Link href={href} className={styles.card} key={title}>
-                <div className={styles.cardTop}>
-                  <span className={styles.cardIcon}>
-                    <Icon size={24} aria-hidden="true" />
+                <span className={styles.cardArtwork}>
+                  <Image
+                    src={`/illustrations/${image}.png`}
+                    width={2000}
+                    height={2000}
+                    alt=""
+                    sizes="(max-width: 760px) 160px, 320px"
+                    className={styles.roleIllustration}
+                  />
+                </span>
+                <span className={styles.cardContent}>
+                  <span className={styles.cardLabel}>{label}</span>
+                  <span className={styles.cardTitle}>
+                    <h3>{title}</h3>
+                    <ArrowRight size={21} aria-hidden="true" />
                   </span>
-                  <span>{number}</span>
-                </div>
-                <p className={styles.role}>{role}</p>
-                <h3>{title}</h3>
-                <p className={styles.cardDescription}>{description}</p>
-                <span className={styles.cardAction}>
-                  {action}
-                  <ArrowRight size={18} aria-hidden="true" />
                 </span>
               </Link>
             ))}
           </div>
         </section>
-        <div className={styles.utilities}>
-          <span>Need a specific tool?</span>
+        <footer className={styles.utilities}>
           <Link href="/map">
-            <Map size={17} aria-hidden="true" /> Open operations map{" "}
-            <ArrowRight size={14} aria-hidden="true" />
+            <Map size={16} aria-hidden="true" /> Operations map
           </Link>
           <Link href="/capture">
-            <Video size={17} aria-hidden="true" /> Connect a camera{" "}
-            <ArrowRight size={14} aria-hidden="true" />
+            <Video size={16} aria-hidden="true" /> Connect a camera
           </Link>
-        </div>
+        </footer>
       </main>
-      <footer className={styles.footer}>
-        <span>
-          Paw Patrol <span aria-hidden="true">/</span> Connected response
-        </span>
-        <span>Built for HackMIT 2026</span>
-      </footer>
-    </div>
+    </LandingTheme>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { BrandLogo } from "@/components/BrandLogo";
 import { isValidToken } from "@/features/camera-triage/frame";
 
 import { useCameraTriage, type CaptureState } from "@/features/camera-triage";
@@ -196,7 +197,9 @@ function JoinSession({
   return (
     <main className={styles.root}>
       <header className={styles.header}>
-        <p className={styles.eyebrow}>Paw Patrol · live map</p>
+        <p className={styles.eyebrow}>
+          <BrandLogo /> Paw Patrol · live map
+        </p>
         <a href="/sign-in">Officer sign-in →</a>
         <h1 className={styles.title}>{live ? "You are on the map" : "Join the map"}</h1>
         <p className={styles.unit}>

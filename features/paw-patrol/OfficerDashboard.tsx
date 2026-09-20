@@ -19,13 +19,13 @@ import {
   Pause,
   Play,
   RotateCcw,
-  Shield,
   Signal,
   SlidersHorizontal,
   Smartphone,
   Sun,
   Watch,
 } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
 import type { Officer } from "@/features/access/roster";
 import type { MapTheme } from "../boston-map/types";
 import type { HeartRateConnection } from "../heart-rate/useHeartRate";
@@ -189,7 +189,7 @@ export function OfficerDashboard({
       <header className={styles.header}>
         <Link href="/" className={styles.brand} aria-label="Paw Patrol home">
           <span>
-            <Shield size={18} aria-hidden="true" />
+            <BrandLogo size={40} />
           </span>
           <strong>Paw Patrol</strong>
         </Link>

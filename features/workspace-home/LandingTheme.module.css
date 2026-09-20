@@ -1,0 +1,31 @@
+.root {
+  color-scheme: light;
+}
+
+.root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--landing-border);
+  border-radius: 50%;
+  color: var(--landing-text);
+  background: var(--landing-surface);
+  cursor: pointer;
+}
+
+.toggle:hover {
+  border-color: var(--landing-text);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--landing-text);
+  outline-offset: 4px;
+}

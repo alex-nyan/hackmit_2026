@@ -208,6 +208,9 @@
   padding: 28px;
 }
 .header p {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 10px;
   letter-spacing: 0.12em;
   color: var(--ops-accent);

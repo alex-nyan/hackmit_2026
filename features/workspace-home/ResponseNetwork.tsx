@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, HeartPulse, Pause, Play, Radio, Shield } from "lucide-react";
+import { HeartPulse, Pause, Play, Radio, Shield } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
 import styles from "./WorkspaceHome.module.css";
 
 export function ResponseNetwork() {
@@ -13,9 +14,12 @@ export function ResponseNetwork() {
       aria-label="Illustrated response network"
     >
       <div className={styles.diagramHeading}>
-        <span>THE RESPONSE NETWORK</span>
+        <div className={styles.screenBrand}>
+          <BrandLogo size={28} />
+          <span>Paw Patrol</span>
+        </div>
         <div className={styles.networkControls}>
-          <span>ILLUSTRATION</span>
+          <span>Illustration</span>
           <button
             type="button"
             className={styles.motionControl}
@@ -29,7 +33,6 @@ export function ResponseNetwork() {
             ) : (
               <Pause size={12} aria-hidden="true" />
             )}
-            {paused ? "Play motion" : "Pause motion"}
           </button>
         </div>
       </div>
@@ -61,38 +64,27 @@ export function ResponseNetwork() {
         <div className={styles.orbit} />
         <div className={styles.orbitInner} />
         <div className={styles.hub}>
-          <Shield size={34} aria-hidden="true" />
+          <BrandLogo size={64} />
           <strong>One shared picture</strong>
-          <span>Connected response</span>
         </div>
         <div className={`${styles.node} ${styles.field}`}>
           <Shield size={20} aria-hidden="true" />
           <div>
             <strong>Field team</strong>
-            <span>Observe &amp; share</span>
           </div>
         </div>
         <div className={`${styles.node} ${styles.dispatch}`}>
           <Radio size={20} aria-hidden="true" />
           <div>
             <strong>Dispatch</strong>
-            <span>Review &amp; coordinate</span>
           </div>
         </div>
         <div className={`${styles.node} ${styles.hospital}`}>
           <HeartPulse size={20} aria-hidden="true" />
           <div>
             <strong>Hospital</strong>
-            <span>Prepare &amp; receive</span>
           </div>
         </div>
-      </div>
-      <div className={styles.diagramFooter}>
-        <span>FIELD OBSERVATION</span>
-        <ArrowRight size={14} aria-hidden="true" />
-        <span>HUMAN REVIEW</span>
-        <ArrowRight size={14} aria-hidden="true" />
-        <span>HANDOFF</span>
       </div>
     </section>
   );

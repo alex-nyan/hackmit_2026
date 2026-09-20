@@ -11,7 +11,6 @@ import {
   Play,
   Radio,
   Search,
-  Shield,
   Signal,
   SlidersHorizontal,
   Smartphone,
@@ -21,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { BentoCell, BentoLabel } from "@/components/ui/builder-os-bento";
+import { BrandLogo } from "@/components/BrandLogo";
 import type { MapTheme } from "../boston-map/types";
 import type { LiveTrackState } from "../live-track/types";
 import type { HeartRateConnection } from "../heart-rate/useHeartRate";
@@ -332,7 +332,7 @@ export function DispatchDashboard({
       <header className={styles.header}>
         <Link href="/" aria-label="Paw Patrol home" className={styles.brand}>
           <span className={styles.brandIcon}>
-            <Shield size={19} aria-hidden="true" />
+            <BrandLogo size={40} />
           </span>
           <strong>Paw Patrol</strong>
           <span className={styles.divider}>/</span>

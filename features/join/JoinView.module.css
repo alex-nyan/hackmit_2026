@@ -19,6 +19,9 @@
 }
 
 .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: rgb(237 242 243 / 55%);
   font-size: 12px;
   letter-spacing: 0.08em;

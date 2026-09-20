@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export const metadata: Metadata = { title: "Paw Patrol · Locked" };
 
@@ -19,7 +20,9 @@ export default async function Unlock({
   return (
     <main className="unlock">
       <form className="unlock__card" method="post" action="/api/unlock">
-        <h1>Paw Patrol</h1>
+        <h1 style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <BrandLogo /> Paw Patrol
+        </h1>
         <p>This dashboard shows live cameras. Enter the shared passphrase to continue.</p>
         <input type="hidden" name="next" value={next} />
         <input

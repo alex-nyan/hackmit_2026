@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Shield, Radio, HeartPulse } from "lucide-react";
+import { Radio, HeartPulse } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
 import {
   parseSessionInfo,
   type SessionInfo,
@@ -116,7 +117,7 @@ export function LiveWorkspace() {
       <header className={styles.header}>
         <div>
           <h1>
-            <Shield size={28} aria-hidden="true" /> Paw Patrol
+            <BrandLogo /> Paw Patrol
           </h1>
           <p>Connected incident workspace · live data</p>
         </div>

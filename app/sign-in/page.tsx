@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { BrandLogo } from "@/components/BrandLogo";
 import { ArrowLeft, ArrowRight, ChevronDown, PawPrint } from "lucide-react";
 
 import { publicOfficer, readRoster } from "@/features/access/roster";
@@ -30,9 +31,7 @@ export default async function SignIn({
       </a>
       <header className={styles.header}>
         <Link href="/" className={styles.brand} aria-label="Paw Patrol home">
-          <span>
-            <PawPrint size={24} strokeWidth={1.7} aria-hidden="true" />
-          </span>
+          <BrandLogo />
           <strong>Paw Patrol</strong>
         </Link>
         <Link href="/" className={styles.back}>

@@ -2,8 +2,8 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
+import { BrandLogo } from "@/components/BrandLogo";
 import {
-  Shield,
   Play,
   Pause,
   RotateCcw,
@@ -730,7 +730,7 @@ export function PawPatrol({
       </a>
       <header className="topbar">
         <Link className="wordmark" href="/" aria-label="Paw Patrol home">
-          <Shield />
+          <BrandLogo />
           <span>Paw Patrol{view === "command" && <small>CONNECTED RESPONSE</small>}</span>
         </Link>
         <WorkspaceNav
