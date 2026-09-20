@@ -36,7 +36,10 @@ export function useCameraTriage({ sourceId, incidentId, cameraId }: Options) {
 
   const stop = useCallback(() => {
     sessionRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current?.getTracks().forEach((track) => {
+      track.onended = null;
+      track.stop();
+    });
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setState({ state: "idle" });
@@ -72,6 +75,16 @@ export function useCameraTriage({ sourceId, incidentId, cameraId }: Options) {
         return;
       }
       streamRef.current = stream;
+      stream.getTracks().forEach((track) => {
+        track.onended = () => {
+          if (sessionRef.current !== session) return;
+          stop();
+          setState({
+            state: "denied",
+            reason: "Camera capture ended. Start the camera to try again.",
+          });
+        };
+      });
       const video = videoRef.current;
       if (video) {
         video.srcObject = stream;
@@ -82,7 +95,10 @@ export function useCameraTriage({ sourceId, incidentId, cameraId }: Options) {
     } catch (error) {
       if (sessionRef.current !== session) return;
       sessionRef.current = null;
-      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current?.getTracks().forEach((track) => {
+        track.onended = null;
+        track.stop();
+      });
       streamRef.current = null;
       if (videoRef.current) videoRef.current.srcObject = null;
       const name = error instanceof Error ? error.name : "";
@@ -94,7 +110,7 @@ export function useCameraTriage({ sourceId, incidentId, cameraId }: Options) {
             : "No usable camera was found.",
       });
     }
-  }, [cameraId]);
+  }, [cameraId, stop]);
 
   useEffect(() => {
     if (state.state !== "running") return;
