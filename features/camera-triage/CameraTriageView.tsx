@@ -31,7 +31,8 @@ export function CameraTriageView({ officer }: { officer?: Officer } = {}) {
   // Location is its own switch: a unit that turns the camera off to save
   // battery should still be findable, and somebody who will share a camera has
   // not thereby agreed to share where they are.
-  const position = useDevicePosition(sourceId);
+  // The map should name the officer, not the slot they signed into.
+  const position = useDevicePosition(sourceId, officer?.name);
   const sharing = position.state.state === "requesting" || position.state.state === "publishing";
   const running = state.state === "running";
   const listening =
