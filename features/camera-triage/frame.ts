@@ -50,12 +50,18 @@ export function buildTriageRequest(options: {
   };
 }
 
+export type FrameOutcome = "ok" | "busy" | "unconfigured" | "error";
+
 /**
  * Back-pressure. The service admits one frame at a time and answers 429 when
  * busy, so a fixed interval would just queue frames until they went stale.
+ *
+ * A deployment with no triage service behind it is not a failure to back off
+ * from: the capture still feeds the body camera wall, and slowing it down
+ * would only make the wall staler for everyone watching.
  */
-export function nextDelayMs(outcome: "ok" | "busy" | "error", baseMs: number): number {
-  if (outcome === "ok") return baseMs;
+export function nextDelayMs(outcome: FrameOutcome, baseMs: number): number {
+  if (outcome === "ok" || outcome === "unconfigured") return baseMs;
   if (outcome === "busy") return Math.max(baseMs, 1500);
   return Math.max(baseMs, 3000);
 }

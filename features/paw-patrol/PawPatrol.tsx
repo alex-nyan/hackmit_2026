@@ -28,6 +28,7 @@ import { BuildingPanel } from "../boston-map/BuildingPanel";
 import type { BuildingFacts } from "../boston-map/buildingSelection";
 import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-track";
+import { JoinCard, type JoinLink } from "@/features/join";
 import { OperationsMap } from "./OperationsMap";
 import { WorkspaceMapShell } from "./WorkspaceMapShell";
 import officerStyles from "./OfficerWorkspace.module.css";
@@ -160,11 +161,14 @@ export function PawPatrol({
   workspace = null,
   officerMedia,
   presentation = "map",
+  join = null,
 }: {
   workspace?: Workspace | null;
   officerMedia?: OfficerMediaInput | null;
   /** Dispatch defaults to the map; retain its detailed workflows for regression coverage. */
   presentation?: "map" | "detailed";
+  /** Resolved on the server from the request's own origin. */
+  join?: JoinLink | null;
 }) {
   const { time, running, readClock, dispatch, sceneOverride, panics, audit } = useScenario();
   // The only state shared across workspaces. Everything else stays local.
@@ -184,8 +188,12 @@ export function PawPatrol({
   const [following, setFollowing] = useState(false);
   const [hardware, setHardware] = useState(false);
   const [evidence, setEvidence] = useState<"camera" | "audio" | null>(null);
-  // Both are opt-in: no camera, microphone or tracking request until asked.
-  const [tracking, setTracking] = useState(false);
+  // The camera and microphone stay opt-in. Tracking does not: it was opt-in
+  // when it meant reaching out to a Traccar server holding credentials
+  // somewhere else, and the positions now come from this deployment's own
+  // store — with a join code on screen inviting people to publish into it.
+  // Left off, a phone could scan, join and publish and still appear nowhere.
+  const [tracking, setTracking] = useState(true);
   const liveTrack = useLiveTrack(tracking);
   const liveDevices = liveTrack.state === "tracking" ? liveTrack.devices : EMPTY_DEVICES;
   const [building, setBuilding] = useState<BuildingFacts | null>(null);
@@ -400,6 +408,7 @@ export function PawPatrol({
         />
         <div className="map-overlay">
           <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+          {view === "command" && <JoinCard join={join} />}
           <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
         </div>
         <div className="campus-switch" aria-label="Map area">

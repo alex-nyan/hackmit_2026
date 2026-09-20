@@ -117,8 +117,8 @@ describe("fetching the fleet", () => {
     if (payload.state !== "tracking") return;
 
     expect(payload.devices).toHaveLength(2);
-    const one = payload.devices.find((device) => device.id === 1)!;
-    const two = payload.devices.find((device) => device.id === 2)!;
+    const one = payload.devices.find((device) => device.id === "1")!;
+    const two = payload.devices.find((device) => device.id === "2")!;
     expect(one.fix?.fixedAt).toBe("2026-09-19T20:29:30.000Z");
     expect(one.online).toBe(true);
     expect(two.fix?.latitude).toBe(42.37);
@@ -154,7 +154,7 @@ describe("fetching the fleet", () => {
     vi.stubGlobal("fetch", mockTraccar([UNIT_ONE], [position({ valid: false })]));
     const payload = await fetchLiveTrack(SETTINGS, NOW);
     if (payload.state !== "tracking") throw new Error("expected tracking");
-    expect(payload.devices).toEqual([{ id: 1, name: "Unit 1", online: true, fix: null }]);
+    expect(payload.devices).toEqual([{ id: "1", name: "Unit 1", online: true, fix: null }]);
   });
 
   it("restricts the fleet when device ids are configured", async () => {
@@ -164,7 +164,7 @@ describe("fetching the fleet", () => {
     );
     const payload = await fetchLiveTrack({ ...SETTINGS, deviceIds: [2] }, NOW);
     if (payload.state !== "tracking") throw new Error("expected tracking");
-    expect(payload.devices.map((device) => device.id)).toEqual([2]);
+    expect(payload.devices.map((device) => device.id)).toEqual(["2"]);
   });
 
   it("reports no devices instead of an empty map", async () => {
