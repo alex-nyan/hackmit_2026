@@ -30,9 +30,12 @@ import type { DemoHotspot } from "./hotspots";
 import { PixelHotspotFlag, PIXEL_HOTSPOT_FLAG_SVG } from "./PixelHotspotFlag";
 import { DEMO_HEALTH_CENTRES, type DemoAmbulanceMission } from "./demoAmbulance";
 import { PIXEL_AMBULANCE_SVG } from "./PixelAmbulance";
+import type { IncidentEvent } from "./incidents";
 import styles from "./OperationsMap.module.css";
 
 export interface OperationsMapProps {
+  audioAlerts?: IncidentEvent[];
+  onSelectAudioAlert?: (event: IncidentEvent) => void;
   /** Visual-only opt-in; does not recreate the map or change marker motion. */
   appearance?: "default" | "glass";
   time: number;
@@ -83,6 +86,7 @@ type Runtime = {
   moveCamera: (officer: boolean) => void;
   setTheme: () => void;
   syncLiveDevices: () => void;
+  syncAudioAlerts: () => void;
   flyToFix: () => void;
   syncHotspots: () => void;
   syncHotspotDrag: () => void;
@@ -141,6 +145,9 @@ export function OperationsMap(props: OperationsMapProps) {
   useEffect(() => {
     runtimeRef.current?.setTheme();
   }, [theme]);
+  useEffect(() => {
+    runtimeRef.current?.syncAudioAlerts();
+  }, [props.audioAlerts]);
   // Live fixes arrive on their own poll, independently of the scenario clock.
   useEffect(() => {
     runtimeRef.current?.syncLiveDevices();
@@ -192,6 +199,7 @@ export function OperationsMap(props: OperationsMapProps) {
     const markers: UnitMarker[] = [],
       beacons: BeaconMarker[] = [],
       cleanups: Array<() => void> = [];
+    const audioMarkers = new Map<string, { marker: Marker; dispose: () => void }>();
     const hotspotMarkers = new Map<
       string,
       { marker: Marker; glow: Marker; button: HTMLButtonElement; dispose: () => void }
@@ -507,6 +515,45 @@ export function OperationsMap(props: OperationsMapProps) {
           }
         };
         // Safe before restore() has run: updateLiveLayers no-ops without a source.
+        const syncAudioAlerts = () => {
+          if (disposed) return;
+          const alerts = latestRef.current.audioAlerts ?? [];
+          const ids = new Set(alerts.filter((event) => event.location).map((event) => event.id));
+          for (const [id, item] of audioMarkers) {
+            if (ids.has(id)) continue;
+            item.dispose();
+            item.marker.remove();
+            audioMarkers.delete(id);
+          }
+          for (const event of alerts) {
+            if (!event.location || audioMarkers.has(event.id)) continue;
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = styles.audioAlert;
+            button.textContent = `! ${event.personId ?? event.source}`;
+            button.setAttribute(
+              "aria-label",
+              `Review unverified audio concern at reporting officer ${event.personId ?? event.source}'s GPS location`,
+            );
+            button.title = `Officer GPS at ${event.location.fixedAt}; not suspect location`;
+            const select = (click: MouseEvent) => {
+              click.stopPropagation();
+              latestRef.current.onSelectAudioAlert?.(event);
+            };
+            button.addEventListener("click", select);
+            const marker = new mapboxgl.Marker({
+              element: button,
+              anchor: "bottom",
+              offset: [0, -24],
+            })
+              .setLngLat([event.location.longitude, event.location.latitude])
+              .addTo(map);
+            audioMarkers.set(event.id, {
+              marker,
+              dispose: () => button.removeEventListener("click", select),
+            });
+          }
+        };
         const syncLiveDevices = () => {
           if (!disposed) updateLiveLayers(map, latestRef.current.liveDevices);
         };
@@ -798,6 +845,7 @@ export function OperationsMap(props: OperationsMapProps) {
           updateScene,
           moveCamera,
           syncLiveDevices,
+          syncAudioAlerts,
           syncAmbulances,
           flyToFix,
           syncHotspots,
@@ -817,6 +865,7 @@ export function OperationsMap(props: OperationsMapProps) {
             }
           },
         };
+        syncAudioAlerts();
         // Pick the car's fixed screen-sized footprint using the same continuous
         // position as its marker, independently of zoom or the UI snapshot.
         const nearestUnit = (event: MapMouseEvent) => {
@@ -1002,6 +1051,10 @@ export function OperationsMap(props: OperationsMapProps) {
       if (hotspotDragFrame !== null) cancelAnimationFrame(hotspotDragFrame);
       resizeObserver?.disconnect();
       runtimeRef.current = null;
+      audioMarkers.forEach(({ marker, dispose }) => {
+        dispose();
+        marker.remove();
+      });
       cleanups.forEach((cleanup) => cleanup());
       markers.forEach(({ marker, direction, dispose }) => {
         dispose();

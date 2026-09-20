@@ -70,7 +70,8 @@ export function hazardIncident(result: TriageResult, context: SignalContext): In
   const hazard = significantHazard(result);
   if (!hazard) return null;
 
-  const provider = result.models?.[0];
+  const provider =
+    result.models?.find((model) => model.provider !== "ultralytics") ?? result.models?.[0];
   return {
     // Stable in the request id so a retried frame cannot post twice.
     id: `hazard-${result.request_id}`,
@@ -100,6 +101,16 @@ export function hazardIncident(result: TriageResult, context: SignalContext): In
  * finding that anybody said anything, and the event says so.
  */
 const DISTRESS_TERMS = [
+  "i will shoot",
+  "i'll shoot",
+  "shoot you",
+  "kill you",
+  "kill him",
+  "kill her",
+  "stab you",
+  "i have a gun",
+  "i have a knife",
+  "knife",
   "chase",
   "pursuit",
   "suspect",
@@ -123,7 +134,7 @@ const DISTRESS_TERMS = [
 ] as const;
 
 export function distressTerms(text: string): string[] {
-  const haystack = text.toLowerCase();
+  const haystack = text.toLowerCase().replace(/[’‘]/g, "'");
   return DISTRESS_TERMS.filter((term) => {
     const pattern = new RegExp(
       `(^|[^a-z])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`,
@@ -150,7 +161,7 @@ export function transcriptIncident(
     detail: [
       `Transcript hypothesis: "${result.text.slice(0, 240)}".`,
       `Matched terms: ${matched.join(", ")}.`,
-      "A transcript is a model hypothesis, not a record of speech, and a matched word is not a determination that anyone is in danger.",
+      "Unverified phrase match. Speaker identity is unknown; this may be an officer, bystander, quotation or negation. Review the audio before acting.",
     ].join(" "),
     source: context.sourceLabel,
     provenance: {

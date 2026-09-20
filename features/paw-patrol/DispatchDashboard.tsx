@@ -35,9 +35,11 @@ import { PixelHotspotFlag } from "./PixelHotspotFlag";
 import { InferencePreview } from "./InferencePreview";
 import { DispatchAmbulanceTools } from "./DispatchAmbulanceTools";
 import type { useDemoAmbulances } from "./useDemoAmbulances";
+import { MapFullscreenButton } from "./MapFullscreenButton";
 import styles from "./DispatchDashboard.module.css";
 
 interface Props {
+  alertSource?: string | null;
   workspace: Workspace | null;
   onViewChange: (view: View) => void;
   selectedId: string;
@@ -255,6 +257,7 @@ function WorkspaceSwitcher({ onViewChange }: { onViewChange: (view: View) => voi
 
 /** Command-only presentation; hotspot dispatches remain local demo state. */
 export function DispatchDashboard({
+  alertSource,
   workspace,
   onViewChange,
   selectedId,
@@ -419,6 +422,9 @@ export function DispatchDashboard({
             <WorkspaceSwitcher onViewChange={onViewChange} />
           )}
         </nav>
+        <Link href="/sign-in" className={styles.accountLink}>
+          Officer sign-in
+        </Link>
         <span className={styles.demoBadge}>
           <span aria-hidden="true" /> Demo workspace
         </span>
@@ -462,6 +468,7 @@ export function DispatchDashboard({
             <div className={styles.cardHeading}>
               <h2 id="dispatch-map-title">Patrol map</h2>
               <span className={styles.smallBadge}>{PEOPLE.length} demo units</span>
+              <MapFullscreenButton />
             </div>
             <div className={styles.mapFrame} ref={mapFrame}>
               {map}
@@ -606,7 +613,7 @@ export function DispatchDashboard({
                   <dd>{knownRequests}</dd>
                 </div>
                 <div>
-                  <dt>Acknowledged, not resolved</dt>
+                  <dt>Awaiting resolution</dt>
                   <dd>{acknowledged}</dd>
                 </div>
                 <div>
@@ -616,13 +623,13 @@ export function DispatchDashboard({
               </dl>
             </div>
             <p className={styles.footnote}>
-              Demo roster, not an availability or safety assessment.
+              Simulated roster.
               {busStatus !== "live" && " Reports may be out of date."}
             </p>
           </BentoCell>
 
           <BentoCell className={styles.coverageCell} labelledBy="dispatch-inference-title">
-            <InferencePreview />
+            <InferencePreview events={events} status={busStatus} selectedSource={alertSource} />
             {selectedHotspotId && (
               <p className={styles.inferenceContext}>
                 Selected incident: {selectedHotspotId} · sample context only
@@ -763,7 +770,7 @@ export function DispatchDashboard({
                   </span>
                 </div>
                 <p className={styles.cardDescription}>
-                  Real devices are not included in the 15-person demo roster.
+                  Connected devices appear separately from the demo roster.
                 </p>
                 <button
                   type="button"
@@ -814,8 +821,7 @@ export function DispatchDashboard({
             </span>
           </div>
           <p className={styles.cardDescription}>
-            Local demo actions stay in this tab and reset on reload. Received reports remain
-            separate; model outputs require human review.
+            Demo activity resets on reload. Review automated reports before acting.
             {busStatus !== "live" &&
               newest.length > 0 &&
               " Showing last received reports; updates are unavailable."}
@@ -828,8 +834,8 @@ export function DispatchDashboard({
               </strong>
               <p>
                 {busStatus === "live"
-                  ? "Published assistance requests and AI observations will appear here. No report does not mean no incident."
-                  : "The log is not current. This is not an all-clear."}
+                  ? "Assistance requests and camera reports will appear here."
+                  : "Updates are offline. Reconnect to receive reports."}
               </p>
             </div>
           ) : (

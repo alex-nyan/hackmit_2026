@@ -91,22 +91,22 @@ export function SituationPanel({
       <aside
         className={styles.knowledge}
         data-concern={concern}
-        aria-label="AI situation awareness"
+        aria-label="Latest observation"
       >
-        <small>AI SITUATION · {fresh ? "RECENT OBSERVATION" : "COVERAGE UNKNOWN"}</small>
+        <small>Latest observation · {fresh ? "Recent" : "No current report"}</small>
         <strong>
           {status !== "live"
             ? "Situation updates disconnected"
             : !latest
-              ? "Waiting for camera / audio analysis"
+              ? "Waiting for a camera or audio report"
               : !fresh
-                ? "Last observation is stale"
+                ? "Last report is out of date"
                 : latest.title}
         </strong>
         <p>
           {fresh
             ? latest?.detail
-            : "No current AI assessment. Missing observations do not establish safety."}
+            : "No recent camera or audio reports. Scene status unknown."}
         </p>
         {latest && (
           <small>
@@ -124,7 +124,7 @@ export function SituationPanel({
             setOpen(true);
           }}
         >
-          Review situation &amp; medic report
+          Review report
         </button>
       </aside>
       {open && (
@@ -136,8 +136,8 @@ export function SituationPanel({
             </button>
           </header>
           <p>
-            Camera and audio are unverified observations. Heart rate belongs to the
-            operator-selected wearer; it does not identify a suspect or establish an injury.
+            Verify camera and audio reports before acting. Heart rate is linked to the selected
+            wearer and is not an injury assessment.
           </p>
           <label>
             Source / assigned profile

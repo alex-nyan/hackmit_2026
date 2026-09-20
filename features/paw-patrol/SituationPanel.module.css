@@ -4,9 +4,9 @@
   width: min(520px, calc(100vw - 32px));
   z-index: 65;
   overflow-y: auto;
-  background: #fafcfb;
-  color: #162b25;
-  border: 1px solid #bdcec8;
+  background: var(--bento-card, #fafcfb);
+  color: var(--bento-text, #162b25);
+  border: 1px solid var(--bento-border, #bdcec8);
   border-radius: 16px;
   padding: 22px;
   box-shadow: 0 12px 48px #0004;
@@ -31,7 +31,7 @@
   white-space: pre-wrap;
 }
 .panel article {
-  border-top: 1px solid #d6e2dd;
+  border-top: 1px solid var(--bento-border, #d6e2dd);
   padding: 12px 0;
 }
 .panel small {
@@ -48,16 +48,16 @@
 .panel textarea {
   width: 100%;
   padding: 10px;
-  border: 1px solid #a4bdb2;
+  border: 1px solid var(--bento-border, #a4bdb2);
   border-radius: 8px;
-  background: white;
-  color: #162b25;
+  background: var(--bento-bg, white);
+  color: var(--bento-text, #162b25);
 }
 .panel button {
   cursor: pointer;
-  border: 1px solid #a4bdb2;
-  background: #e4efe9;
-  color: #163a2e;
+  border: 1px solid var(--bento-border, #a4bdb2);
+  background: var(--bento-raised, #e4efe9);
+  color: var(--bento-text, #163a2e);
   border-radius: 8px;
   padding: 9px 12px;
 }
@@ -72,9 +72,9 @@
   bottom: 16px;
   z-index: 60;
   width: min(350px, calc(100vw - 32px));
-  border: 1px solid #abc6bb;
-  background: #f4faf6f5;
-  color: #163a2e;
+  border: 1px solid var(--bento-border, #abc6bb);
+  background: var(--bento-card, #f4faf6f5);
+  color: var(--bento-text, #163a2e);
   border-radius: 16px;
   padding: 14px;
   box-shadow: 0 4px 20px #0002;
@@ -82,9 +82,9 @@
   gap: 7px;
 }
 .knowledge[data-concern="true"] {
-  border-color: #d29843;
-  background: #fff5e7f5;
-  color: #6c3b07;
+  border-color: var(--bento-accent, #d29843);
+  background: color-mix(in srgb, var(--bento-accent, #d29843) 12%, var(--bento-card, #fff5e7));
+  color: var(--bento-text, #6c3b07);
 }
 .knowledge small {
   font-size: 10px;
@@ -105,8 +105,8 @@
 .knowledge button {
   border: 0;
   border-radius: 8px;
-  background: #174c3b;
-  color: white;
+  background: var(--bento-raised, #174c3b);
+  color: var(--bento-text, white);
   padding: 9px;
   cursor: pointer;
 }

@@ -8,7 +8,6 @@ import { useLiveTrack } from "@/features/live-track";
 import { useLivePublisher } from "@/features/live-video";
 
 import { describeTranscript, type TranscriptionResult } from "./audio";
-import { hasLabels } from "./devices";
 import type { TriageResult } from "./types";
 import { useAudioTranscription } from "./useAudioTranscription";
 import { useCameraTriage } from "./useCameraTriage";
@@ -40,7 +39,26 @@ export function CapturePanel({
   onTranscript,
   onPhoneConnectionChange,
 }: CapturePanelProps) {
-  const { devices, cameraId, setCameraId, resolveDevices } = useCaptureDevices();
+  const {
+    devices,
+    cameraId,
+    setCameraId,
+    microphoneId,
+    setMicrophoneId,
+    resolveDevices,
+    refreshDevices,
+  } = useCaptureDevices();
+  const [discovering, setDiscovering] = useState(false);
+  const startAttempt = useRef<symbol | null>(null);
+  const audioAttempt = useRef<symbol | null>(null);
+  const [audioDiscovering, setAudioDiscovering] = useState(false);
+  useEffect(
+    () => () => {
+      startAttempt.current = null;
+      audioAttempt.current = null;
+    },
+    [],
+  );
 
   const [escalation, setEscalation] = useState<string | null>(null);
   const [alertError, setAlertError] = useState("");
@@ -103,9 +121,11 @@ export function CapturePanel({
     },
   );
   const running = state.state === "running";
-  const busy = running || state.state === "requesting-camera";
+  const busy = discovering || running || state.state === "requesting-camera";
   const listening =
-    audio.state.state === "recording" || audio.state.state === "requesting-microphone";
+    audioDiscovering ||
+    audio.state.state === "recording" ||
+    audio.state.state === "requesting-microphone";
   const deviceLabel = state.state === "running" ? state.deviceLabel : "";
 
   useEffect(() => {
@@ -194,13 +214,43 @@ export function CapturePanel({
   }, [deviceLabel, onPhoneConnectionChange, running, sourceId, videoRef]);
 
   const startedAutomatically = useRef(false);
+  const startListening = useCallback(async () => {
+    if (audioAttempt.current) return;
+    const attempt = Symbol();
+    audioAttempt.current = attempt;
+    setAudioDiscovering(true);
+    try {
+      const chosen = await resolveDevices({ microphone: true });
+      if (audioAttempt.current !== attempt) return;
+      await audio.start(chosen.microphoneId);
+    } finally {
+      if (audioAttempt.current === attempt) {
+        audioAttempt.current = null;
+        setAudioDiscovering(false);
+      }
+    }
+  }, [resolveDevices, audio.start]);
 
   const startCamera = useCallback(async () => {
-    // Permission is what reveals device names, so the phone can only be
-    // preferred over the built-in webcam once the list has been asked for.
-    const chosen = await resolveDevices({ microphone: true });
-    await Promise.all([start(chosen.cameraId), audio.start(chosen.microphoneId)]);
-  }, [resolveDevices, start, audio.start]);
+    if (startAttempt.current) return;
+    const attempt = Symbol();
+    startAttempt.current = attempt;
+    setDiscovering(true);
+    try {
+      // Discover video independently: mic permission must not block camera selection.
+      const chosen = await resolveDevices();
+      if (startAttempt.current !== attempt) return;
+      const opened = await start(chosen.cameraId);
+      if (!opened || startAttempt.current !== attempt) return;
+      // Let Continuity finish opening video before acquiring its microphone.
+      void startListening();
+    } finally {
+      if (startAttempt.current === attempt) {
+        startAttempt.current = null;
+        setDiscovering(false);
+      }
+    }
+  }, [resolveDevices, start, startListening]);
 
   useEffect(() => {
     if (!autoStart || startedAutomatically.current) return;
@@ -247,7 +297,7 @@ export function CapturePanel({
         autoPlay
       />
 
-      {devices.cameras.length > 1 && hasLabels(devices.cameras) && (
+      {devices.cameras.length > 0 && (
         <select
           className="capture-card__picker"
           value={cameraId ?? ""}
@@ -264,14 +314,53 @@ export function CapturePanel({
         </select>
       )}
 
+      <button
+        type="button"
+        className="capture-card__button capture-card__button--quiet"
+        disabled={busy}
+        onClick={() => {
+          setCameraId(undefined);
+          void refreshDevices();
+        }}
+      >
+        Refresh cameras / prefer iPhone
+      </button>
+      {discovering && (
+        <p className="capture-card__note" role="status">
+          Finding cameras — allow camera access when prompted…
+        </p>
+      )}
+      {devices.microphones.length > 0 && (
+        <label className="capture-card__note">
+          Audio source — select your iPhone
+          <select
+            className="capture-card__picker"
+            aria-label="Microphone source"
+            value={microphoneId ?? ""}
+            disabled={listening}
+            onChange={(event) => setMicrophoneId(event.target.value || null)}
+          >
+            <option value="">Browser default microphone</option>
+            {devices.microphones.map((device) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label || "Microphone"}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="capture-card__actions">
         <button
           type="button"
           className="capture-card__button"
           data-stop={busy ? "true" : undefined}
           onClick={() => {
-            if (busy) {
+            if (busy || listening) {
+              startAttempt.current = null;
+              setDiscovering(false);
               stop();
+              audioAttempt.current = null;
+              setAudioDiscovering(false);
               audio.stop();
               setEscalation(null);
             } else void startCamera();
@@ -283,7 +372,13 @@ export function CapturePanel({
           type="button"
           className="capture-card__button capture-card__button--quiet"
           data-on={listening ? "true" : undefined}
-          onClick={() => (listening ? audio.stop() : void audio.start())}
+          onClick={() => {
+            if (listening) {
+              audioAttempt.current = null;
+              setAudioDiscovering(false);
+              audio.stop();
+            } else void startListening();
+          }}
         >
           {listening ? "Mute" : "Listen"}
         </button>

@@ -40,14 +40,17 @@ export function useCaptureDevices() {
     const refresh = ++refreshRef.current;
     try {
       const found = splitDevices(await navigator.mediaDevices.enumerateDevices());
-      if (!mountedRef.current || refresh !== refreshRef.current) return null;
+      if (!mountedRef.current) return null;
+      if (refresh !== refreshRef.current) return found;
       setDevices(found);
       setCameraId((current) =>
-        current && !found.cameras.some((device) => device.deviceId === current) ? null : current,
+        current && !found.cameras.some((device) => device.deviceId === current)
+          ? undefined
+          : current,
       );
       setMicrophoneId((current) =>
         current && !found.microphones.some((device) => device.deviceId === current)
-          ? null
+          ? undefined
           : current,
       );
       return found;
@@ -65,8 +68,8 @@ export function useCaptureDevices() {
    * permission, so on a cold page every camera is anonymous and the automatic
    * choice would land on the laptop's own webcam. Buying the names with a
    * stream that is opened and immediately closed is what lets the iPhone win.
-   * It is only worth a second permission prompt when there is more than one
-   * device of that kind to tell apart.
+   * Browsers may expose only one anonymous device before permission, even
+   * when the iPhone is connected. Do not use the list length as evidence.
    */
   const resolveDevices = useCallback(
     async ({ microphone = false } = {}) => {
@@ -74,7 +77,7 @@ export function useCaptureDevices() {
       // Only worth a prompt where the answer is still open: a kind the
       // operator has already chosen for themselves needs no names.
       const blind = (selection: Selection, available: CaptureDevice[]) =>
-        selection === undefined && available.length > 1 && !hasLabels(available);
+        selection === undefined && !hasLabels(available);
       const blindCamera = blind(cameraSelection, found.cameras);
       const blindMicrophone = microphone && blind(microphoneSelection, found.microphones);
 

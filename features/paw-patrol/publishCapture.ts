@@ -1,3 +1,4 @@
+import { listPublishedDevices } from "@/features/live-track/positionStore";
 import { parseTranscriptionResult, parseTriageResult } from "@/shared/contracts";
 import { hazardIncident, transcriptIncident } from "./hazardSignal";
 import { appendIncident } from "./incidentStore";
@@ -22,7 +23,10 @@ export async function publishCapture(
     let draft: IncidentDraft | null;
     if (kind === "camera") {
       const result = parseTriageResult(JSON.parse(outcome.body));
+      const observer =
+        result.models.find((model) => model.provider !== "ultralytics") ?? result.models[0];
       draft = hazardIncident(result, context);
+      if (draft && result.assessment) draft.detail = `${result.assessment.summary} ${draft.detail}`;
       if (!draft && (result.assessment || result.detections.length > 0)) {
         draft = {
           id: `observation-${result.request_id}`,
@@ -35,8 +39,8 @@ export async function publishCapture(
             result.assessment?.summary ??
             `Detector observations: ${result.detections.map((detection) => `${detection.label} (uncalibrated score ${detection.confidence.toFixed(2)})`).join(", ")}. Camera coordinates only; subject identity and location are not established.`,
           provenance: {
-            provider: result.models[0]?.provider ?? "unknown",
-            model: result.models[0]?.model ?? "unknown",
+            provider: observer?.provider ?? "unknown",
+            model: observer?.model ?? "unknown",
             confidence: null,
           },
           requiresHumanReview: true,
@@ -64,6 +68,29 @@ export async function publishCapture(
       }
     }
     if (!draft) return "none";
+    if (kind === "audio" && draft.title.startsWith("Audio concern")) {
+      try {
+        const { devices } = await listPublishedDevices();
+        const fix = devices.find((device) => device.id === request.source_id)?.fix;
+        const observed = Date.parse(
+          typeof request.captured_at === "string" ? request.captured_at : "",
+        );
+        if (
+          fix?.freshness === "live" &&
+          Number.isFinite(observed) &&
+          Math.abs(Date.parse(fix.fixedAt) - observed) <= 90_000
+        ) {
+          draft.location = {
+            longitude: fix.longitude,
+            latitude: fix.latitude,
+            fixedAt: fix.fixedAt,
+            accuracyMeters: fix.accuracyMeters,
+          };
+        }
+      } catch {
+        /* Publish the warning even when GPS is unavailable. */
+      }
+    }
     draft.detail = draft.detail.slice(0, 600);
     if (typeof request.captured_at === "string") draft.observedAt = request.captured_at;
     const validated = parseIncidentDraft(draft);

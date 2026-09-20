@@ -48,9 +48,9 @@ function errorName(error: unknown): string {
  * Naming an exact device is the only way to reach the iPhone, but an exact
  * device that is not ready yet fails outright rather than waiting, and the
  * capture before this one may have been the permission prompt that woke it.
- * So: try, wait, try once more, and only then settle for whatever camera the
- * browser will give. A declined permission is a decision, not a wait, and is
- * never retried. Whichever camera opens, the panel names it.
+ * So: try, wait, then retry the same device with simpler constraints.
+ * Never silently replace the selected iPhone with a laptop webcam. A declined
+ * permission is never retried. Whichever camera opens, the panel names it.
  */
 async function openCamera(deviceId: string | null): Promise<MediaStream> {
   const wanted: MediaStreamConstraints = {
@@ -71,11 +71,10 @@ async function openCamera(deviceId: string | null): Promise<MediaStream> {
   } catch (error) {
     if (!deviceId || errorName(error) === "NotAllowedError") throw error;
     await new Promise((resolve) => setTimeout(resolve, WAKE_MS));
-    try {
-      return await navigator.mediaDevices.getUserMedia(wanted);
-    } catch {
-      return await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    }
+    return await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: deviceId } },
+      audio: false,
+    });
   }
 }
 
@@ -150,8 +149,8 @@ export function useCameraTriage({
    * straight to the acquisition, with no render in between to go stale.
    */
   const start = useCallback(
-    async (deviceId: string | null = null) => {
-      if (sessionRef.current) return;
+    async (deviceId: string | null = null): Promise<boolean> => {
+      if (sessionRef.current) return false;
       // A new capture re-measures. Inheriting the last session's rung would
       // hold a picture down for a link that is no longer the one it met.
       ladderRef.current = INITIAL_LADDER;
@@ -164,7 +163,7 @@ export function useCameraTriage({
           reason:
             "Camera access needs a secure context. Open this page over HTTPS, or on localhost.",
         });
-        return;
+        return false;
       }
 
       // Reserve the session before awaiting permission so repeated starts cannot
@@ -176,7 +175,7 @@ export function useCameraTriage({
         const stream = await openCamera(deviceId);
         if (sessionRef.current !== session) {
           stream.getTracks().forEach((track) => track.stop());
-          return;
+          return false;
         }
         streamRef.current = stream;
         // The same camera track feeds both triage snapshots and the direct
@@ -202,7 +201,7 @@ export function useCameraTriage({
           video.srcObject = stream;
           await video.play().catch(() => undefined);
         }
-        if (sessionRef.current !== session) return;
+        if (sessionRef.current !== session) return false;
         const [camera] = stream.getTracks().filter((track) => track.kind === "video");
         setState({
           state: "running",
@@ -212,8 +211,9 @@ export function useCameraTriage({
           lastResult: null,
           lastError: null,
         });
+        return true;
       } catch (error) {
-        if (sessionRef.current !== session) return;
+        if (sessionRef.current !== session) return false;
         sessionRef.current = null;
         streamRef.current?.getTracks().forEach((track) => {
           track.onended = null;
@@ -228,8 +228,13 @@ export function useCameraTriage({
           reason:
             name === "NotAllowedError"
               ? "Camera permission was declined."
-              : "No usable camera was found.",
+              : name === "NotReadableError" || name === "AbortError"
+                ? "The selected camera could not start. Close other camera tabs/apps, reconnect your iPhone, then retry."
+                : name === "NotFoundError" || name === "OverconstrainedError"
+                  ? "The selected camera is unavailable. Refresh cameras and choose your iPhone again."
+                  : `Camera could not start${name ? ` (${name})` : ""}. Refresh cameras and retry.`,
         });
+        return false;
       }
     },
     [stop],

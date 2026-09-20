@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Paw Patrol · Locked" };
@@ -35,6 +36,9 @@ export default async function Unlock({
         <button className="unlock__button" type="submit">
           Unlock
         </button>
+        <Link href="/sign-in" className="unlock__button">
+          Sign in as a police officer
+        </Link>
       </form>
     </main>
   );

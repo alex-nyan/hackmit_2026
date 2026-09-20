@@ -25,14 +25,17 @@ import {
   Sun,
   Watch,
 } from "lucide-react";
+import type { Officer } from "@/features/access/roster";
 import type { MapTheme } from "../boston-map/types";
 import type { HeartRateConnection } from "../heart-rate/useHeartRate";
 import { PEOPLE, personStatus, sampleHeartRate, stamp, type Person, type View } from "./scenario";
 import { vehicleAt } from "./vehicles/vehicleMotion";
 import type { Workspace } from "./workspace";
+import { MapFullscreenButton } from "./MapFullscreenButton";
 import styles from "./OfficerDashboard.module.css";
 
 export interface OfficerDashboardProps {
+  officer?: Officer | null;
   workspace: Workspace | null;
   onViewChange: (view: View) => void;
   person: Person;
@@ -161,6 +164,7 @@ function HeartReadout({ value, device }: { value: number | null; device: boolean
 }
 
 export function OfficerDashboard({
+  officer,
   workspace,
   onViewChange,
   person,
@@ -267,6 +271,20 @@ export function OfficerDashboard({
         ) : (
           <WorkspaceSwitcher onViewChange={onViewChange} />
         )}
+        {officer ? (
+          <form action="/api/sign-in" method="post" className={styles.account}>
+            <span>
+              {officer.name} · Badge {officer.badge}
+            </span>
+            <button type="submit" name="action" value="sign-out">
+              Sign out
+            </button>
+          </form>
+        ) : (
+          <Link href="/sign-in" className={styles.accountLink}>
+            Officer sign-in
+          </Link>
+        )}
         <span className={styles.workspaceBadge}>Demo workspace</span>
       </header>
       <main id="workspace" className={styles.main}>
@@ -347,7 +365,7 @@ export function OfficerDashboard({
               </span>
               <span
                 data-connected={phoneConnected}
-                title="Local camera preview only; not officer identity, server receipt, or AI success."
+                title="Camera preview on this device. Upload status is shown in capture controls."
               >
                 <Smartphone size={14} aria-hidden="true" />
                 Local iPhone camera · {phoneConnected ? "Active" : "Not connected"}
@@ -355,7 +373,7 @@ export function OfficerDashboard({
             </div>
             <div className={styles.setup} hidden={briefing}>
               <p className={styles.setupHint}>
-                Connect both device signals to open your briefing, or explore the demo.
+                Connect your watch and camera to open the briefing.
               </p>
               <section className={styles.setupSection} aria-labelledby={`${id}-watch`}>
                 <div className={styles.setupHeading}>
@@ -380,9 +398,7 @@ export function OfficerDashboard({
                   <a href="/capture" target="_blank" rel="noreferrer">
                     Open phone capture page ↗
                   </a>
-                  <span>
-                    Separate capture workflow; opening this link does not verify this profile.
-                  </span>
+                  <span>Capture on a phone in a separate tab.</span>
                 </p>
               </section>
               <div className={styles.previewAction}>
@@ -398,20 +414,20 @@ export function OfficerDashboard({
                     ? "Open incident briefing"
                     : "Preview demo workspace"}
                 </button>
-                <small>Preview does not mark devices connected.</small>
+                <small>Demo preview works without devices.</small>
               </div>
             </div>
             <div className={styles.briefing} hidden={!briefing}>
               {!ready && (
                 <p className={styles.demoNotice} role="status">
                   {previewEnabled
-                    ? "Demo preview · device connections remain unverified."
-                    : "Device signal interrupted · check setup. Briefing remains available; device status is not current."}
+                    ? "Demo preview · devices not connected."
+                    : "Device disconnected. Open setup to reconnect."}
                 </p>
               )}
               <div className={styles.incidentPanel}>{incidentPanel(previewEnabled)}</div>
               <p className={styles.captureHint}>
-                Device setup contains the capture controls. Hiding them does not stop a session.
+                Capture continues in the background. Open device setup to stop it.
               </p>
             </div>
             <div className={styles.support}>
@@ -482,6 +498,7 @@ export function OfficerDashboard({
             <div className={styles.cardHeading}>
               <h2 id={`${id}-map-title`}>Patrol map</h2>
               <span className={styles.badge}>15 demo units</span>
+              <MapFullscreenButton />
             </div>
             <div className={styles.mapFrame}>
               {map}

@@ -39,6 +39,13 @@ export interface IncidentEvent {
   seq: number;
   /** Capture/receipt time, distinct from log publication. */
   observedAt?: string;
+  /** Reporting device GPS, never an inferred subject position. */
+  location?: {
+    longitude: number;
+    latitude: number;
+    fixedAt: string;
+    accuracyMeters: number | null;
+  };
   id: string;
   kind: IncidentKind;
   origin: IncidentOrigin;
@@ -101,6 +108,34 @@ export function parseIncidentDraft(value: unknown): IncidentDraft | null {
     (typeof observedAt !== "string" || !Number.isFinite(Date.parse(observedAt)))
   )
     return null;
+  let location: IncidentEvent["location"];
+  if (raw.location !== undefined) {
+    if (!raw.location || typeof raw.location !== "object") return null;
+    const fix = raw.location as Record<string, unknown>;
+    if (
+      typeof fix.longitude !== "number" ||
+      !Number.isFinite(fix.longitude) ||
+      Math.abs(fix.longitude) > 180 ||
+      typeof fix.latitude !== "number" ||
+      !Number.isFinite(fix.latitude) ||
+      Math.abs(fix.latitude) > 90 ||
+      typeof fix.fixedAt !== "string" ||
+      !Number.isFinite(Date.parse(fix.fixedAt)) ||
+      !(
+        fix.accuracyMeters === null ||
+        (typeof fix.accuracyMeters === "number" &&
+          Number.isFinite(fix.accuracyMeters) &&
+          fix.accuracyMeters >= 0)
+      )
+    )
+      return null;
+    location = {
+      longitude: fix.longitude,
+      latitude: fix.latitude,
+      fixedAt: fix.fixedAt,
+      accuracyMeters: fix.accuracyMeters,
+    };
+  }
   const id = text(raw.id, MAX_ID);
   const title = text(raw.title);
   const detail = text(raw.detail);
@@ -131,6 +166,7 @@ export function parseIncidentDraft(value: unknown): IncidentDraft | null {
 
   return {
     id,
+    ...(location ? { location } : {}),
     ...(typeof observedAt === "string" ? { observedAt } : {}),
     kind: raw.kind as IncidentKind,
     origin: raw.origin as IncidentOrigin,

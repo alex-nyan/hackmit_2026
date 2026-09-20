@@ -57,7 +57,7 @@ describe("camera acquisition lifecycle", () => {
     const camera = cameraStream();
     getUserMedia.mockReturnValue(acquisition.promise);
     const { result, unmount } = renderHook(() => useCameraTriage({ sourceId: "unit-01" }));
-    let starting!: Promise<void>;
+    let starting!: Promise<boolean>;
     act(() => {
       starting = result.current.start();
     });
@@ -80,8 +80,8 @@ describe("camera acquisition lifecycle", () => {
     const camera = cameraStream();
     getUserMedia.mockReturnValue(acquisition.promise);
     const { result } = renderHook(() => useCameraTriage({ sourceId: "unit-01" }));
-    let first!: Promise<void>;
-    let second!: Promise<void>;
+    let first!: Promise<boolean>;
+    let second!: Promise<boolean>;
     act(() => {
       first = result.current.start();
       second = result.current.start();
@@ -105,7 +105,7 @@ describe("camera acquisition lifecycle", () => {
     const { result } = renderHook(() => useCameraTriage({ sourceId: "unit-01" }));
     const video = document.createElement("video");
     result.current.videoRef.current = video;
-    let starting!: Promise<void>;
+    let starting!: Promise<boolean>;
     await act(async () => {
       starting = result.current.start();
     });
@@ -130,7 +130,7 @@ describe("camera acquisition lifecycle", () => {
       .mockReturnValueOnce(oldAcquisition.promise)
       .mockResolvedValueOnce(newCamera.stream);
     const { result } = renderHook(() => useCameraTriage({ sourceId: "unit-01" }));
-    let oldStart!: Promise<void>;
+    let oldStart!: Promise<boolean>;
     act(() => {
       oldStart = result.current.start();
     });
@@ -155,7 +155,7 @@ describe("camera acquisition lifecycle", () => {
       .mockReturnValueOnce(oldAcquisition.promise)
       .mockResolvedValueOnce(newCamera.stream);
     const { result } = renderHook(() => useCameraTriage({ sourceId: "unit-01" }));
-    let oldStart!: Promise<void>;
+    let oldStart!: Promise<boolean>;
     act(() => {
       oldStart = result.current.start();
     });
@@ -176,7 +176,7 @@ describe("camera acquisition lifecycle", () => {
       .mockRejectedValueOnce(new DOMException("Device in use", "NotReadableError"))
       .mockResolvedValueOnce(phone.stream);
     const { result } = renderHook(() => useCameraTriage({ sourceId: "unit-01" }));
-    let starting!: Promise<void>;
+    let starting!: Promise<boolean>;
     act(() => {
       starting = result.current.start("iphone");
     });
@@ -200,7 +200,7 @@ describe("camera acquisition lifecycle", () => {
       .mockRejectedValueOnce(new DOMException("Not found", "NotFoundError"))
       .mockResolvedValueOnce(webcam.stream);
     const { result } = renderHook(() => useCameraTriage({ sourceId: "unit-01" }));
-    let starting!: Promise<void>;
+    let starting!: Promise<boolean>;
     act(() => {
       starting = result.current.start("iphone");
     });

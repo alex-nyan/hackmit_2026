@@ -1,0 +1,39 @@
+.panel {
+  position: absolute;
+  top: 12px;
+  right: 54px;
+  z-index: 12;
+  width: min(310px, calc(100% - 76px));
+  max-height: 45%;
+  overflow: auto;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #ef6472;
+  border-radius: 10px;
+  background: var(--bento-card, #121519);
+  color: var(--bento-text, #f1f1ec);
+  font:
+    12px/1.45 Arial,
+    sans-serif;
+}
+.panel > strong {
+  color: #ef6472;
+}
+.panel button {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  text-align: left;
+  border-radius: 7px;
+  border: 1px solid #ef6472;
+  background: color-mix(in srgb, #ef6472 12%, var(--bento-card, #121519));
+  color: inherit;
+}
+.panel small {
+  font-size: 11px;
+}
+.panel button small {
+  max-height: 4.5em;
+  overflow: auto;
+}

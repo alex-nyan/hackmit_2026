@@ -744,3 +744,94 @@
     filter: none;
   }
 }
+
+/* Map chrome follows the same theme as the surrounding workspace. */
+.root[data-theme="dark"] {
+  --map-card: var(--bento-card, #121519);
+  --map-raised: var(--bento-raised, #1b2026);
+  --map-text: var(--bento-text, #f1f1ec);
+  --map-muted: var(--bento-muted, #a0a8b3);
+  --map-border: var(--bento-border, #2b3139);
+  --focus: var(--bento-accent, #ff9b62);
+  background: var(--bento-bg, #0a0c0f);
+  color: var(--map-text);
+  color-scheme: dark;
+}
+.root[data-theme="dark"] .feedback,
+.root[data-theme="dark"] .legend,
+.root[data-theme="dark"] :global(.mapboxgl-ctrl-attrib),
+.root[data-theme="dark"] :global(.mapboxgl-ctrl-group) {
+  background: var(--map-card);
+  color: var(--map-text);
+  border-color: var(--map-border);
+}
+.root[data-theme="dark"] .feedback p {
+  color: var(--map-muted);
+}
+.root[data-theme="dark"] .feedbackIcon,
+.root[data-theme="dark"] .retry {
+  background: var(--map-raised);
+  color: var(--map-text);
+}
+.root[data-theme="dark"] .error .feedbackIcon {
+  background: color-mix(in srgb, #da6a72 20%, var(--map-card));
+}
+.root[data-theme="dark"] .retry:hover {
+  background: var(--map-border);
+}
+.root[data-theme="dark"] .unitDot {
+  background: var(--map-text);
+}
+.root[data-theme="dark"] .routeDash {
+  border-color: var(--map-text);
+}
+.root[data-theme="dark"] .officerMarker,
+.root[data-theme="dark"] .officerMarker::after {
+  background: var(--map-card);
+  color: var(--map-text);
+  border-color: var(--map-border);
+}
+.root[data-theme="dark"] .officerMarker[data-selected="true"] {
+  background: var(--map-raised);
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px var(--focus);
+}
+.root[data-theme="dark"] .officerMarker[data-selected="true"]::after {
+  background: var(--map-raised);
+}
+.root[data-theme="dark"] .officerMarker[data-emergency="true"] {
+  border-color: #efa876;
+}
+.root[data-theme="dark"] .destinationMarker {
+  background: var(--map-raised);
+  color: var(--bento-good, #7bcba5);
+  border-color: var(--bento-good, #7bcba5);
+}
+.root[data-theme="dark"] :global(.mapboxgl-ctrl-group button + button) {
+  border-color: var(--map-border);
+}
+.root[data-theme="dark"] :global(.mapboxgl-ctrl-icon),
+.root[data-theme="dark"] :global(.mapboxgl-ctrl-attrib-button) {
+  filter: invert(1);
+}
+.root[data-theme="dark"] :global(.mapboxgl-ctrl-attrib a) {
+  color: var(--map-text);
+}
+
+.audioAlert {
+  padding: 9px 12px;
+  border: 2px solid #ffb4bd;
+  border-radius: 24px;
+  background: #b42335;
+  color: white;
+  font:
+    700 12px/1.2 Arial,
+    sans-serif;
+  box-shadow: 0 0 0 5px #e43b5540;
+  cursor: pointer;
+  z-index: 10;
+}
+.audioAlert:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 3px;
+}

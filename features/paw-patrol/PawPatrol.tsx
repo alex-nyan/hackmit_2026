@@ -25,6 +25,8 @@ import { type MapFocus, type MapTheme, MAP_FOCUS } from "../boston-map/types";
 import { BuildingPanel } from "../boston-map/BuildingPanel";
 import type { BuildingFacts } from "../boston-map/buildingSelection";
 import type { Officer } from "@/features/access/roster";
+import { AudioAlerts, useAudioAlerts } from "./AudioAlerts";
+import type { IncidentEvent } from "./incidents";
 import { BodyCamWall } from "@/features/body-cam";
 import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, UnitCard, useLiveTrack, type LiveDevice } from "@/features/live-track";
@@ -177,6 +179,8 @@ export function PawPatrol({
   const { time, running, readClock, dispatch, sceneOverride, panics, audit } = useScenario();
   // The only state shared across workspaces. Everything else stays local.
   const bus = useIncidentBus();
+  const audioAlerts = useAudioAlerts(bus.events);
+  const [alertSource, setAlertSource] = useState<string | null>(null);
   const [session, setSession] = useState(0);
   const [tactical, setTactical] = useState(emptyTactical);
   const fixedView = workspace ? WORKSPACE_VIEWS[workspace] : undefined;
@@ -265,6 +269,15 @@ export function PawPatrol({
       latitude: device.fix!.latitude,
       nonce: (previous?.nonce ?? 0) + 1,
     }));
+  }, []);
+  const selectAudioAlert = useCallback((event: IncidentEvent) => {
+    setAlertSource(event.source);
+    setOpenDeviceId(event.source);
+    if (event.location) {
+      const { longitude, latitude } = event.location;
+      setFollowing(false);
+      setFixRequest((previous) => ({ longitude, latitude, nonce: (previous?.nonce ?? 0) + 1 }));
+    }
   }, []);
   const person = PEOPLE.find((p) => p.id === selectedId) ?? PEOPLE[0];
   // Device readings stay local until an operator shares a snapshot.
@@ -451,6 +464,8 @@ export function PawPatrol({
           recenterKey={recenterKey}
           following={following}
           onStopFollowing={() => setFollowing(false)}
+          audioAlerts={audioAlerts}
+          onSelectAudioAlert={selectAudioAlert}
           liveDevices={liveDevices}
           fixRequest={fixRequest}
           onSelectLiveDevice={setOpenDeviceId}
@@ -483,6 +498,7 @@ export function PawPatrol({
               : undefined
           }
         />
+        <AudioAlerts alerts={audioAlerts} status={bus.status} onSelect={selectAudioAlert} />
         {view !== "officer" && (
           <div className="map-overlay">
             {!dispatchDashboard && (
@@ -551,6 +567,7 @@ export function PawPatrol({
   if (dispatchDashboard) {
     return (
       <DispatchDashboard
+        alertSource={alertSource}
         workspace={workspace}
         onViewChange={setView}
         selectedId={selectedId}
@@ -565,8 +582,13 @@ export function PawPatrol({
         map={
           <>
             {map}
-            <SituationPanel events={bus.events} status={bus.status} publish={publish}
-              personId={person.id} heartRate={heartRate} />
+            <SituationPanel
+              events={bus.events}
+              status={bus.status}
+              publish={publish}
+              personId={person.id}
+              heartRate={heartRate}
+            />
           </>
         }
         liveTrack={liveTrack}
@@ -612,6 +634,7 @@ export function PawPatrol({
       <>
         {handoff.bridge}
         <OfficerDashboard
+          officer={officer}
           workspace={workspace}
           onViewChange={setView}
           person={person}
@@ -629,7 +652,8 @@ export function PawPatrol({
           map={map}
           heartRate={heartRate}
           phoneConnected={
-            phonePreview.sourceId === (officer?.id ?? `officer-${person.id}`) && phonePreview.connected
+            phonePreview.sourceId === (officer?.id ?? `officer-${person.id}`) &&
+            phonePreview.connected
           }
           heartRatePanel={
             <>

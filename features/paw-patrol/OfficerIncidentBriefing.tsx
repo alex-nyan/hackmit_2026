@@ -80,9 +80,9 @@ function BriefingContext({ events, busStatus, personId, onLocate, demo }: Props)
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>
-            <Eye size={14} aria-hidden="true" /> INCIDENT CONTEXT
+            <Eye size={14} aria-hidden="true" /> Incident report
           </p>
-          <h2 id={headingId}>Inference information</h2>
+          <h2 id={headingId}>Latest report</h2>
         </div>
         <span className={styles.connection} data-connected={connected} role="status">
           <Radio size={12} aria-hidden="true" />
@@ -115,7 +115,7 @@ function BriefingContext({ events, busStatus, personId, onLocate, demo }: Props)
       {!connected && (
         <p className={styles.offline} role="status">
           <ShieldAlert size={14} aria-hidden="true" />
-          Updates are unconfirmed. Displayed records may be old; this is not an all-clear.
+          Updates are offline. Showing the last received reports.
         </p>
       )}
 

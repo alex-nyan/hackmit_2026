@@ -1,3 +1,5 @@
+import Link from "next/link";
+import styles from "./page.module.css";
 import { PawPatrol } from "@/features/paw-patrol/PawPatrol";
 import { parseWorkspace, WORKSPACE_LABELS } from "@/features/paw-patrol/workspace";
 import { connection } from "next/server";
@@ -22,6 +24,16 @@ export default async function Home() {
   const mode = process.env.PAW_PATROL_DATA_MODE ?? "demo";
   if (mode !== "demo" && mode !== "live")
     throw new Error("PAW_PATROL_DATA_MODE must be demo or live.");
-  if (mode === "live") return <LiveWorkspace />;
-  return <PawPatrol workspace={workspace} />;
+  return (
+    <>
+      <nav className={styles.officerAccess} aria-label="Officer access">
+        <div>
+          <strong>Police officer access</strong>
+          <span>Sign in with your assigned officer account.</span>
+        </div>
+        <Link href="/sign-in">Sign in as a police officer</Link>
+      </nav>
+      {mode === "live" ? <LiveWorkspace /> : <PawPatrol workspace={workspace} />}
+    </>
+  );
 }
