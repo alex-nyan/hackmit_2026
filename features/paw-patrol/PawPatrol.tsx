@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { BodyCamWall } from "@/features/body-cam";
 import { CapturePanel } from "@/features/camera-triage";
+import { JoinCard } from "@/features/join";
+import type { JoinLink } from "@/features/join";
 import { OperationsMapPanel } from "./OperationsMapPanel";
 import {
   DURATION,
@@ -98,7 +100,14 @@ function HeartChart({ time, id }: { time: number; id: string }) {
   );
 }
 
-export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }) {
+export function PawPatrol({
+  workspace = null,
+  join = null,
+}: {
+  workspace?: Workspace | null;
+  /** Resolved on the server from the request's own origin. */
+  join?: JoinLink | null;
+}) {
   const { time, running, readClock, dispatch, sceneOverride, panics, audit } = useScenario();
   // One of the two things that cross workspaces, the body camera wall being
   // the other. Both live on the server, so both need the workspaces to be one
@@ -497,6 +506,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
                   </button>
                 )}
               </div>
+              <JoinCard join={join} />
             </aside>
             {map}
             <aside className="panel incident-panel">
