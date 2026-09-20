@@ -55,4 +55,10 @@ Review corrected authorization after grant/roster removal, cached-receipt author
 
 Validation: 234 backend tests passed, one optional real-model smoke skipped; 124 dashboard tests and four lockfile tests passed; 241 root app tests and 13 launcher tests passed. Both apps passed TypeScript, lint and production builds. Browser verification exercised sign-in, assistance, acknowledgment, manual handoff, measured readings, interrupted coverage, backend outage and sign-out. The outage retained explicitly stale readings and disabled authoritative report updates; it never substituted demo data.
 
-Remaining phase: integrated fault/replay verification and runbook/CI wiring. Hardware latency/endurance, domain-trained weapon performance, native SDK/device qualification and field/clinical qualification require separate evidence and are not established by software unit tests.
+**Phase 5 — integration verification, runbook and CI: implemented.**
+
+The reproducible `scripts.live_smoke` runs real HTTP/SSE against a separate loopback-only process with private random credentials and temporary databases. Ten checks cover telemetry, SSE revisions, assistance idempotency, human acknowledgment/reporting, responder/patient access isolation, local MIST records, disabled-model failure, durable restart and cleanup. The final frozen implementation passed all ten checks. The existing triage CI now runs this smoke after unit tests and contract drift checks.
+
+The [live pipeline runbook](live-pipeline.md) gives concrete replay, operator, device, model, HTTPS, patient enrollment, interface and validation instructions. The native README distinguishes available host checks from required Xcode/device verification. The demo server has a bounded graceful-shutdown timeout for open SSE connections.
+
+All five software implementation phases have been reviewed and committed. Outstanding qualification remains: full native SDK/device builds and permission/transport tests; representative domain model accuracy and hard-negative evaluation; concurrent-load latency, battery and thermal measurements; deployment privacy/security and field/clinical acceptance. No software test result in this record establishes those properties. No public deployment, external handoff, real device capture, or model download was performed during implementation.

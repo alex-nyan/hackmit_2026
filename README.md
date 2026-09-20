@@ -5,6 +5,11 @@ contains the original live fleet map and a separate visual hazard-triage service
 The three workspaces share the dashboard implementation in `apps/paw-patrol`;
 each runs as its own local server with its own build output.
 
+An explicit authenticated **live mode** now connects iPhone camera/microphone/GPS,
+Apple Watch heart rate, local inference and shared incident state. Start with the
+[live pipeline runbook](docs/live-pipeline.md) and its model-free replay. The
+default startup below remains the synthetic demonstration.
+
 ## Quick start
 
 Requirements:
