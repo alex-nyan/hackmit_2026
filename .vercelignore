@@ -13,8 +13,16 @@ node_modules
 .next-*
 
 # The hazard triage service is a separate Python app with its own deployment;
-# its virtualenv and model weights have no business in this bundle.
-services
+# its virtualenv, tests and model weights have no business in this bundle.
+#
+# Its JSON contracts do, though: shared/contracts imports the schemas at build
+# time, so excluding the whole directory fails the build with fifteen
+# unresolved modules. Re-including a path means not excluding its parents,
+# hence the directory-by-directory form rather than a bare `services`.
+services/*
+!services/triage
+services/triage/*
+!services/triage/contracts
 
 # Never upload local TLS material or notes.
 certificates
