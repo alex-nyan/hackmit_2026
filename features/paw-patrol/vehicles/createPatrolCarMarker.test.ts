@@ -26,11 +26,18 @@ describe("screen-sized patrol car artwork", () => {
     expect(element.getAttribute("aria-hidden")).toBe("true");
     expect(car?.getAttribute("width")).toBe("32");
     expect(car?.getAttribute("height")).toBe("44");
-    expect(car?.getAttribute("viewBox")).toBe("0 0 32 44");
+    expect(car?.getAttribute("viewBox")).toBe("0 0 64 88");
     expect(car?.getAttribute("focusable")).toBe("false");
     expect(element.querySelectorAll("[tabindex], button, a, image, use")).toHaveLength(0);
     expect(element.querySelector("[data-car-outline]")).not.toBeNull();
     expect(createPatrolCarMarker()).not.toBe(element);
+  });
+
+  it("creates the same neutral artwork without inheriting a unit colour", () => {
+    const first = createPatrolCarMarker();
+    const second = createPatrolCarMarker();
+    expect(first.outerHTML).not.toMatch(/currentColor|--route-color|data-color/i);
+    expect(second.innerHTML).toBe(first.innerHTML);
   });
 });
 

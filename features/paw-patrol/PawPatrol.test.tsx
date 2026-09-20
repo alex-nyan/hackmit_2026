@@ -3,9 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CapturePanel } from "../camera-triage";
 import { triageFixture, transcriptFixture } from "../contracts/fixtures";
 import { useLiveTrack } from "../live-track";
+import * as heartRateHooks from "../heart-rate/useHeartRate";
 import { PawPatrol } from "./PawPatrol";
 import { OperationsMap, type OperationsMapProps } from "./OperationsMap";
-import { PEOPLE } from "./scenario";
+import { PEOPLE, sampleHeartRate } from "./scenario";
 import { useIncidentBus } from "./useIncidentBus";
 
 vi.mock("./useIncidentBus", () => ({ useIncidentBus: vi.fn() }));
@@ -53,6 +54,81 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("workspace entry points", () => {
+  it.each(["officer", "dispatch", "hospital"] as const)(
+    "opts only Officer into liquid glass in the fixed %s workspace",
+    (workspace) => {
+      const ui = render(<PawPatrol workspace={workspace} />);
+      const officer = workspace === "officer";
+      expect(vi.mocked(OperationsMap).mock.calls.at(-1)![0].appearance).toBe(
+        officer ? "glass" : "default",
+      );
+      expect(ui.container.querySelector('[data-officer-glass="true"]') !== null).toBe(officer);
+      expect(ui.container.querySelectorAll("[data-liquid-glass]").length > 0).toBe(officer);
+      expect(ui.queryByRole("button", { name: "Officer overview" }) !== null).toBe(officer);
+      expect(bus.publish).not.toHaveBeenCalled();
+      expect(bus.clear).not.toHaveBeenCalled();
+    },
+  );
+
+  it("removes the glass opt-in when navigating away from Officer", () => {
+    const ui = render(<PawPatrol />);
+    const navigate = (name: string) =>
+      fireEvent.click(
+        within(ui.getByRole("navigation", { name: "Workspace" })).getByRole("button", { name }),
+      );
+
+    for (const name of ["Officer", "Hospital", "Officer", "Command"]) {
+      navigate(name);
+      const officer = name === "Officer";
+      expect(vi.mocked(OperationsMap).mock.calls.at(-1)![0].appearance).toBe(
+        officer ? "glass" : "default",
+      );
+      expect(ui.container.querySelector('[data-officer-glass="true"]') !== null).toBe(officer);
+      expect(ui.container.querySelectorAll("[data-liquid-glass]").length > 0).toBe(officer);
+      expect(ui.queryByRole("button", { name: "Officer overview" }) !== null).toBe(officer);
+    }
+    expect(bus.publish).not.toHaveBeenCalled();
+    expect(bus.clear).not.toHaveBeenCalled();
+  });
+
+  it("switches Officer glass themes without resetting selection or closing its overview", () => {
+    const ui = render(<PawPatrol />);
+    const navigate = (name: string) =>
+      fireEvent.click(
+        within(ui.getByRole("navigation", { name: "Workspace" })).getByRole("button", { name }),
+      );
+    navigate("Officer");
+    fireEvent.click(ui.getByRole("button", { name: "Officer overview" }));
+    const overview = ui.getByRole("region", { name: "Officer overview" });
+    const selection = within(overview).getByRole("combobox", {
+      name: "Overview officer",
+    }) as HTMLSelectElement;
+    fireEvent.change(selection, { target: { value: "P-04" } });
+    const root = ui.container.querySelector('[data-officer-glass="true"]');
+    expect(root?.getAttribute("data-officer-theme")).toBe("light");
+
+    for (const theme of ["dark", "light"]) {
+      fireEvent.click(ui.getByRole("button", { name: "Toggle map theme" }));
+      expect(root?.getAttribute("data-officer-theme")).toBe(theme);
+      expect(ui.getByTestId("map-selection").getAttribute("data-theme")).toBe(theme);
+      expect(ui.getByTestId("map-selection").textContent).toBe("P-04");
+      expect(ui.getByRole("region", { name: "Officer overview" })).toBe(overview);
+      expect(selection.value).toBe("P-04");
+      expect(
+        ui.getByRole("button", { name: "Officer overview" }).getAttribute("aria-expanded"),
+      ).toBe("true");
+    }
+
+    for (const role of ["Hospital", "Command"]) {
+      navigate(role);
+      expect(ui.container.querySelector("[data-officer-theme], [data-officer-glass]")).toBeNull();
+      expect(ui.container.querySelector("[data-liquid-glass]")).toBeNull();
+      expect(vi.mocked(OperationsMap).mock.calls.at(-1)![0].appearance).toBe("default");
+    }
+    expect(bus.publish).not.toHaveBeenCalled();
+    expect(bus.clear).not.toHaveBeenCalled();
+  });
+
   it("preserves switching roles in the detailed standalone demonstration", () => {
     const ui = render(<PawPatrol presentation="detailed" />);
     const nav = within(ui.getByRole("navigation", { name: "Workspace" }));
@@ -228,6 +304,108 @@ describe("default map-only workspace shells", () => {
 });
 
 describe("existing workspace integrations", () => {
+  it("keeps the Officer overview selection, map, vitals and capture identity synchronized", () => {
+    const ui = render(<PawPatrol workspace="officer" />);
+    expect(ui.queryByRole("region", { name: "Officer overview" })).toBeNull();
+    fireEvent.click(ui.getByRole("button", { name: "Officer overview" }));
+    const panel = ui.getByRole("region", { name: "Officer overview" });
+    const overview = within(panel);
+    const roster = overview.getByRole("list", { name: "Officer roster" });
+    expect(within(roster).getAllByRole("button")).toHaveLength(PEOPLE.length);
+    const row = (id: string) => roster.querySelector<HTMLElement>(`[data-officer-id="${id}"]`)!;
+    const overlay = ui.container.querySelector(".map-overlay");
+    expect(ui.container.querySelectorAll(".map-overlay")).toHaveLength(1);
+    expect(overlay?.parentElement).toBe(panel.parentElement?.parentElement);
+    expect(overlay?.textContent).toContain("Live tracking panel");
+    const overviewSelect = overview.getByRole("combobox", {
+      name: "Overview officer",
+    }) as HTMLSelectElement;
+    const mapSelect = ui.getByRole("combobox", {
+      name: /^Selected person$/,
+    }) as HTMLSelectElement;
+
+    fireEvent.change(overviewSelect, { target: { value: "P-02" } });
+    expect(overviewSelect.value).toBe("P-02");
+    expect(mapSelect.value).toBe("P-02");
+    expect(ui.getByTestId("map-selection").textContent).toBe("P-02");
+    expect(row("P-02").getAttribute("aria-pressed")).toBe("true");
+    expect(row("P-01").getAttribute("aria-pressed")).toBe("false");
+    expect(within(row("P-02")).getByText(PEOPLE[1].name)).toBeTruthy();
+    expect(within(row("P-02")).getByText(String(sampleHeartRate("P-02", 0)))).toBeTruthy();
+    expect(within(row("P-02")).getByText("Simulated")).toBeTruthy();
+
+    fireEvent.change(mapSelect, { target: { value: "P-03" } });
+    expect(overviewSelect.value).toBe("P-03");
+    expect(row("P-03").getAttribute("aria-pressed")).toBe("true");
+    expect(row("P-02").getAttribute("aria-pressed")).toBe("false");
+    expect(ui.getByTestId("map-selection").textContent).toBe("P-03");
+
+    fireEvent.click(row("P-04"));
+    expect(row("P-04").getAttribute("aria-pressed")).toBe("true");
+    expect(row("P-03").getAttribute("aria-pressed")).toBe("false");
+    expect(overviewSelect.value).toBe("P-04");
+    expect(mapSelect.value).toBe("P-04");
+    expect(ui.getByTestId("map-selection").textContent).toBe("P-04");
+    expect(bus.publish).not.toHaveBeenCalled();
+    expect(bus.clear).not.toHaveBeenCalled();
+
+    fireEvent.click(ui.getByRole("button", { name: "Camera" }));
+    expect(ui.getByTestId("capture-source").textContent).toBe("officer-P-04");
+    const capture = vi.mocked(CapturePanel).mock.calls.at(-1)![0];
+    capture.onResult!(triageFixture({ source_id: "officer-P-04" }));
+    expect(bus.publish).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        kind: "hazard",
+        personId: "P-04",
+        origin: "model",
+        source: "Officer body camera",
+        provenance: { provider: "ultralytics", model: "yolo26n", confidence: 0.75 },
+        requiresHumanReview: true,
+      }),
+    );
+  });
+
+  it.each(["waiting", "stale", "disconnected", "error"] as const)(
+    "does not label an old device BPM as current in the Officer overview while %s",
+    (status) => {
+      vi.spyOn(heartRateHooks, "useHeartRate").mockReturnValue({
+        mode: "device",
+        status,
+        bpm: 123,
+        receivedAt: 1_000,
+        deviceName: "HeartCast",
+        message: "No current device reading.",
+        history: [
+          { bpm: 117, receivedAt: 500 },
+          { bpm: 123, receivedAt: 1_000 },
+        ],
+        supported: true,
+        connect: vi.fn(async () => {}),
+        disconnect: vi.fn(),
+        useDemo: vi.fn(),
+      });
+      const ui = render(<PawPatrol workspace="officer" />);
+      fireEvent.click(ui.getByRole("button", { name: "Officer overview" }));
+      const panel = ui.getByRole("region", { name: "Officer overview" });
+      const overview = within(panel);
+      const selectedRow = panel.querySelector<HTMLElement>('[data-officer-id="P-01"]')!;
+      const readout = within(selectedRow);
+      expect(selectedRow.getAttribute("aria-pressed")).toBe("true");
+      expect(selectedRow.getAttribute("data-source")).toBe("device");
+      expect(readout.getByText("--")).toBeTruthy();
+      expect(readout.queryByText("123")).toBeNull();
+      expect(readout.queryByText("Live device")).toBeNull();
+      expect(readout.getByText(`${status} · no current reading`)).toBeTruthy();
+      expect(readout.queryByText("Simulated")).toBeNull();
+      expect(readout.getByText("Past received BPM · not ECG")).toBeTruthy();
+      expect(selectedRow.querySelector("svg[data-running]")).toBeNull();
+      expect(overview.getAllByText("Simulated")).toHaveLength(PEOPLE.length - 1);
+      expect(overview.getByText(/not verified officer identity/)).toBeTruthy();
+      expect(bus.publish).not.toHaveBeenCalled();
+      expect(bus.clear).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(["dispatch", "hospital"] as const)("keeps live tracking opt-in in %s", (workspace) => {
     const ui = render(<PawPatrol workspace={workspace} />);
     expect(useLiveTrack).toHaveBeenLastCalledWith(false);

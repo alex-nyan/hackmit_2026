@@ -277,6 +277,18 @@ function expectFixedCar(marker: TestMarker) {
   );
 }
 
+function expectNeutralUnitMarkers() {
+  for (const marker of mocked.markers) {
+    expect(marker.options.element.outerHTML).not.toMatch(/--route-color|data-color|currentColor/i);
+  }
+  const artwork = carMarkers().map(
+    (marker) => marker.options.element.querySelector("svg")?.outerHTML,
+  );
+  expect(artwork).toHaveLength(PEOPLE.length);
+  expect(artwork[0]).toBeDefined();
+  expect(new Set(artwork).size).toBe(1);
+}
+
 function device(name: string, ageSeconds: number): LiveDevice {
   return {
     id: 7,
@@ -302,6 +314,40 @@ function frame(milliseconds = 40) {
 }
 
 describe("patrol map integration", () => {
+  it("changes glass presentation without replacing the map, cars or camera", async () => {
+    const { map, current, container, rerender } = await mount();
+    const root = container.querySelector("[data-appearance]");
+    const markers = [...mocked.markers];
+    const cars = carMarkers();
+    const artwork = cars.map((marker) => marker.options.element.innerHTML);
+    const positions = cars.map((marker) => [...marker.point]);
+    expect(root?.getAttribute("data-appearance")).toBe("default");
+    map.flyTo.mockClear();
+    map.jumpTo.mockClear();
+    map.easeTo.mockClear();
+
+    for (const appearance of ["glass", "default"] as const) {
+      rerender(<OperationsMap {...current} appearance={appearance} />);
+      expect(root?.getAttribute("data-appearance")).toBe(appearance);
+      expect(mocked.maps).toEqual([map]);
+      expect(mocked.markers).toEqual(markers);
+      expect(cars.map((marker) => marker.options.element.innerHTML)).toEqual(artwork);
+      expect(cars.map((marker) => marker.point)).toEqual(positions);
+      cars.forEach(expectFixedCar);
+      expect(map.flyTo).not.toHaveBeenCalled();
+      expect(map.jumpTo).not.toHaveBeenCalled();
+      expect(map.easeTo).not.toHaveBeenCalled();
+      expect(map.setStyle).not.toHaveBeenCalled();
+      expect(map.remove).not.toHaveBeenCalled();
+      expectNoPatrolRoutes(map);
+    }
+  });
+
+  it("uses identical neutral car artwork and labels without per-unit colour hooks", async () => {
+    await mount();
+    expectNeutralUnitMarkers();
+  });
+
   it("does not create another map or move the camera just because selection changes", async () => {
     const { map, current, rerender } = await mount();
     map.flyTo.mockClear();
@@ -502,11 +548,15 @@ describe("patrol map integration", () => {
   );
 
   it("changes selection and emergency styling without changing the car size", async () => {
-    const { current, rerender } = await mount();
+    const { current, getByRole, rerender } = await mount();
     const cars = carMarkers();
+    const firstLabel = getByRole("button", { name: new RegExp(`${PEOPLE[0].name}.*P-01`) });
+    const secondLabel = getByRole("button", { name: new RegExp(`${PEOPLE[1].name}.*P-02`) });
     expect(cars[0].options.element.dataset.selected).toBe("true");
     expect(cars[1].options.element.dataset.selected).toBe("false");
     expect(cars[1].options.element.dataset.emergency).toBe("false");
+    expect(firstLabel.getAttribute("aria-pressed")).toBe("true");
+    expect(secondLabel.getAttribute("aria-pressed")).toBe("false");
     const originalVehicleAt = vehicleMotion.vehicleAt;
     const sample = vi.spyOn(vehicleMotion, "vehicleAt").mockImplementation((id, time) => ({
       ...originalVehicleAt(id, time),
@@ -517,8 +567,12 @@ describe("patrol map integration", () => {
       expect(cars[0].options.element.dataset.selected).toBe("false");
       expect(cars[1].options.element.dataset.selected).toBe("true");
       expect(cars[1].options.element.dataset.emergency).toBe("true");
+      expect(firstLabel.getAttribute("aria-pressed")).toBe("false");
+      expect(secondLabel.getAttribute("aria-pressed")).toBe("true");
+      expect(secondLabel.dataset.emergency).toBe("true");
       expect(carMarkers()).toEqual(cars);
       for (const car of cars) expectFixedCar(car);
+      expectNeutralUnitMarkers();
     } finally {
       sample.mockRestore();
     }

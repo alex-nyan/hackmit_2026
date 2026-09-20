@@ -19,11 +19,12 @@ import { addLiveLayers, updateLiveLayers, type LiveDevice } from "@/features/liv
 import { PEOPLE, personStatus } from "./scenario";
 import type { DemoState } from "./useScenario";
 import { vehicleAt, vehicleRoute } from "./vehicles/vehicleMotion";
-import { patrolRouteColor } from "./vehicles/routePresentation";
 import { createPatrolCarMarker, patrolCarScreenHeading } from "./vehicles/createPatrolCarMarker";
 import styles from "./OperationsMap.module.css";
 
 export interface OperationsMapProps {
+  /** Visual-only opt-in; does not recreate the map or change marker motion. */
+  appearance?: "default" | "glass";
   time: number;
   running: boolean;
   readClock: () => DemoState;
@@ -183,14 +184,12 @@ export function OperationsMap(props: OperationsMapProps) {
         });
         ownMap = map;
         map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "bottom-right");
-        for (const [index, person] of PEOPLE.entries()) {
+        for (const person of PEOPLE) {
           const anchor = document.createElement("div");
           anchor.className = styles.markerAnchor;
           const button = document.createElement("button");
           button.type = "button";
           button.className = styles.officerMarker;
-          button.dataset.color = person.color;
-          button.style.setProperty("--route-color", patrolRouteColor(index));
           const label = document.createElement("span");
           label.className = styles.officerLabel;
           label.textContent = person.id;
@@ -206,7 +205,6 @@ export function OperationsMap(props: OperationsMapProps) {
             .addTo(map);
           const directionElement = createPatrolCarMarker();
           directionElement.className = styles.vehicleDirection;
-          directionElement.style.setProperty("--route-color", patrolRouteColor(index));
           const direction = new mapboxgl.Marker({
             element: directionElement,
             anchor: "center",
@@ -498,7 +496,7 @@ export function OperationsMap(props: OperationsMapProps) {
 
   const hasError = feedback.status === "error" || feedback.status === "missing-token";
   return (
-    <div className={styles.root} data-theme={theme}>
+    <div className={styles.root} data-theme={theme} data-appearance={props.appearance ?? "default"}>
       <div
         ref={containerRef}
         className={styles.canvas}

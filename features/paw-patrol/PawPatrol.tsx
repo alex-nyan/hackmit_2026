@@ -35,6 +35,9 @@ import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-track";
 import { OperationsMap } from "./OperationsMap";
 import { WorkspaceMapShell } from "./WorkspaceMapShell";
+import { OfficerOverview } from "./OfficerOverview";
+import { GlassEffect } from "@/components/ui/liquid-glass";
+import glassStyles from "./OfficerGlass.module.css";
 import officerStyles from "./OfficerWorkspace.module.css";
 import {
   EVENTS,
@@ -362,7 +365,8 @@ export function PawPatrol({
 
   const map = (
     <section className="map-panel" aria-label="Operations map">
-      <div className="map-heading">
+      <div className={`map-heading ${view === "officer" ? glassStyles.bubble : ""}`}>
+        {view === "officer" && <GlassEffect />}
         <span>
           <MapPin size={16} />
           Boston & Cambridge
@@ -412,6 +416,7 @@ export function PawPatrol({
       </div>
       <div className="map-wrapper">
         <OperationsMap
+          appearance={view === "officer" ? "glass" : "default"}
           time={time}
           running={running}
           readClock={readClock}
@@ -426,11 +431,17 @@ export function PawPatrol({
           fixRequest={fixRequest}
           onBuildingSelect={handleBuildingSelect}
         />
-        <div className="map-overlay">
-          <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
-          <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
-        </div>
-        <div className="campus-switch" aria-label="Map area">
+        {view !== "officer" && (
+          <div className="map-overlay">
+            <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+            <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
+          </div>
+        )}
+        <div
+          className={`campus-switch ${view === "officer" ? `${glassStyles.bubble} ${glassStyles.pill}` : ""}`}
+          aria-label="Map area"
+        >
+          {view === "officer" && <GlassEffect />}
           {Object.entries(MAP_FOCUS).map(([key, target]) => (
             <button
               key={key}
@@ -489,11 +500,16 @@ export function PawPatrol({
   }
 
   return (
-    <div className={`paw-app ${view === "officer" ? officerStyles.officer : ""}`}>
+    <div
+      className={`paw-app ${view === "officer" ? `${officerStyles.officer} ${glassStyles.workspace}` : ""}`}
+      data-officer-glass={view === "officer" ? "true" : undefined}
+      data-officer-theme={view === "officer" ? theme : undefined}
+    >
       <a className="skip-link" href="#workspace">
         Skip to workspace
       </a>
-      <header className="topbar">
+      <header className={`topbar ${view === "officer" ? glassStyles.bubble : ""}`}>
+        {view === "officer" && <GlassEffect />}
         <Link className="wordmark" href="/" aria-label="Paw Patrol home">
           <Shield />
           <span>Paw Patrol{view !== "officer" && <small>CONNECTED RESPONSE</small>}</span>
@@ -598,7 +614,10 @@ export function PawPatrol({
           </>
         )}
         {hardware && (
-          <section className="hardware-panel panel">
+          <section
+            className={`hardware-panel panel ${view === "officer" ? glassStyles.bubble : ""}`}
+          >
+            {view === "officer" && <GlassEffect />}
             <div className="panel-heading">
               <h2>Hardware readiness</h2>
               <button
@@ -812,7 +831,11 @@ export function PawPatrol({
           <>
             <h1 className="sr-only">Officer workspace</h1>
             {map}
-            <div className={officerStyles.unitPicker}>
+            <div
+              className={`${officerStyles.unitPicker} ${glassStyles.bubble} ${glassStyles.pill}`}
+              data-officer-picker=""
+            >
+              <GlassEffect />
               <Shield size={18} aria-hidden="true" />
               <label className="sr-only" htmlFor="officer-person">
                 Selected person
@@ -830,7 +853,21 @@ export function PawPatrol({
               </select>
               <span>{personStatus(person.id, time)}</span>
             </div>
-            <div className={officerStyles.tools}>
+            <div className={glassStyles.sidebar}>
+              <OfficerOverview
+                person={person}
+                onSelect={setSelectedId}
+                time={time}
+                running={running}
+                heartRate={heartRate}
+              />
+              <div className="map-overlay">
+                <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+                <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
+              </div>
+            </div>
+            <div className={`${officerStyles.tools} ${glassStyles.bubble} ${glassStyles.pill}`}>
+              <GlassEffect />
               <button
                 aria-expanded={evidence === "camera"}
                 aria-controls="officer-camera"
@@ -854,9 +891,10 @@ export function PawPatrol({
             </div>
             <section
               id="officer-camera"
-              className={officerStyles.camera}
+              className={`${officerStyles.camera} ${glassStyles.bubble}`}
               hidden={evidence !== "camera"}
             >
+              <GlassEffect />
               <div className="panel-heading">
                 <h2>Camera & audio</h2>
                 <button

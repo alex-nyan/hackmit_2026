@@ -1,0 +1,73 @@
+.layers {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--liquid-fallback, #eef2f6);
+}
+
+.filter {
+  position: absolute;
+  pointer-events: none;
+}
+.refraction,
+.tint,
+.shine {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.refraction {
+  inset: -8px;
+}
+.tint {
+  background: var(
+    --liquid-tint,
+    linear-gradient(
+      135deg,
+      rgb(255 255 255 / 80%),
+      rgb(246 250 255 / 52%) 48%,
+      rgb(234 242 252 / 70%)
+    )
+  );
+}
+.shine {
+  box-shadow: var(
+    --liquid-highlight,
+    inset 1px 1px 1px rgb(255 255 255 / 95%),
+    inset -1px -1px 1px rgb(255 255 255 / 65%),
+    inset 0 0 12px rgb(255 255 255 / 28%)
+  );
+}
+
+@supports ((backdrop-filter: blur(6px)) or (-webkit-backdrop-filter: blur(6px))) {
+  .layers {
+    background: transparent;
+  }
+  .refraction {
+    backdrop-filter: blur(6px) saturate(150%);
+    -webkit-backdrop-filter: blur(6px) saturate(150%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .layers {
+    background: var(--liquid-fallback, #f8fafc);
+  }
+  .refraction {
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .layers {
+    background: Canvas;
+  }
+  .refraction,
+  .tint,
+  .shine {
+    display: none;
+  }
+}

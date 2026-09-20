@@ -31,10 +31,10 @@
   gap: 5px;
   min-height: 30px;
   padding: 6px 8px;
-  border: 1px solid var(--route-color, #343e8a);
+  border: 1px solid #94a3b8;
   border-radius: 7px;
-  background: #fcf7ed;
-  color: var(--route-color, #343e8a);
+  background: #f8fafc;
+  color: #263342;
   box-shadow: 0 3px 12px rgb(40 46 78 / 20%);
   font:
     700 10px/1.1 Arial,
@@ -53,7 +53,7 @@
   left: calc(50% - 4px);
   width: 8px;
   height: 8px;
-  background: #fcf7ed;
+  background: #f8fafc;
   transform: rotate(45deg);
 }
 
@@ -65,15 +65,15 @@
   outline-offset: 4px;
 }
 .officerMarker[data-selected="true"] {
-  background: var(--route-color, #343e8a);
+  background: #263342;
   color: #fff;
-  border-color: var(--route-color, #343e8a);
+  border-color: #263342;
   box-shadow:
     0 0 0 2px #fff,
     0 3px 8px rgb(24 39 65 / 25%);
 }
 .officerMarker[data-selected="true"]::after {
-  background: var(--route-color, #343e8a);
+  background: #263342;
 }
 .officerMarker[data-emergency="true"] {
   border-color: #ae6c3e;
@@ -87,6 +87,62 @@
 }
 .officerLabel {
   letter-spacing: 0.035em;
+}
+
+/* Only Officer opts in. The car artwork and hit targets remain screen-sized. */
+.root[data-appearance="glass"] .officerMarker {
+  border-radius: 999px;
+  border-color: rgb(255 255 255 / 95%);
+  background: rgb(246 250 255 / 86%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    inset 0 1px 1px #fff,
+    0 3px 12px rgb(24 39 65 / 20%);
+}
+.root[data-appearance="glass"] .officerMarker::after {
+  display: none;
+}
+.root[data-appearance="glass"] .officerMarker[data-selected="true"] {
+  background: #263342;
+  border-color: #fff;
+  box-shadow:
+    0 0 0 2px #263342,
+    0 3px 12px rgb(24 39 65 / 20%);
+}
+.root[data-appearance="glass"] .officerMarker[data-emergency="true"] {
+  border-color: #ae6c3e;
+}
+
+.root[data-appearance="glass"][data-theme="dark"] .officerMarker {
+  background: rgb(23 37 54 / 92%);
+  color: #e9f1fb;
+  border-color: rgb(186 212 241 / 45%);
+  box-shadow:
+    inset 0 1px 1px rgb(208 230 255 / 25%),
+    0 3px 12px rgb(0 0 0 / 30%);
+}
+.root[data-appearance="glass"][data-theme="dark"] .officerMarker[data-selected="true"] {
+  background: #e9f1fb;
+  color: #172536;
+  border-color: #fff;
+  box-shadow:
+    0 0 0 2px #172536,
+    0 3px 12px rgb(0 0 0 / 30%);
+}
+.root[data-appearance="glass"][data-theme="dark"] .officerMarker[data-emergency="true"] {
+  border-color: #efa876;
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .root[data-appearance="glass"] .officerMarker:not([data-selected="true"]) {
+    background: #f8fafc;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .root[data-appearance="glass"][data-theme="dark"] .officerMarker:not([data-selected="true"]) {
+    background: #172536;
+  }
 }
 
 .incidentMarker {
@@ -260,7 +316,6 @@
   height: 44px;
   z-index: 2;
   pointer-events: none;
-  color: var(--route-color, #343e8a);
   filter: drop-shadow(0 2px 2px rgb(20 35 55 / 40%));
 }
 .vehicleDirection svg {
@@ -277,10 +332,8 @@
   stroke: none;
 }
 .vehicleDirection[data-selected="true"] [data-car-outline] {
-  fill: rgb(255 255 255 / 25%);
-  stroke: currentColor;
+  stroke: #263342;
 }
 .vehicleDirection[data-emergency="true"] [data-car-outline] {
-  fill: rgb(223 139 90 / 22%);
   stroke: #ae6c3e;
 }
