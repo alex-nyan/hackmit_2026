@@ -20,8 +20,9 @@ default startup below remains the synthetic demonstration.
 The default dashboard also supports an optional [HeartCast Bluetooth heart-rate
 test](docs/paw-patrol/heartcast-local-test.md) in desktop Chrome. Connect explicitly
 from the selected person's heart-rate panel. Device readings stay in that tab;
-they do not enter the shared incident log, MIST handoff, or authenticated live
-pipeline. This is separate from the live mode's Apple Watch telemetry.
+an operator can explicitly share a current snapshot into the shared incident log
+and reviewed MIST workflow. Continuous readings do not enter the authenticated
+live pipeline. This is separate from the live mode's Apple Watch telemetry.
 
 ## Quick start
 
@@ -73,14 +74,16 @@ the launcher.** An occupied port produces an error; it does not terminate an
 unrelated server. Stop an older dashboard on 5176 before starting the launcher.
 Run a subset with `pnpm run dev -- officer hospital`, or see `pnpm run dev -- --help`.
 
-These are independent, synthetic browser demo sessions. Starting playback or
-entering a handoff in one browser does not update another. Port separation selects
-the UI; it is not authentication or role authorization.
+Scenario playback is local to each browser. Real observations and operator reports
+share `/api/incidents`: use `PAW_PATROL_INCIDENT_STORE=local` for a shared file on
+one development host, or private Vercel Blob storage for deployed instances.
+Camera frames, WebRTC signaling and phone GPS require Blob separately; local
+incident storage does not configure them. Port separation selects the UI, not
+authentication or role authorization. The animated ambulance handoff relay is
+same-browser only and does not synchronize separate devices.
 
-**One server is required for anything shared.** The incident log and the body
-camera wall live in a server's memory, so three `next dev` processes each see
-only their own. Three ports give you isolation, not a shared incident — use the
-role routes below when the workspaces need to see each other.
+For the current deployed workflow, blockers and verification boundaries, see
+[the deployment audit](docs/deployment-audit.md).
 
 See [the development guide](docs/development.md) for the directory map, individual
 commands and troubleshooting. Setup preserves existing local configuration.
@@ -101,11 +104,12 @@ reachable in one place:
 | `/join`          | One-tap page behind the QR code: put this phone on the map       |
 | `/capture/check` | Whether this device will provide camera and microphone           |
 
-The three role routes are how you get separate dashboards that still share an
-incident and a body camera wall: open them in three windows on the one server.
-Each looks exactly like its pinned port does, without the tab switcher. A server
-started with `PAW_PATROL_WORKSPACE` set is dedicated to its own role and answers
-404 for the other two.
+The three role routes provide separate dashboards on one origin. Their shared
+incident and media stores must still be configured; one server alone is not enough.
+In demo mode, each looks like its pinned port, without the tab switcher. A server
+started with `PAW_PATROL_WORKSPACE` set serves its assigned demo role (signed-in
+officers can also access `/officer`). In native live mode, all four main URLs
+render the authenticated workspace; the operator credential determines the role.
 
 To run it alongside the pinned workspaces:
 
@@ -440,8 +444,8 @@ docs/paw-patrol/         Dashboard architecture, route provenance, and verificat
 - **Phone access:** `localhost` on a phone points to the phone, not your laptop.
   The default server binds to loopback. For a trusted LAN only, explicitly use
   `pnpm exec next dev --hostname 0.0.0.0`, open the laptop's LAN address, and update
-  token URL restrictions. Phone positions come from Traccar (see **Live fleet
-  tracking**), not from the browser's geolocation API.
+  token URL restrictions. Phone positions can come from browser geolocation (`/join` with HTTPS and Blob)
+  or Traccar (see **Live fleet tracking**).
 
 - **The locate button says tracking is not configured.** `TRACCAR_URL`,
   `TRACCAR_EMAIL` and `TRACCAR_PASSWORD` must all be set in `.env.local`, and the

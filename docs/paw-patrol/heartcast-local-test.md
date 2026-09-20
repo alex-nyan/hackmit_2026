@@ -8,7 +8,7 @@ another scenario action.
 
 This feature is separate from the authenticated `PAW_PATROL_DATA_MODE=live`
 dashboard and its server telemetry. It does not authenticate the wearer, upload
-readings, add a backend contract, or populate live-mode telemetry. A real Bluetooth
+continuous readings, add a backend contract, or populate live-mode telemetry. A real Bluetooth
 reading in a demo workspace does not turn that workspace into a live operational
 dashboard. Other app features retain their existing data flows.
 
@@ -44,8 +44,9 @@ dashboard. Other app features retain their existing data flows.
 - **No synthetic fallback:** after starting a connection attempt, missing or
   disconnected device data displays `--`. Choose **Use demo heart rate** to
   deliberately restore the synthetic scenario.
-- **Freshness:** no usable updates for 30 seconds marks the feed stale and
-  removes the current BPM. Any remaining trend represents past received data.
+- **Freshness:** no usable updates for 3 seconds marks the feed stale and
+  removes the current BPM. Reported no-contact, zero/invalid readings, and
+  disconnect clear it immediately. Any remaining trend represents past received data.
   A stream of repeated values cannot prove that HeartCast has a fresh Watch
   measurement; this UI measures notification freshness only.
 - **Person changes:** changing the selected person disconnects the device and
@@ -54,16 +55,18 @@ dashboard. Other app features retain their existing data flows.
   scripted demo does not pause an active Bluetooth stream.
 - **Disconnect/retry:** use Disconnect to stop the current connection. Reconnect
   asks Chrome to select the device again and retrieves fresh GATT objects.
-- **Local only:** device readings are held in this tab's memory. They are not
-  uploaded, logged, written to local storage, included in copied MIST, added to
-  the shared incident bus, or sent to another dashboard. Reloading or closing
-  the tab discards them.
-- **Separate ports are separate sessions:** connecting on 5177 does not update
-  5176 or 5178. Use one tab for the hardware test; cross-dashboard transport is
-  not implemented, and some BLE peripherals allow only one connection.
-- **MIST remains separate:** simulated handoffs keep their scripted vital signs,
-  and source-labelled MIST drafts retain their existing inputs. HeartCast data
-  is never mixed into either record.
+- **Continuous readings stay local:** samples are held in this tab's memory and
+  are discarded on reload or close. In Situation & medic report, **Share current
+  heart rate** explicitly publishes a current snapshot to the shared incident log.
+  That snapshot can appear in other workspaces and reviewed MIST drafts; it does
+  not create a continuous remote heart-rate stream.
+- **Separate ports are separate sessions:** connecting on 5177 does not stream
+  continuous samples to 5176 or 5178. Use one tab for the hardware connection;
+  other dashboards receive only explicitly shared snapshots. Some BLE peripherals
+  allow only one connection.
+- **MIST provenance:** simulated handoffs keep their scripted vital signs.
+  Reviewed evidence drafts can include explicitly shared snapshots or a current
+  local device reading, labelled with its source and browser receipt time.
 
 ## Troubleshooting
 
@@ -96,8 +99,8 @@ Automated tests use mock Bluetooth objects; they do **not** establish physical
 HeartCast compatibility. The real-device acceptance test is: pair your device,
 compare the displayed BPM against HeartCast, observe updates, stop the broadcast,
 verify stale/disconnected states, reconnect, then change the selected person and
-verify the previous reading is cleared. Also confirm that the other dashboard
-ports and copied MIST do not receive the reading. No diagnosis or physiological
+verify the previous reading is cleared. Confirm that other dashboards receive
+only explicitly shared snapshots, not the continuous Bluetooth stream. No diagnosis or physiological
 accuracy claim follows from successful transport.
 
 ## References

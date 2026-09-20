@@ -7,7 +7,9 @@ import type { IncidentDraft, IncidentEvent } from "./incidents";
 export function usesLocalIncidents() {
   return process.env.PAW_PATROL_INCIDENT_STORE === "local" && !process.env.VERCEL;
 }
-const directory = () => path.resolve(process.env.PAW_PATROL_LOCAL_DATA_DIR || ".runtime");
+// Runtime data is provisioned on the host, never bundled from the developer's machine.
+const directory = () =>
+  path.resolve(/* turbopackIgnore: true */ process.env.PAW_PATROL_LOCAL_DATA_DIR || ".runtime");
 const filename = () => path.join(directory(), "incidents.json");
 
 export async function readLocalIncidents(): Promise<IncidentEvent[]> {

@@ -8,6 +8,13 @@ export const WORKSPACE_VIEWS = {
 
 export type Workspace = keyof typeof WORKSPACE_VIEWS;
 
+/** Every workspace route must use the same data source; live failures never select demo data. */
+export function parseDataMode(value: string | undefined): "demo" | "live" {
+  if (value === undefined || value === "demo") return "demo";
+  if (value === "live") return "live";
+  throw new Error("PAW_PATROL_DATA_MODE must be demo or live.");
+}
+
 export const WORKSPACE_LABELS: Record<Workspace, string> = {
   dispatch: "Dispatch",
   officer: "Officer",
@@ -26,8 +33,8 @@ export function parseWorkspace(value: string | undefined): Workspace | null {
  * A role is pinned two ways now. `PAW_PATROL_WORKSPACE` dedicates a whole
  * server to one, which is what the three-port launcher does; a role route
  * pins one window on a server that is serving every role at once. The second
- * is what lets three separate dashboards share one incident log and one body
- * camera wall, because sharing needs a single process. Where a server has been
+ * gives all three dashboards one origin. Incident/media sharing still depends
+ * on their configured stores, not the process count. Where a server has been
  * dedicated, the other roles' routes are not its to serve.
  */
 export function pinnedElsewhere(workspace: Workspace, value: string | undefined): boolean {

@@ -3,6 +3,7 @@
 .env
 .env.*
 certificates/
+.runtime/
 
 node_modules
 .next
