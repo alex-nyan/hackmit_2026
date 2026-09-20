@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { BroadcastDock } from "@/features/live-video/BroadcastDock";
 import "./globals.css";
 import "./operations.css";
 
@@ -23,7 +24,10 @@ export default function RootLayout({
     // Extensions commonly add attributes to these two elements before React
     // hydrates; that mismatch is not the app's to reconcile.
     <html lang="en" suppressHydrationWarning>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        {children}
+        <BroadcastDock />
+      </body>
     </html>
   );
 }
