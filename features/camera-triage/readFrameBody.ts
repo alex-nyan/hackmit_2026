@@ -1,7 +1,10 @@
 type BodyReadResult = { ok: true; body: string } | { ok: false; status: 400 | 413; error: string };
 
-/** Bound raw request bytes before decoding or retaining the full frame. */
-export async function readFrameBody(request: Request, maxBytes: number): Promise<BodyReadResult> {
+/** Bound raw request or response bytes before decoding or retaining the full body. */
+export async function readFrameBody(
+  request: Pick<Request, "headers" | "body">,
+  maxBytes: number,
+): Promise<BodyReadResult> {
   const contentLength = request.headers.get("content-length");
   if (contentLength !== null) {
     if (!/^\d+$/.test(contentLength)) {

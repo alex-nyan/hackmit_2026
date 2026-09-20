@@ -22,28 +22,32 @@ afterEach(() => {
 });
 
 describe("bounded frame body", () => {
-  it("stops consuming and cancels an oversized stream even without Content-Length", async () => {
-    const cancel = vi.fn();
-    let chunksRead = 0;
-    const stream = new ReadableStream<Uint8Array>(
-      {
-        pull(controller) {
-          chunksRead += 1;
-          controller.enqueue(new Uint8Array(4));
+  it.each(["request", "response"] as const)(
+    "cancels an oversized %s stream without Content-Length",
+    async (kind) => {
+      const cancel = vi.fn();
+      let chunksRead = 0;
+      const stream = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            chunksRead += 1;
+            controller.enqueue(new Uint8Array(4));
+          },
+          cancel,
         },
-        cancel,
-      },
-      { highWaterMark: 0 },
-    );
+        { highWaterMark: 0 },
+      );
 
-    expect(await readFrameBody(streamedRequest(stream), 8)).toEqual({
-      ok: false,
-      status: 413,
-      error: "frame-too-large",
-    });
-    expect(chunksRead).toBe(3);
-    expect(cancel).toHaveBeenCalledOnce();
-  });
+      const input = kind === "request" ? streamedRequest(stream) : new Response(stream);
+      expect(await readFrameBody(input, 8)).toEqual({
+        ok: false,
+        status: 413,
+        error: "frame-too-large",
+      });
+      expect(chunksRead).toBe(3);
+      expect(cancel).toHaveBeenCalledOnce();
+    },
+  );
 
   it("checks streamed bytes even when Content-Length understates the body", async () => {
     const stream = new ReadableStream<Uint8Array>({
