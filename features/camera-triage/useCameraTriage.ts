@@ -4,12 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { trackConstraint } from "./devices";
 import { buildTriageRequest, nextDelayMs, type FrameOutcome } from "./frame";
+import {
+  CAPTURE_REQUEST_WIDTH,
+  INITIAL_LADDER,
+  afterUpload,
+  encodingAt,
+  linkTimeMs,
+} from "./frameQuality";
 import type { CaptureState, TriageResult } from "./types";
 import { useWakeLock } from "./useWakeLock";
 
 const BASE_INTERVAL_MS = 2000;
-const CAPTURE_WIDTH = 1280;
-const JPEG_QUALITY = 0.72;
 /** A phone that has just been asked for itself needs a moment to wake. */
 const WAKE_MS = 600;
 
@@ -38,7 +43,7 @@ async function openCamera(deviceId: string | null): Promise<MediaStream> {
   const wanted: MediaStreamConstraints = {
     video: deviceId
       ? trackConstraint(deviceId)
-      : { facingMode: "environment", width: { ideal: CAPTURE_WIDTH } },
+      : { facingMode: "environment", width: { ideal: CAPTURE_REQUEST_WIDTH } },
     audio: false,
   };
 
@@ -76,6 +81,7 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<symbol | null>(null);
+  const ladderRef = useRef(INITIAL_LADDER);
   const optionsRef = useRef({ sourceId, incidentId });
   const onResultRef = useRef(onResult);
 
@@ -107,6 +113,9 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
   const start = useCallback(
     async (deviceId: string | null = null) => {
       if (sessionRef.current) return;
+      // A new capture re-measures. Inheriting the last session's rung would
+      // hold a picture down for a link that is no longer the one it met.
+      ladderRef.current = INITIAL_LADDER;
 
       if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
         // Safari exposes mediaDevices only in a secure context, so this is the
@@ -152,6 +161,7 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
           state: "running",
           deviceLabel: camera?.label ?? "",
           triageConfigured: true,
+          encoding: encodingAt(ladderRef.current),
           lastResult: null,
           lastError: null,
         });
@@ -188,7 +198,8 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
       const video = videoRef.current;
       if (!video || video.videoWidth === 0) return "error" as const;
 
-      const scale = Math.min(1, CAPTURE_WIDTH / video.videoWidth);
+      const encoding = encodingAt(ladderRef.current);
+      const scale = Math.min(1, encoding.width / video.videoWidth);
       canvas.width = Math.round(video.videoWidth * scale);
       canvas.height = Math.round(video.videoHeight * scale);
       const context = canvas.getContext("2d");
@@ -196,12 +207,37 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       const body = buildTriageRequest({
-        dataUrl: canvas.toDataURL("image/jpeg", JPEG_QUALITY),
+        dataUrl: canvas.toDataURL("image/jpeg", encoding.quality),
         sourceId: optionsRef.current.sourceId,
         capturedAt: new Date(),
         incidentId: optionsRef.current.incidentId,
       });
       if (!body) return "error" as const;
+
+      /**
+       * Steers the next frame's size on what the link just did. Only an upload
+       * that completed is a measurement: a refusal says the model is busy and
+       * a failure says nothing at all, and shrinking the picture for either
+       * would be reading the wrong signal.
+       */
+      const startedAt = performance.now();
+      const settle = (serverMs: number | undefined) => {
+        const next = afterUpload(
+          ladderRef.current,
+          linkTimeMs(performance.now() - startedAt, serverMs),
+        );
+        if (next.index === ladderRef.current.index) {
+          ladderRef.current = next;
+          return;
+        }
+        ladderRef.current = next;
+        const moved = encodingAt(next);
+        if (!cancelled) {
+          setState((current) =>
+            current.state === "running" ? { ...current, encoding: moved } : current,
+          );
+        }
+      };
 
       const response = await fetch("/api/triage", {
         method: "POST",
@@ -228,6 +264,9 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
       if (response.status === 503) {
         const reason = (await response.json().catch(() => null)) as { error?: unknown } | null;
         if (reason?.error === "not-configured") {
+          // The whole frame was still uploaded, and no model was involved, so
+          // this is the cleanest link measurement the loop ever gets.
+          settle(undefined);
           if (!cancelled) {
             setState((current) =>
               current.state === "running"
@@ -251,6 +290,7 @@ export function useCameraTriage({ sourceId, incidentId, onResult }: Options) {
       }
 
       const result = (await response.json()) as TriageResult;
+      settle(result.timings_ms?.total);
       if (!cancelled) {
         setState((current) =>
           current.state === "running"

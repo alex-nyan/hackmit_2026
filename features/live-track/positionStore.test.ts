@@ -13,8 +13,13 @@ class BlobPreconditionFailedError extends Error {
 
 vi.mock("@vercel/blob", () => ({ put, get, del, BlobPreconditionFailedError }));
 
-const { clearPositions, isPositionStoreConfigured, listPublishedDevices, publishPosition } =
-  await import("./positionStore");
+const {
+  clearPositions,
+  isPositionStoreConfigured,
+  listPublishedDevices,
+  publishPosition,
+  removePosition,
+} = await import("./positionStore");
 const { POSITION_PATH } = await import("./devicePosition");
 import type { PositionSubmission, StoredPosition } from "./devicePosition";
 
@@ -35,11 +40,16 @@ function submission(overrides: Partial<PositionSubmission> = {}): PositionSubmis
   };
 }
 
+/**
+ * A body stream can only be read once, so each read gets a fresh one. The real
+ * client returns a new response per call; reusing one here would make a retry
+ * look at an empty store and mask whether it re-read at all.
+ */
 function holds(positions: StoredPosition[], etag = "etag-1") {
-  get.mockResolvedValue({
+  get.mockImplementation(async () => ({
     stream: new Response(JSON.stringify(positions)).body,
     blob: { etag, uploadedAt: NOW },
-  });
+  }));
 }
 
 function written(call = 0): StoredPosition[] {
@@ -200,5 +210,68 @@ describe("knowing whether there is anywhere to publish", () => {
     expect(isPositionStoreConfigured({})).toBe(false);
     expect(isPositionStoreConfigured({ BLOB_READ_WRITE_TOKEN: "   " })).toBe(false);
     expect(isPositionStoreConfigured({ BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_x" })).toBe(true);
+  });
+});
+
+describe("withdrawing one unit", () => {
+  function stored(sourceId: string, at = "2026-09-20T11:59:58.000Z"): StoredPosition {
+    return { ...submission({ sourceId }), publishedAt: at };
+  }
+
+  it("removes the unit that left and leaves everyone else on the map", async () => {
+    holds([stored("unit-01"), stored("unit-02")]);
+
+    await expect(removePosition("unit-01", NOW, noSleep)).resolves.toBe(true);
+    expect(written().map((position) => position.sourceId)).toEqual(["unit-02"]);
+  });
+
+  it("does not write when the unit is not there to remove", async () => {
+    holds([stored("unit-02")]);
+
+    await expect(removePosition("unit-01", NOW, noSleep)).resolves.toBe(false);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("does not write against an empty store", async () => {
+    await expect(removePosition("unit-01", NOW, noSleep)).resolves.toBe(false);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("guards the write with the etag it read, like every other write does", async () => {
+    holds([stored("unit-01")], "etag-9");
+
+    await removePosition("unit-01", NOW, noSleep);
+    expect(put.mock.calls[0][2]).toMatchObject({ ifMatch: "etag-9" });
+  });
+
+  it("writes an empty store when the last unit leaves", async () => {
+    holds([stored("unit-01")]);
+
+    await removePosition("unit-01", NOW, noSleep);
+    expect(written()).toEqual([]);
+  });
+
+  it("retries against the store as it now stands when it loses a race", async () => {
+    holds([stored("unit-01"), stored("unit-02")]);
+    put.mockRejectedValueOnce(new BlobPreconditionFailedError()).mockResolvedValue({});
+
+    await expect(removePosition("unit-01", NOW, noSleep)).resolves.toBe(true);
+    expect(put).toHaveBeenCalledTimes(2);
+    expect(written(1).map((position) => position.sourceId)).toEqual(["unit-02"]);
+  });
+
+  it("gives a failure that is not a lost race back to the caller", async () => {
+    holds([stored("unit-01")]);
+    put.mockRejectedValue(new Error("blob store unreachable"));
+
+    await expect(removePosition("unit-01", NOW, noSleep)).rejects.toThrow("unreachable");
+  });
+
+  it("drops units that had already expired while it is writing anyway", async () => {
+    // Two hours old, well past the point where a fix describes anywhere.
+    holds([stored("unit-01"), stored("unit-09", "2026-09-20T10:00:00.000Z")]);
+
+    await removePosition("unit-01", NOW, noSleep);
+    expect(written()).toEqual([]);
   });
 });

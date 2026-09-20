@@ -1,8 +1,10 @@
+import { isValidToken } from "@/features/camera-triage/frame";
 import { parsePositionSubmission } from "@/features/live-track/devicePosition";
 import {
   clearPositions,
   isPositionStoreConfigured,
   publishPosition,
+  removePosition,
 } from "@/features/live-track/positionStore";
 
 /**
@@ -62,8 +64,36 @@ export async function POST(request: Request): Promise<Response> {
   );
 }
 
-/** Demo reset. Clears every published position at once. */
-export async function DELETE(): Promise<Response> {
-  await clearPositions();
+/**
+ * Withdraws one unit, or resets the whole demo.
+ *
+ * `?sourceId=` is somebody pressing stop: they left, and a marker that fades
+ * out over the next half hour would have a dispatcher reading a unit that is
+ * not there. Without it this is the demo reset, which clears everyone — so the
+ * scope is required to be explicit rather than inferred from a body that may
+ * not have survived the page closing.
+ */
+export async function DELETE(request: Request): Promise<Response> {
+  const sourceId = new URL(request.url).searchParams.get("sourceId");
+
+  if (sourceId === null) {
+    await clearPositions();
+    return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  }
+
+  if (!isValidToken(sourceId)) {
+    return Response.json(
+      { error: "invalid-source" },
+      { status: 422, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  if (!isPositionStoreConfigured()) {
+    // Nowhere to withdraw from is not a failure to withdraw: the caller wanted
+    // this unit gone, and it is.
+    return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  }
+
+  await removePosition(sourceId);
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }

@@ -28,6 +28,27 @@ const PUBLISH_MS = 4_000;
 const MAX_REPUBLISH_MS = 90_000;
 const METRES_PER_SECOND_TO_KMH = 3.6;
 
+/**
+ * Tells the store this unit has left.
+ *
+ * Fire-and-forget, and `keepalive` on purpose: the most common moment to stop
+ * publishing is the one where the page is going away, and an ordinary fetch
+ * started during teardown is cancelled with the document. A withdrawal that
+ * does not arrive is not worth reporting — the fix ages out on its own, just
+ * slower than it should.
+ */
+function withdraw(sourceId: string): void {
+  try {
+    void fetch(`${ENDPOINT}?sourceId=${encodeURIComponent(sourceId)}`, {
+      method: "DELETE",
+      keepalive: true,
+      cache: "no-store",
+    }).catch(() => undefined);
+  } catch {
+    // Some browsers throw synchronously on a keepalive fetch during unload.
+  }
+}
+
 export type DevicePositionState =
   | { state: "idle" }
   | { state: "unsupported"; reason: string }
@@ -52,6 +73,12 @@ interface Session {
   inFlight: AbortController | undefined;
   /** The newest fix, held only for republishing. Never a track. */
   latest: GeolocationPosition | null;
+  /**
+   * Whether the store ever accepted a fix from this session. A unit that never
+   * got one was never on the map, and withdrawing it would be a request that
+   * cannot remove anything.
+   */
+  published: boolean;
 }
 
 function describe(error: GeolocationPositionError): string {
@@ -94,8 +121,13 @@ export function useDevicePosition(
     sessionRef.current = null;
     navigator.geolocation.clearWatch(session.watchId);
     if (session.timer) clearTimeout(session.timer);
+    // Abandon the publish in flight before withdrawing, so the two are not
+    // racing to say opposite things about the same unit.
     session.inFlight?.abort();
     session.latest = null;
+    // Only for a session that actually published: a unit that never got a fix
+    // was never on the map to be taken off it.
+    if (session.published) withdraw(toSourceId(idRef.current));
   }, []);
 
   const stop = useCallback(() => {
@@ -121,6 +153,7 @@ export function useDevicePosition(
       timer: undefined,
       inFlight: undefined,
       latest: null,
+      published: false,
     };
 
     const current = () => sessionRef.current === session;
@@ -172,6 +205,7 @@ export function useDevicePosition(
           }),
         });
         if (!response.ok) throw new Error(String(response.status));
+        session.published = true;
         report({ lastError: null });
       } catch (error) {
         if (controller.signal.aborted) return;

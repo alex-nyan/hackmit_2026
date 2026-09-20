@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CameraTriageView } from "./CameraTriageView";
 import { CapturePanel } from "./CapturePanel";
+import { CAPTURE_REQUEST_WIDTH } from "./frameQuality";
 
 function info(deviceId: string, label: string) {
   return { kind: "videoinput", deviceId, label, groupId: "g" } as MediaDeviceInfo;
@@ -49,7 +50,7 @@ describe.each([
 
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Start" })));
     expect(getUserMedia).toHaveBeenLastCalledWith({
-      video: { facingMode: "environment", width: { ideal: 1280 } },
+      video: { facingMode: "environment", width: { ideal: CAPTURE_REQUEST_WIDTH } },
       audio: false,
     });
   });

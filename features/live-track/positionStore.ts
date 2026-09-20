@@ -104,6 +104,50 @@ export async function publishPosition(
   throw new Error("The position could not be published.");
 }
 
+/**
+ * Takes one unit off the map now, instead of letting it age out.
+ *
+ * Ageing out is the right answer for a phone that went quiet: it stopped
+ * saying where it was, and grey says exactly that. It is the wrong answer for
+ * somebody who pressed stop, because they did not go quiet — they left, and a
+ * dispatcher watching a marker fade over the next half hour is reading a unit
+ * that is not there.
+ *
+ * Answers whether there was anything to withdraw, so a caller can tell a
+ * removal from a no-op without reading the store again.
+ */
+export async function removePosition(
+  sourceId: string,
+  now: Date = new Date(),
+  sleep: Sleep = realSleep,
+): Promise<boolean> {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const { positions, etag } = await readPositions();
+    // Nothing of this unit's to remove. Writing anyway would cost a round trip
+    // and a lost race for whoever is publishing right now.
+    if (!positions.some((position) => position.sourceId === sourceId)) return false;
+
+    const next = activePositions(positions, now.getTime()).filter(
+      (position) => position.sourceId !== sourceId,
+    );
+
+    try {
+      await put(POSITION_PATH, JSON.stringify(next), {
+        access: "private",
+        contentType: "application/json",
+        addRandomSuffix: false,
+        ...(etag ? { ifMatch: etag } : { allowOverwrite: false }),
+      });
+      return true;
+    } catch (error) {
+      if (!isWriteConflict(error) || attempt === MAX_ATTEMPTS - 1) throw error;
+      await sleep(BACKOFF_MS * (attempt + 1) * (0.5 + Math.random() / 2));
+    }
+  }
+
+  throw new Error("The position could not be withdrawn.");
+}
+
 /** Every unit currently publishing, as the view model the map already draws. */
 export async function listPublishedDevices(nowMs: number = Date.now()): Promise<LiveDevice[]> {
   const { positions } = await readPositions();

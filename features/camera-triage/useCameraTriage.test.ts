@@ -2,6 +2,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useCameraTriage } from "./useCameraTriage";
+import { CAPTURE_REQUEST_WIDTH } from "./frameQuality";
 
 const getUserMedia = vi.fn<() => Promise<MediaStream>>();
 
@@ -43,7 +44,7 @@ describe("camera acquisition lifecycle", () => {
 
     await act(async () => result.current.start());
     expect(getUserMedia).toHaveBeenLastCalledWith({
-      video: { facingMode: "environment", width: { ideal: 1280 } },
+      video: { facingMode: "environment", width: { ideal: CAPTURE_REQUEST_WIDTH } },
       audio: false,
     });
     act(() => disconnected());

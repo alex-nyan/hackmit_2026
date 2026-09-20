@@ -1,3 +1,5 @@
+import type { Encoding } from "./frameQuality";
+
 /** Mirrors services/triage/contracts/triage-request.schema.json. */
 export interface TriageRequestBody {
   image_base64: string;
@@ -89,6 +91,11 @@ export type CaptureState =
        * there is simply no model reading them.
        */
       triageConfigured: boolean;
+      /**
+       * The size and compression this capture has settled on. It moves with
+       * the link, so it is reported rather than assumed by a reader.
+       */
+      encoding: Encoding;
       lastResult: TriageResult | null;
       lastError: string | null;
     };

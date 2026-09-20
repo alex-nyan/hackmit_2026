@@ -244,7 +244,11 @@ function Status({ position, camera }: { position: DevicePositionState; camera: C
   if (camera.state === "running") {
     lines.push({
       key: "c-ok",
-      text: camera.lastError ?? "Camera publishing to the body camera wall",
+      // The rung is worth showing: it moves on its own, and a picture that
+      // quietly got smaller is otherwise indistinguishable from a worse camera.
+      text:
+        camera.lastError ??
+        `Camera publishing to the body camera wall · ${camera.encoding.width}px`,
       bad: Boolean(camera.lastError),
     });
   }
