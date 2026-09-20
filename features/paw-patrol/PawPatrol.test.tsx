@@ -52,12 +52,12 @@ describe("workspace entry points", () => {
     fireEvent.click(nav.getByRole("button", { name: "Officer" }));
     expect(ui.getByRole("heading", { level: 1 }).textContent).toBe("Officer workspace");
     fireEvent.click(nav.getByRole("button", { name: "Hospital" }));
-    expect(ui.getByRole("heading", { level: 1 }).textContent).toBe("Ready before arrival.");
+    expect(ui.getByRole("heading", { level: 1 }).textContent).toBe("Officer care");
   });
 
   it.each([
     ["officer", "Officer", "Officer workspace"],
-    ["hospital", "Hospital", "Ready before arrival."],
+    ["hospital", "Hospital", "Officer care"],
   ] as const)(
     "opens the fixed %s workspace without role switching controls",
     (workspace, label, heading) => {
@@ -69,6 +69,8 @@ describe("workspace entry points", () => {
       fireEvent.change(ui.getByRole("combobox", { name: /^Selected person$/ }), {
         target: { value: "P-02" },
       });
+      if (workspace === "hospital")
+        fireEvent.click(ui.getByText("Connections", { selector: "summary span" }));
       fireEvent.click(ui.getByRole("button", { name: "Reset demo" }));
       expect(ui.getByRole("heading", { level: 1 }).textContent).toBe(heading);
       expect(bus.clear).toHaveBeenCalledTimes(1);
@@ -104,6 +106,61 @@ describe("workspace entry points", () => {
     expect(ui.getByTestId("map-selection").textContent).toBe("P-02");
     expect(ui.getByRole("heading", { name: "On the ground" })).toBeTruthy();
     expect(ui.queryByRole("heading", { name: "Officer workspace" })).toBeNull();
+  });
+
+  it("prioritizes hospital media and heart rate, with setup below the main view", () => {
+    const ui = render(<PawPatrol workspace="hospital" />);
+    expect(ui.getByRole("region", { name: "Officer camera and audio" })).toBeTruthy();
+    expect(ui.getByRole("region", { name: "Heart monitor" })).toBeTruthy();
+    expect(ui.queryByText("Body viewer")).toBeNull();
+    expect(
+      ui.queryByText(
+        /Awaiting a handoff|Context, not conclusions|Demo heart rate|Connect your own device/,
+      ),
+    ).toBeNull();
+    const connectionControls = ui
+      .getByRole("button", { name: "Connect Heart Rate" })
+      .closest("details");
+    expect(connectionControls?.open).toBe(false);
+    fireEvent.click(ui.getByText("Connections", { selector: "summary span" }));
+    expect(ui.getByRole("button", { name: "Connect Heart Rate" })).toBeTruthy();
+  });
+
+  it("shows only the selected officer's latest audio report without converting it into clearance", () => {
+    const event = {
+      seq: 1,
+      id: "transcript-one",
+      kind: "transcript" as const,
+      origin: "model" as const,
+      at: "2026-09-20T01:00:00Z",
+      scenarioAt: 15,
+      personId: "P-01",
+      title: "Audio concern",
+      detail: "First officer audio report",
+      source: "Officer body camera",
+      provenance: { provider: "faster_whisper", model: "whisper", confidence: 0.98 },
+      requiresHumanReview: true,
+    };
+    bus.events = [
+      event,
+      {
+        ...event,
+        seq: 2,
+        id: "transcript-two",
+        personId: "P-02",
+        detail: "Second officer audio report",
+      },
+    ];
+    const ui = render(<PawPatrol workspace="hospital" />);
+    fireEvent.click(ui.getByText("Activity & source details", { selector: "summary" }));
+    const media = within(ui.getByRole("region", { name: "Latest audio report" }));
+    expect(media.getByText("First officer audio report")).toBeTruthy();
+    expect(media.queryByText("Second officer audio report")).toBeNull();
+    expect(ui.getByText("Hold · Clearance unconfirmed")).toBeTruthy();
+    fireEvent.change(ui.getByLabelText("Selected person"), { target: { value: "P-02" } });
+    expect(media.getByText("Second officer audio report")).toBeTruthy();
+    expect(media.queryByText("First officer audio report")).toBeNull();
+    expect(media.getByText("Machine transcript · unverified")).toBeTruthy();
   });
 });
 
@@ -185,6 +242,8 @@ describe("existing workspace integrations", () => {
       ];
       const ui = render(<PawPatrol workspace={workspace} />);
 
+      if (workspace === "hospital")
+        fireEvent.click(ui.getByText("Activity & source details", { selector: "summary" }));
       expect(ui.getByRole("heading", { name: "Shared incident log" })).toBeTruthy();
       expect(ui.getByText("Workspaces in sync")).toBeTruthy();
       expect(ui.getByText("1 shared event")).toBeTruthy();

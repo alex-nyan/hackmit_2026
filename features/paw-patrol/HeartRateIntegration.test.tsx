@@ -83,6 +83,8 @@ function renderWorkspace(workspace: "dispatch" | "officer" | "hospital") {
     expect(ui.queryByRole("button", { name: /connect heart rate/i })).toBeNull();
     fireEvent.click(ui.getByRole("button", { name: "Devices" }));
   }
+  if (workspace === "hospital")
+    fireEvent.click(ui.getByText("Connections", { selector: "summary span" }));
   return ui;
 }
 
