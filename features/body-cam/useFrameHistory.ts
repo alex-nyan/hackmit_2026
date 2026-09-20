@@ -13,27 +13,21 @@ export type HistoryStatus = "loading" | "ready" | "unavailable";
  * Timestamps only. The images are fetched one at a time as the scrubber
  * lands on them, so opening review costs a listing rather than an archive.
  */
-export function useFrameHistory(sourceId: string | null) {
+export function useFrameHistory(sourceId: string) {
   const [frames, setFrames] = useState<number[]>([]);
   const [status, setStatus] = useState<HistoryStatus>("loading");
 
   useEffect(() => {
-    if (!sourceId) {
-      setFrames([]);
-      setStatus("loading");
-      return;
-    }
-
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const inFlight = new AbortController();
 
     async function load() {
       try {
-        const response = await fetch(
-          `/api/streams/${encodeURIComponent(sourceId as string)}/history`,
-          { cache: "no-store", signal: inFlight.signal },
-        );
+        const response = await fetch(`/api/streams/${encodeURIComponent(sourceId)}/history`, {
+          cache: "no-store",
+          signal: inFlight.signal,
+        });
         if (!response.ok) throw new Error(String(response.status));
         const body = (await response.json()) as { frames?: unknown };
         if (stopped) return;

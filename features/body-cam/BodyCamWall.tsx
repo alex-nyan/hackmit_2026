@@ -124,7 +124,11 @@ export function BodyCamWall({ excludeSourceId, className = "panel" }: BodyCamWal
         </div>
       )}
 
-      {reviewing && <FrameReview sourceId={reviewing} onClose={() => setReviewing(null)} />}
+      {/* Keyed by officer: a different timeline is a different component,
+          which is what resets the scrubber without an effect to do it. */}
+      {reviewing && (
+        <FrameReview key={reviewing} sourceId={reviewing} onClose={() => setReviewing(null)} />
+      )}
 
       <p className={styles.caveat}>
         Latest frame per officer, about one every two seconds. These are stills, not a live video

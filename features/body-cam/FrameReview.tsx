@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import styles from "./BodyCamWall.module.css";
 import { useFrameHistory } from "./useFrameHistory";
@@ -27,11 +27,6 @@ export function FrameReview({ sourceId, onClose }: { sourceId: string; onClose: 
   // Follow the newest frame until the reviewer takes hold of the scrubber.
   const position = index ?? Math.max(frames.length - 1, 0);
   const at = frames[position];
-
-  useEffect(() => {
-    // A new officer is a new timeline; do not carry a position across.
-    setIndex(null);
-  }, [sourceId]);
 
   return (
     <section className={styles.review} aria-label={`Review footage from ${sourceId}`}>
