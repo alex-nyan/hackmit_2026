@@ -25,9 +25,9 @@ import { type MapFocus, type MapTheme, MAP_FOCUS } from "../boston-map/types";
 import { BuildingPanel } from "../boston-map/BuildingPanel";
 import type { BuildingFacts } from "../boston-map/buildingSelection";
 import type { Officer } from "@/features/access/roster";
+import { liveOfficer } from "./liveOfficer";
 import { AudioAlerts, useAudioAlerts } from "./AudioAlerts";
 import type { IncidentEvent } from "./incidents";
-import { BodyCamWall } from "@/features/body-cam";
 import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, UnitCard, useLiveTrack, type LiveDevice } from "@/features/live-track";
 import { OperationsMap } from "./OperationsMap";
@@ -189,7 +189,9 @@ export function PawPatrol({
   function setView(nextView: View) {
     if (!fixedView) setSelectedView(nextView);
   }
-  const [selectedId, setSelectedId] = useState<string>("P-01");
+  const [selectedId, setSelectedId] = useState<string>(
+    officer?.id.match(/^unit-(\d{2})$/) ? officer.id.replace("unit-", "P-") : "P-01",
+  );
   const [focus, setFocus] = useState<MapFocus>("all");
   const [theme, setTheme] = useState<MapTheme>("light");
   // Command owns its presentation theme; switching to Officer/Hospital keeps theirs intact.
@@ -393,6 +395,11 @@ export function PawPatrol({
     setView("officer");
   }
   function selectCommandOfficer(id: string) {
+    const live = liveOfficer(id, liveDevices);
+    if (live) {
+      handleFocusDevice(live);
+      return;
+    }
     setSelectedId(id);
     setFollowing(true);
     setRecenterKey((key) => key + 1);
@@ -457,7 +464,7 @@ export function PawPatrol({
           running={running}
           readClock={readClock}
           selectedId={selectedId}
-          onSelect={dispatchDashboard ? selectCommandOfficer : setSelectedId}
+          onSelect={selectCommandOfficer}
           focus={focus}
           areaFocusKey={dispatchDashboard ? dispatchAreaFocusKey : 0}
           theme={mapTheme}
@@ -499,21 +506,20 @@ export function PawPatrol({
           }
         />
         <AudioAlerts alerts={audioAlerts} status={bus.status} onSelect={selectAudioAlert} />
-        {view !== "officer" && (
-          <div className="map-overlay">
-            {!dispatchDashboard && (
-              <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
-            )}
-            {openDevice && (
-              <UnitCard
-                device={openDevice}
-                heartRate={heartRate}
-                onDismiss={() => setOpenDeviceId(null)}
-              />
-            )}
-            <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
-          </div>
-        )}
+        <div className="map-overlay">
+          {!dispatchDashboard && view !== "officer" && !openDevice && (
+            <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+          )}
+          {openDevice && (
+            <UnitCard
+              key={openDevice.id}
+              device={openDevice}
+              heartRate={heartRate}
+              onDismiss={() => setOpenDeviceId(null)}
+            />
+          )}
+          <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
+        </div>
         <div
           className={`campus-switch ${view === "officer" ? `${glassStyles.bubble} ${glassStyles.pill}` : ""}`}
           aria-label="Map area"
@@ -637,11 +643,7 @@ export function PawPatrol({
           workspace={workspace}
           onViewChange={setView}
           person={person}
-          onSelect={(id) => {
-            setSelectedId(id);
-            setFollowing(true);
-            setRecenterKey((key) => key + 1);
-          }}
+          onSelect={selectCommandOfficer}
           time={time}
           running={running}
           onTogglePlayback={() => (running ? dispatch({ type: "pause" }) : play())}
@@ -710,13 +712,6 @@ export function PawPatrol({
           trackingPanel={
             <>
               <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
-              {openDevice && (
-                <UnitCard
-                  device={openDevice}
-                  heartRate={heartRate}
-                  onDismiss={() => setOpenDeviceId(null)}
-                />
-              )}
               <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
             </>
           }

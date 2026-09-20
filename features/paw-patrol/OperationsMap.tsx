@@ -30,6 +30,7 @@ import type { DemoHotspot } from "./hotspots";
 import { PixelHotspotFlag, PIXEL_HOTSPOT_FLAG_SVG } from "./PixelHotspotFlag";
 import { DEMO_HEALTH_CENTRES, type DemoAmbulanceMission } from "./demoAmbulance";
 import { PIXEL_AMBULANCE_SVG } from "./PixelAmbulance";
+import { liveOfficer } from "./liveOfficer";
 import type { IncidentEvent } from "./incidents";
 import styles from "./OperationsMap.module.css";
 
@@ -401,7 +402,9 @@ export function OperationsMap(props: OperationsMapProps) {
             const person = PEOPLE[i],
               selected = person.id === current.selectedId,
               pose = sampleVehicle(person.id, frameTime);
-            const available = !!vehicleRoute(person.id, frameTime);
+            const available =
+              !!vehicleRoute(person.id, frameTime) &&
+              !liveOfficer(person.id, current.liveDevices)?.fix;
             const beacon = beacons[i];
             marker.getElement().hidden = !available;
             direction.getElement().hidden = !available;
@@ -555,7 +558,10 @@ export function OperationsMap(props: OperationsMapProps) {
           }
         };
         const syncLiveDevices = () => {
-          if (!disposed) updateLiveLayers(map, latestRef.current.liveDevices);
+          if (!disposed) {
+            updateLiveLayers(map, latestRef.current.liveDevices);
+            draw(false);
+          }
         };
         const syncAmbulances = () => {
           if (disposed) return;
@@ -872,7 +878,11 @@ export function OperationsMap(props: OperationsMapProps) {
           let id: string | null = null,
             distance = 24;
           for (const person of PEOPLE) {
-            if (!vehicleRoute(person.id, frameTime)) continue;
+            if (
+              !vehicleRoute(person.id, frameTime) ||
+              liveOfficer(person.id, latestRef.current.liveDevices)?.fix
+            )
+              continue;
             const p = map.project(sampleVehicle(person.id, frameTime).point),
               d = Math.hypot(p.x - event.point.x, p.y - event.point.y);
             if (d < distance) {

@@ -8,7 +8,7 @@ import { useLiveWatcher, type WatchState } from "./useLiveWatcher";
 interface LiveTileProps {
   sourceId: string;
   /** The latest published frame, shown whenever there is no direct link. */
-  fallbackSrc: string;
+  fallbackSrc?: string;
   alt: string;
   className?: string;
   /**
@@ -51,6 +51,15 @@ export function LiveTile({
   }, [onStateChange, state]);
 
   if (stream) return <LiveVideo stream={stream} className={className} label={alt} />;
+
+  if (!fallbackSrc)
+    return (
+      <p role="status">
+        {state === "unavailable"
+          ? "Live camera is unavailable. Retrying the connection…"
+          : "Connecting to this officer’s live camera…"}
+      </p>
+    );
 
   // eslint-disable-next-line @next/next/no-img-element
   return <img className={className} src={fallbackSrc} alt={alt} />;
