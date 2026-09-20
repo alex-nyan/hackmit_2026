@@ -1,5 +1,6 @@
 import { MEDIA_TYPE } from "@/features/body-cam/frames";
 import { readFrame, readFrameAt } from "@/features/body-cam/store";
+import { isValidToken } from "@/features/camera-triage/frame";
 
 /**
  * One officer's latest frame, as bytes.
@@ -18,6 +19,12 @@ export async function GET(
   { params }: { params: Promise<{ sourceId: string }> },
 ): Promise<Response> {
   const { sourceId } = await params;
+  if (!isValidToken(sourceId)) {
+    return Response.json(
+      { error: "invalid-source" },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   // `at` names a moment in the archive. Without it this is the live tile,
   // where the same query doubles as the cache key for the latest frame.
   const at = Number.parseInt(new URL(request.url).searchParams.get("at") ?? "", 10);

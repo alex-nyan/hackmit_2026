@@ -1,5 +1,6 @@
 import { appendIncident, clearIncidents, readIncidents } from "@/features/paw-patrol/incidentStore";
 import { parseIncidentDraft } from "@/features/paw-patrol/incidents";
+import { readFrameBody } from "@/features/camera-triage/readFrameBody";
 
 /**
  * The one piece of state the three workspaces share.
@@ -32,17 +33,17 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const raw = await request.text();
-  if (raw.length > MAX_BODY_BYTES) {
+  const raw = await readFrameBody(request, MAX_BODY_BYTES);
+  if (!raw.ok) {
     return Response.json(
-      { error: "too-large" },
-      { status: 413, headers: { "Cache-Control": "no-store" } },
+      { error: raw.status === 413 ? "too-large" : raw.error },
+      { status: raw.status, headers: { "Cache-Control": "no-store" } },
     );
   }
 
   let body: unknown;
   try {
-    body = JSON.parse(raw);
+    body = JSON.parse(raw.body);
   } catch {
     return Response.json(
       { error: "invalid-json" },
@@ -64,6 +65,13 @@ export async function POST(request: Request): Promise<Response> {
 
 /** Demo reset. Clears the shared log for every workspace. */
 export async function DELETE(): Promise<Response> {
-  await clearIncidents();
-  return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  try {
+    await clearIncidents();
+    return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return Response.json(
+      { error: "reset-failed", reason: "The shared incident log could not be cleared." },
+      { status: 502, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 }

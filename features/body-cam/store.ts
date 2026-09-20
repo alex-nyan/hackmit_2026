@@ -78,12 +78,26 @@ export async function listHistory(sourceId: string, nowMs: number = Date.now()):
   const earliest = nowMs - HISTORY_WINDOW_MS;
   return blobs
     .map((blob) => atFromHistoryPath(blob.pathname, sourceId))
-    .filter((at): at is number => at !== null && at >= earliest)
+    .filter((at): at is number => at !== null && at >= earliest && at <= nowMs)
     .sort((a, b) => a - b);
 }
 
 /** One frame from the archive, by the moment it was published. */
-export async function readFrameAt(sourceId: string, atMs: number): Promise<ReadableStream | null> {
+export async function readFrameAt(
+  sourceId: string,
+  atMs: number,
+  nowMs: number = Date.now(),
+): Promise<ReadableStream | null> {
+  // Pruning is best-effort. The read boundary must enforce retention even
+  // when an older object has not yet been removed from storage.
+  if (
+    !Number.isSafeInteger(atMs) ||
+    atMs <= 0 ||
+    atMs < nowMs - HISTORY_WINDOW_MS ||
+    atMs > nowMs
+  ) {
+    return null;
+  }
   const found = await get(historyPath(sourceId, atMs), { access: "private", useCache: false });
   return found?.stream ?? null;
 }

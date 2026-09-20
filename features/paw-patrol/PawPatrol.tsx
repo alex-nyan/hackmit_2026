@@ -33,10 +33,11 @@ import { useDemoHotspots } from "./useDemoHotspots";
 import { useDemoAmbulances } from "./useDemoAmbulances";
 import { useDemoHandoff } from "./useDemoHandoff";
 import { OfficerOverview } from "./OfficerOverview";
+import { OfficerDashboard } from "./OfficerDashboard";
+import { OfficerIncidentBriefing } from "./OfficerIncidentBriefing";
 import { GlassEffect } from "@/components/ui/liquid-glass";
 import glassStyles from "./OfficerGlass.module.css";
 import { WorkspaceNav } from "./WorkspaceNav";
-import officerStyles from "./OfficerWorkspace.module.css";
 import hospitalStyles from "./HospitalWorkspace.module.css";
 import { HospitalWorkspace } from "./HospitalWorkspace";
 import type { OfficerMediaInput } from "./OfficerFeed";
@@ -270,6 +271,14 @@ export function PawPatrol({
   const person = PEOPLE.find((p) => p.id === selectedId) ?? PEOPLE[0];
   // Local-only: never pass device readings to the incident bus or MIST records.
   const heartRate = useHeartRate(person.id, session);
+  const [phonePreview, setPhonePreview] = useState({ sourceId: "", connected: false });
+  const onPhoneConnectionChange = useCallback((sourceId: string, connected: boolean) => {
+    setPhonePreview((current) =>
+      current.sourceId === sourceId && current.connected === connected
+        ? current
+        : { sourceId, connected },
+    );
+  }, []);
   const vehicle = vehicleAt(person.id, time);
   const phase = phaseAt(time);
   const complete = false;
@@ -617,17 +626,109 @@ export function PawPatrol({
     );
   }
 
+  if (view === "officer") {
+    return (
+      <>
+        {handoff.bridge}
+        <OfficerDashboard
+          workspace={workspace}
+          onViewChange={setView}
+          person={person}
+          onSelect={(id) => {
+            setSelectedId(id);
+            setFollowing(true);
+            setRecenterKey((key) => key + 1);
+          }}
+          time={time}
+          running={running}
+          onTogglePlayback={() => (running ? dispatch({ type: "pause" }) : play())}
+          onReset={reset}
+          theme={theme}
+          onToggleTheme={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+          map={map}
+          heartRate={heartRate}
+          phoneConnected={
+            phonePreview.sourceId === `officer-${person.id}` && phonePreview.connected
+          }
+          heartRatePanel={
+            <>
+              <HeartRatePanel
+                connection={heartRate}
+                personId={person.id}
+                personName={person.name}
+                compact
+              />
+              <details>
+                <summary>Heart rate trend</summary>
+                <HeartChart
+                  time={time}
+                  id={person.id}
+                  deviceSamples={heartRate.mode === "device" ? heartRate.history : undefined}
+                />
+              </details>
+            </>
+          }
+          capturePanel={
+            <CapturePanel
+              key={person.id}
+              sourceId={`officer-${person.id}`}
+              onResult={onHazard}
+              onTranscript={onTranscript}
+              onPhoneConnectionChange={onPhoneConnectionChange}
+            />
+          }
+          incidentPanel={(demo) => (
+            <OfficerIncidentBriefing
+              events={bus.events}
+              busStatus={bus.status}
+              personId={person.id}
+              demo={demo}
+              onLocate={(id) => {
+                const unit = vehicleAt(id, readClock().time);
+                if (!unit.routeId) return;
+                setFollowing(false);
+                setFixRequest((previous) => ({
+                  longitude: unit.point[0],
+                  latitude: unit.point[1],
+                  nonce: (previous?.nonce ?? 0) + 1,
+                }));
+              }}
+            />
+          )}
+          overview={
+            <OfficerOverview
+              person={person}
+              onSelect={setSelectedId}
+              time={time}
+              running={running}
+              heartRate={heartRate}
+            />
+          }
+          trackingPanel={
+            <>
+              <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+              {openDevice && (
+                <UnitCard
+                  device={openDevice}
+                  heartRate={heartRate}
+                  onDismiss={() => setOpenDeviceId(null)}
+                />
+              )}
+              <JoinCard join={join} />
+              <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
+            </>
+          }
+        />
+      </>
+    );
+  }
+
   return (
-    <div
-      className={`paw-app ${view === "officer" ? `${officerStyles.officer} ${glassStyles.workspace}` : view === "hospital" ? hospitalStyles.hospital : ""}`}
-      data-officer-glass={view === "officer" ? "true" : undefined}
-      data-officer-theme={view === "officer" ? theme : undefined}
-    >
+    <div className={`paw-app ${view === "hospital" ? hospitalStyles.hospital : ""}`}>
       <a className="skip-link" href="#workspace">
         Skip to workspace
       </a>
-      <header className={`topbar ${view === "officer" ? glassStyles.bubble : ""}`}>
-        {view === "officer" && <GlassEffect />}
+      <header className="topbar">
         <Link className="wordmark" href="/" aria-label="Paw Patrol home">
           <Shield />
           <span>Paw Patrol{view === "command" && <small>CONNECTED RESPONSE</small>}</span>
@@ -642,7 +743,7 @@ export function PawPatrol({
           <button
             className="hardware-toggle"
             data-live={heartRate.status === "receiving"}
-            aria-label={view === "officer" ? "Devices" : "Devices offline"}
+            aria-label="Devices offline"
             onClick={() => setHardware(!hardware)}
             aria-expanded={hardware}
           >
@@ -712,10 +813,7 @@ export function PawPatrol({
           </>
         )}
         {hardware && view !== "hospital" && (
-          <section
-            className={`hardware-panel panel ${view === "officer" ? glassStyles.bubble : ""}`}
-          >
-            {view === "officer" && <GlassEffect />}
+          <section className="hardware-panel panel">
             <div className="panel-heading">
               <h2>Hardware readiness</h2>
               <button
@@ -726,21 +824,6 @@ export function PawPatrol({
                 <X size={18} />
               </button>
             </div>
-            {view === "officer" && (
-              <>
-                <HeartRateReadout connection={heartRate} time={time} personId={person.id} />
-                <HeartChart
-                  time={time}
-                  id={person.id}
-                  deviceSamples={heartRate.mode === "device" ? heartRate.history : undefined}
-                />
-                <HeartRatePanel
-                  connection={heartRate}
-                  personId={person.id}
-                  personName={person.name}
-                />
-              </>
-            )}
             <div className="hardware-grid">
               {[
                 {
@@ -906,93 +989,6 @@ export function PawPatrol({
               )}
             </aside>
           </div>
-        )}
-
-        {view === "officer" && (
-          <>
-            <h1 className="sr-only">Officer workspace</h1>
-            {map}
-            <div
-              className={`${officerStyles.unitPicker} ${glassStyles.bubble} ${glassStyles.pill}`}
-              data-officer-picker=""
-            >
-              <GlassEffect />
-              <Shield size={18} aria-hidden="true" />
-              <label className="sr-only" htmlFor="officer-person">
-                Selected person
-              </label>
-              <select
-                id="officer-person"
-                value={selectedId}
-                onChange={(e) => setSelectedId(e.target.value)}
-              >
-                {PEOPLE.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.id} · {p.name}
-                  </option>
-                ))}
-              </select>
-              <span>{personStatus(person.id, time)}</span>
-            </div>
-            <div className={glassStyles.sidebar}>
-              <OfficerOverview
-                person={person}
-                onSelect={setSelectedId}
-                time={time}
-                running={running}
-                heartRate={heartRate}
-              />
-              <div className="map-overlay">
-                <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
-                <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
-              </div>
-            </div>
-            <div className={`${officerStyles.tools} ${glassStyles.bubble} ${glassStyles.pill}`}>
-              <GlassEffect />
-              <button
-                aria-expanded={evidence === "camera"}
-                aria-controls="officer-camera"
-                onClick={() => setEvidence(evidence === "camera" ? null : "camera")}
-              >
-                <Camera size={17} /> Camera
-              </button>
-              <button onClick={() => (running ? dispatch({ type: "pause" }) : play())}>
-                {running ? <Pause size={17} /> : <Play size={17} />}
-                {running
-                  ? "Pause demo"
-                  : complete
-                    ? "Replay demo"
-                    : time > 0
-                      ? "Resume demo"
-                      : "Run demo"}
-              </button>
-              <button aria-label="Reset demo" title="Reset demo" onClick={reset}>
-                <RotateCcw size={17} />
-              </button>
-            </div>
-            <section
-              id="officer-camera"
-              className={`${officerStyles.camera} ${glassStyles.bubble}`}
-              hidden={evidence !== "camera"}
-            >
-              <GlassEffect />
-              <div className="panel-heading">
-                <h2>Camera & audio</h2>
-                <button
-                  className="icon-control"
-                  aria-label="Close camera"
-                  onClick={() => setEvidence(null)}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <CapturePanel
-                sourceId={`officer-${person.id}`}
-                onResult={onHazard}
-                onTranscript={onTranscript}
-              />
-            </section>
-          </>
         )}
 
         {view === "hospital" && (

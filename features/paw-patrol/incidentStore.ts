@@ -127,5 +127,17 @@ export async function readIncidents(since: number): Promise<IncidentEvent[]> {
 
 /** Demo reset. Clears the log for every workspace at once. */
 export async function clearIncidents(): Promise<void> {
-  await del(LOG_PATH).catch(() => undefined);
+  try {
+    await del(LOG_PATH);
+  } catch (error) {
+    // An already-absent object is a completed reset, unlike denied access,
+    // a suspended/missing store, or a network failure. Do not report those as success.
+    if (
+      error instanceof Error &&
+      (error.message === "not found" ||
+        /^Vercel Blob: The requested blob does not exist\.?$/.test(error.message))
+    )
+      return;
+    throw error;
+  }
 }

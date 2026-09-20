@@ -8,6 +8,7 @@ import {
   requiredPassphrase,
 } from "@/features/access/passphrase";
 import { OFFICER_COOKIE, readSession } from "@/features/access/session";
+import { findOfficer, readRoster } from "@/features/access/roster";
 
 /**
  * Holds the shared passphrase in front of every page and route.
@@ -28,8 +29,12 @@ export async function proxy(request: NextRequest) {
   // An officer who signed in has already proved more than the shared
   // passphrase asks for; making them type both would be theatre.
   const session = request.cookies.get(OFFICER_COOKIE)?.value;
-  if (await readSession(session, process.env.PAW_PATROL_OFFICERS ?? "")) {
-    return NextResponse.next();
+  const roster = readRoster(process.env);
+  // No configured roster means there is no secret signing input or officer
+  // identity to trust. A cookie alone must not bypass the shared gate.
+  if (session && roster.length > 0) {
+    const officerId = await readSession(session, process.env.PAW_PATROL_OFFICERS ?? "");
+    if (officerId && findOfficer(roster, officerId)) return NextResponse.next();
   }
 
   // An API caller gets an answer it can act on rather than a login page.

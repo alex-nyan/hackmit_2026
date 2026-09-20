@@ -2,28 +2,62 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { IncidentDraft, IncidentEvent } from "./incidents";
+import { parseIncidentDraft, type IncidentDraft, type IncidentEvent } from "./incidents";
 
 const ENDPOINT = "/api/incidents";
 /** Fast enough that a panic button feels immediate, slow enough to be cheap. */
 const POLL_MS = 1_500;
+/** The shared store retains this bounded snapshot, not an unbounded client backlog. */
+const MAX_RETAINED = 200;
+
+function parseSnapshot(value: unknown): IncidentEvent[] | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const body = value as Record<string, unknown>;
+  if (
+    !Array.isArray(body.events) ||
+    body.events.length > MAX_RETAINED ||
+    typeof body.seq !== "number" ||
+    !Number.isSafeInteger(body.seq) ||
+    body.seq < 0
+  )
+    return null;
+  const events: IncidentEvent[] = [];
+  let previousSequence = 0;
+  for (const item of body.events) {
+    const draft = parseIncidentDraft(item);
+    if (!draft || !item || typeof item !== "object" || Array.isArray(item)) return null;
+    const raw = item as Record<string, unknown>;
+    if (
+      typeof raw.seq !== "number" ||
+      !Number.isSafeInteger(raw.seq) ||
+      raw.seq <= previousSequence ||
+      typeof raw.at !== "string" ||
+      raw.at.length > 40 ||
+      !Number.isFinite(Date.parse(raw.at))
+    )
+      return null;
+    events.push({ ...draft, seq: raw.seq, at: raw.at });
+    previousSequence = raw.seq;
+  }
+  return body.seq === previousSequence ? events : null;
+}
 
 export type BusStatus = "connecting" | "live" | "offline";
 
 /**
  * Subscribes this workspace to the shared incident log.
  *
- * `EventSource` reconnects on its own and replays from `Last-Event-ID`, so a
- * dropped connection loses no events — the server filters by sequence. The
- * status is reported honestly rather than optimistically: `offline` means this
- * workspace is no longer seeing what the others do, which a viewer must be able
- * to tell apart from a quiet incident.
+ * Poll the full bounded snapshot: server sequence numbers restart after a demo
+ * reset, so a remembered cursor can otherwise hide every event in the new run.
+ * Failed or malformed reads retain the last accepted snapshot with an offline
+ * status, never an empty log that looks like a quiet incident.
  */
 export function useIncidentBus() {
   const [events, setEvents] = useState<IncidentEvent[]>([]);
   const [status, setStatus] = useState<BusStatus>("connecting");
-  const seenRef = useRef<Set<number>>(new Set());
-  const sinceRef = useRef(0);
+  const snapshotSignature = useRef("");
+  const resetGeneration = useRef(0);
+  const clearing = useRef(false);
 
   useEffect(() => {
     let stopped = false;
@@ -31,31 +65,28 @@ export function useIncidentBus() {
     const inFlight = new AbortController();
 
     async function poll() {
+      const generation = resetGeneration.current;
       try {
-        const response = await fetch(`${ENDPOINT}?since=${sinceRef.current}`, {
+        if (clearing.current) return;
+        const response = await fetch(`${ENDPOINT}?since=0`, {
           cache: "no-store",
-          signal: inFlight.signal,
+          signal: AbortSignal.any([inFlight.signal, AbortSignal.timeout(10_000)]),
         });
         if (!response.ok) throw new Error(String(response.status));
-        const body = (await response.json()) as { events?: unknown };
-        if (stopped) return;
-
-        const arriving = Array.isArray(body.events) ? (body.events as IncidentEvent[]) : [];
-        const fresh = arriving.filter(
-          (event) => typeof event?.seq === "number" && !seenRef.current.has(event.seq),
-        );
-        if (fresh.length > 0) {
-          for (const event of fresh) seenRef.current.add(event.seq);
-          // The cursor only advances on events this workspace has accepted,
-          // so a partial read is retried rather than skipped.
-          sinceRef.current = Math.max(sinceRef.current, ...fresh.map((event) => event.seq));
-          setEvents((current) => [...current, ...fresh]);
+        const arriving = parseSnapshot(await response.json());
+        if (!arriving) throw new Error("Invalid incident snapshot");
+        if (stopped || generation !== resetGeneration.current || clearing.current) return;
+        const signature = JSON.stringify(arriving);
+        if (signature !== snapshotSignature.current) {
+          snapshotSignature.current = signature;
+          setEvents(arriving);
         }
         setStatus("live");
       } catch {
         // A failed poll is not a quiet incident: the log stays on screen and
         // the status says it can no longer be trusted.
-        if (!stopped) setStatus("offline");
+        if (!stopped && generation === resetGeneration.current && !clearing.current)
+          setStatus("offline");
       } finally {
         if (!stopped) timer = setTimeout(() => void poll(), POLL_MS);
       }
@@ -86,14 +117,25 @@ export function useIncidentBus() {
   }, []);
 
   const clear = useCallback(async (): Promise<void> => {
+    if (clearing.current) return;
+    clearing.current = true;
+    resetGeneration.current += 1;
     try {
-      await fetch(ENDPOINT, { method: "DELETE" });
+      const response = await fetch(ENDPOINT, {
+        method: "DELETE",
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new Error("Incident reset was not confirmed");
+      snapshotSignature.current = "[]";
+      setEvents([]);
+      setStatus("live");
     } catch {
-      // Local state is cleared by the caller's own reset regardless.
+      // Keep the last accepted shared log until the server confirms its removal.
+      setStatus("offline");
+    } finally {
+      resetGeneration.current += 1;
+      clearing.current = false;
     }
-    seenRef.current.clear();
-    sinceRef.current = 0;
-    setEvents([]);
   }, []);
 
   return { events, status, publish, clear };

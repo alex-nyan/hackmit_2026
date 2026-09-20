@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { describeTranscript, type TranscriptionResult } from "./audio";
 import { hasLabels } from "./devices";
 import type { TriageResult } from "./types";
@@ -12,6 +13,8 @@ interface CapturePanelProps {
   /** Receives each accepted result so a workspace can publish it as an incident. */
   onResult?: (result: TriageResult) => void;
   onTranscript?: (result: TranscriptionResult) => void;
+  /** Local iPhone-labelled preview readiness, not identity or server/AI delivery. */
+  onPhoneConnectionChange?: (sourceId: string, connected: boolean) => void;
 }
 
 /**
@@ -19,7 +22,12 @@ interface CapturePanelProps {
  * the hand; this is the same pipeline beside the map, which is how a Continuity
  * Camera is actually used: phone as the lens, laptop as the console.
  */
-export function CapturePanel({ sourceId, onResult, onTranscript }: CapturePanelProps) {
+export function CapturePanel({
+  sourceId,
+  onResult,
+  onTranscript,
+  onPhoneConnectionChange,
+}: CapturePanelProps) {
   const { devices, cameraId, setCameraId, resolveDevices } = useCaptureDevices();
 
   const { state, videoRef, start, stop } = useCameraTriage({ sourceId, onResult });
@@ -28,6 +36,92 @@ export function CapturePanel({ sourceId, onResult, onTranscript }: CapturePanelP
   const busy = running || state.state === "requesting-camera";
   const listening =
     audio.state.state === "recording" || audio.state.state === "requesting-microphone";
+  const deviceLabel = state.state === "running" ? state.deviceLabel : "";
+
+  useEffect(() => {
+    if (!onPhoneConnectionChange) return;
+    let lastReported: boolean | undefined;
+    const deliver = (connected: boolean) => {
+      if (lastReported === connected) return;
+      lastReported = connected;
+      try {
+        onPhoneConnectionChange(sourceId, connected);
+      } catch {
+        // A view-only observer must never interrupt capture or its cleanup.
+      }
+    };
+    const video = videoRef.current;
+    const stream =
+      typeof MediaStream !== "undefined" && video?.srcObject instanceof MediaStream
+        ? video.srcObject
+        : null;
+    const tracks = stream?.getVideoTracks() ?? [];
+    if (!running || !/iphone/i.test(deviceLabel) || !video || !stream || !tracks.length) {
+      deliver(false);
+      return;
+    }
+    let blocked = false;
+    let previousPosition = video.currentTime;
+    let lastAdvance = Number.NEGATIVE_INFINITY;
+    const report = () => {
+      const now = performance.now();
+      const position = video.currentTime;
+      if (Number.isFinite(position) && position > previousPosition) lastAdvance = now;
+      else if (!Number.isFinite(position) || position < previousPosition)
+        lastAdvance = Number.NEGATIVE_INFINITY;
+      previousPosition = position;
+      // A playing element alone is not evidence of a fresh preview. Require its
+      // media clock to advance, and turn the indicator off after three seconds.
+      deliver(
+        Boolean(
+          !blocked &&
+          now - lastAdvance <= 3_000 &&
+          video.srcObject === stream &&
+          video.readyState >= 2 &&
+          !video.paused &&
+          !video.ended &&
+          !video.error &&
+          tracks.some((track) => track.readyState === "live" && track.enabled && !track.muted),
+        ),
+      );
+    };
+    const block = () => {
+      blocked = true;
+      lastAdvance = Number.NEGATIVE_INFINITY;
+      deliver(false);
+    };
+    const playing = () => {
+      blocked = false;
+      previousPosition = video.currentTime;
+      lastAdvance = Number.NEGATIVE_INFINITY;
+      report();
+    };
+    const trackChanged = () => {
+      previousPosition = video.currentTime;
+      lastAdvance = Number.NEGATIVE_INFINITY;
+      report();
+    };
+    const blockedVideoEvents = ["waiting", "stalled", "pause", "ended", "emptied", "error"];
+    const trackEvents = ["ended", "mute", "unmute"];
+    blockedVideoEvents.forEach((event) => video.addEventListener(event, block));
+    video.addEventListener("playing", playing);
+    video.addEventListener("timeupdate", report);
+    tracks.forEach((track) =>
+      trackEvents.forEach((event) => track.addEventListener(event, trackChanged)),
+    );
+    const watchdog = setInterval(report, 250);
+    report();
+    return () => {
+      clearInterval(watchdog);
+      blockedVideoEvents.forEach((event) => video.removeEventListener(event, block));
+      video.removeEventListener("playing", playing);
+      video.removeEventListener("timeupdate", report);
+      tracks.forEach((track) =>
+        trackEvents.forEach((event) => track.removeEventListener(event, trackChanged)),
+      );
+      deliver(false);
+    };
+  }, [deviceLabel, onPhoneConnectionChange, running, sourceId, videoRef]);
 
   async function startCamera() {
     // Permission is what reveals device names, so the phone can only be

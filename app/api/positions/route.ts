@@ -1,4 +1,5 @@
 import { isValidToken } from "@/features/camera-triage/frame";
+import { readFrameBody } from "@/features/camera-triage/readFrameBody";
 import { parsePositionSubmission } from "@/features/live-track/devicePosition";
 import {
   clearPositions,
@@ -35,17 +36,17 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const raw = await request.text();
-  if (raw.length > MAX_BODY_BYTES) {
+  const raw = await readFrameBody(request, MAX_BODY_BYTES);
+  if (!raw.ok) {
     return Response.json(
-      { error: "too-large" },
-      { status: 413, headers: { "Cache-Control": "no-store" } },
+      { error: raw.status === 413 ? "too-large" : raw.error },
+      { status: raw.status, headers: { "Cache-Control": "no-store" } },
     );
   }
 
   let body: unknown;
   try {
-    body = JSON.parse(raw);
+    body = JSON.parse(raw.body);
   } catch {
     return Response.json(
       { error: "invalid-json" },

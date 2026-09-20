@@ -16,19 +16,29 @@ export async function POST(request: Request): Promise<Response> {
   const form = await request.formData();
   const offered = String(form.get("passphrase") ?? "");
   const next = String(form.get("next") ?? "/");
-  // Only ever back into this app, never to a URL an attacker supplied.
-  const destination = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  // Check the parsed origin too: URL normalizes backslashes, so checking only
+  // a leading slash would allow an off-site destination such as /\\host.
+  const requestOrigin = new URL(request.url).origin;
+  let destination = new URL("/", requestOrigin);
+  if (next.startsWith("/") && !next.startsWith("//")) {
+    try {
+      const proposed = new URL(next, requestOrigin);
+      if (proposed.origin === requestOrigin) destination = proposed;
+    } catch {
+      // Malformed destinations return to the application root.
+    }
+  }
 
   if (!matches(await digest(offered), await digest(expected))) {
     const retry = new URL("/unlock", request.url);
-    retry.searchParams.set("next", destination);
+    retry.searchParams.set("next", destination.pathname + destination.search + destination.hash);
     retry.searchParams.set("wrong", "1");
     return Response.redirect(retry, 303);
   }
 
   const response = new Response(null, {
     status: 303,
-    headers: { Location: new URL(destination, request.url).toString() },
+    headers: { Location: destination.toString() },
   });
   response.headers.append(
     "Set-Cookie",

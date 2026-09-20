@@ -71,24 +71,40 @@ export async function GET(): Promise<Response> {
   const [published, tracked] = await Promise.all([
     storeReady ? readPublished() : NOTHING_PUBLISHED,
     settings
-      ? fetchLiveTrack(settings, new Date())
-          .then((payload) => (payload.state === "tracking" ? payload.devices : []))
-          .catch(() => [] as LiveDevice[])
-      : [],
+      ? fetchLiveTrack(settings, new Date()).catch((): LiveTrackPayload => ({
+          state: "unavailable",
+          reason: "The tracking server could not be reached.",
+        }))
+      : null,
   ]);
 
-  const devices = merge(published.devices, tracked);
-  const note = published.note ? { note: published.note } : {};
+  const devices = merge(published.devices, tracked?.state === "tracking" ? tracked.devices : []);
+  const trackingFailed = tracked?.state === "unavailable";
+  const notes = [
+    published.note,
+    ...(published.failed
+      ? ["The position store is unavailable; published units may be missing."]
+      : []),
+    ...(trackingFailed
+      ? ["The tracking server is unavailable; tracked units may be missing."]
+      : []),
+  ].filter(Boolean);
+  const note = notes.length > 0 ? { note: notes.join(" ") } : {};
 
   if (devices.length === 0) {
     // Nothing to draw and the one source that could have drawn it never
     // answered. That is an outage, and it is worth saying so rather than
     // letting it read as a quiet shift.
-    if (published.failed) {
+    if (published.failed || trackingFailed) {
       return Response.json(
         {
           state: "unavailable",
-          reason: "The position store could not be read, so nobody can appear on the map.",
+          reason:
+            published.failed && trackingFailed
+              ? "The position store and tracking server could not be read."
+              : published.failed
+                ? "The position store could not be read, so nobody can appear on the map."
+                : "The tracking server could not be read, so its units cannot appear on the map.",
         } satisfies LiveTrackPayload,
         { headers: { "Cache-Control": "no-store" } },
       );
