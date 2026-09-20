@@ -37,4 +37,12 @@ Evidence uses authenticated opaque references and bounded memory with expiry. It
 
 Independent review corrected concurrent upload admission, unreaped process reuse, capture/inference coverage conflation, and contract narrowing. Validation: 219 backend tests passed, one existing optional model smoke skipped; service lint and generated-contract drift checks passed. Real model performance is not established by these tests.
 
-Remaining phases: native Apple capture; live workspace presentation and handoff; integrated fault/replay verification. Actual device builds, hardware latency/endurance, domain-trained weapon performance, and field/clinical qualification require separate evidence and are not established by software unit tests.
+**Phase 3 — native Apple capture: implemented; device qualification pending.**
+
+`apps/apple-capture` contains the checked-in Xcode project, iPhone foreground camera/microphone/GPS capture, explicitly started walking-workout Watch heart rate, mirrored measurements, Keychain credentials, independent bounded HTTPS upload lanes, and assistance request receipts. Original measurement times and enrollment-owned wearer identity cross the wire. Stop/background clears pending sample sharing; a mirrored workout cannot be rebound to another incident/source while active.
+
+Review corrected stop/start races and stale callbacks, audio continuity across dropped buffers, credential replacement during an uncertain assistance request, permission-start cancellation, Watch coverage restoration, and strict receipt identity/version checks. Independent reviewers rechecked those paths. Validation: 39 executable production-core checks, core/relay Swift type checking, native syntax parsing, project/plist validation, and a Swift-encoded telemetry fixture accepted by the Python schema.
+
+This host has Command Line Tools, without iOS/watchOS SDKs or XCTest. Full native SDK compilation, signing, installation, permission behavior, mirroring, and paired-device endurance remain unverified. The native README supplies the build and device acceptance steps; the checks above are not a device-build claim.
+
+Remaining phases: live workspace presentation and handoff; integrated fault/replay verification. Hardware latency/endurance, domain-trained weapon performance, and field/clinical qualification require separate evidence and are not established by software unit tests.
