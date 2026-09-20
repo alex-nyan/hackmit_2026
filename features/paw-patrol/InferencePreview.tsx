@@ -52,7 +52,7 @@ export function InferencePreview({
   return (
     <div className={styles.preview}>
       <BentoLabel icon={Eye}>Incident visual context</BentoLabel>
-      <h2 id={titleId}>Reported suspect / scene</h2>
+      <h2 id={titleId}>Scene observations</h2>
       <p className={styles.sampleNotice}>
         {source ? `Reporting camera: ${source}` : "Waiting for an audio concern"} · unverified
       </p>

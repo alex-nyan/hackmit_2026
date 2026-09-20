@@ -10,10 +10,10 @@ export const PHASES = [
   { at: 0, label: "Patrol", title: "Boston patrol", detail: "15 units on patrol across Boston." },
 ] as const;
 const names = [
-  "Alex Morgan",
-  "Jordan Lee",
-  "Sam Rivera",
-  "Taylor Brooks",
+  "Nyan",
+  "Henry",
+  "Matt",
+  "Shaun",
   "Casey Chen",
   "Riley Parker",
   "Jamie Quinn",

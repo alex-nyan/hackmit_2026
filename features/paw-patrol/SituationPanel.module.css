@@ -71,13 +71,13 @@
   right: 16px;
   bottom: 16px;
   z-index: 60;
-  width: min(350px, calc(100vw - 32px));
+  width: min(290px, calc(100% - 24px));
   border: 1px solid var(--bento-border, #abc6bb);
-  background: var(--bento-card, #f4faf6f5);
+  border-left: 3px solid var(--bento-accent, #78551b);
+  background: var(--bento-card, #f4faf6);
   color: var(--bento-text, #163a2e);
-  border-radius: 16px;
-  padding: 14px;
-  box-shadow: 0 4px 20px #0002;
+  border-radius: 4px;
+  padding: 12px;
   display: grid;
   gap: 7px;
 }
@@ -109,4 +109,31 @@
   color: var(--bento-text, white);
   padding: 9px;
   cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .knowledge {
+    width: min(220px, calc(100% - 24px));
+  }
+  .knowledge:not([data-concern="true"]) p {
+    display: none;
+  }
+}
+
+.knowledge[data-inline="true"] {
+  position: static;
+  width: 100%;
+  margin-top: 16px;
+  border: 0;
+  border-top: 1px solid var(--bento-border);
+  padding: 14px 0 0;
+  background: transparent;
+}
+.knowledge[data-inline="true"][data-concern="true"] {
+  border-left: 3px solid var(--bento-accent);
+  padding-left: 12px;
+}
+.knowledge[data-inline="true"] button {
+  justify-self: start;
+  padding: 9px 14px;
 }

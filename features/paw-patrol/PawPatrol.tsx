@@ -579,17 +579,16 @@ export function PawPatrol({
         onToggleTheme={() =>
           setDispatchTheme((current) => (current === "light" ? "dark" : "light"))
         }
-        map={
-          <>
-            {map}
-            <SituationPanel
-              events={bus.events}
-              status={bus.status}
-              publish={publish}
-              personId={person.id}
-              heartRate={heartRate}
-            />
-          </>
+        map={map}
+        situationPanel={
+          <SituationPanel
+            inline
+            events={bus.events}
+            status={bus.status}
+            publish={publish}
+            personId={person.id}
+            heartRate={heartRate}
+          />
         }
         liveTrack={liveTrack}
         trackingEnabled={tracking}

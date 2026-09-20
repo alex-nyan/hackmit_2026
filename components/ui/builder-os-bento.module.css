@@ -6,25 +6,15 @@
   min-height: 0;
   padding: 20px;
   border: 1px solid var(--bento-border, #2c2c31);
-  border-radius: 18px;
+  border-radius: 4px;
   background: var(--bento-card, #131316);
   color: var(--bento-text, #f2f1ec);
-  animation: bento-enter 360ms ease-out;
+
   transition: border-color 180ms ease;
 }
 
 .cell:focus-within {
   border-color: var(--bento-accent, #ff8a4c);
-}
-
-@media (hover: hover) {
-  .cell:hover {
-    border-color: color-mix(
-      in srgb,
-      var(--bento-accent, #ff8a4c) 42%,
-      var(--bento-border, #2c2c31)
-    );
-  }
 }
 
 .label {

@@ -6,14 +6,15 @@
   --handoff-line: var(--line, #384655);
   width: calc(100% - 48px);
   max-width: 1200px;
-  margin: 24px auto 0;
-  padding: 20px;
-  border: 1px solid var(--handoff-line);
-  border-radius: 14px;
-  background: var(--handoff-surface);
+  margin: 32px auto 0;
+  padding: 24px 0;
+  border: 0;
+  border-top: 2px solid var(--handoff-line);
+  border-radius: 0;
+  background: transparent;
   color: var(--handoff-ink);
   font:
-    13px/1.5 Arial,
+    14px/1.6 Arial,
     Helvetica,
     sans-serif;
 }

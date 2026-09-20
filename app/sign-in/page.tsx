@@ -36,6 +36,14 @@ export default async function SignIn({
         </Link>
       </header>
       <main className={styles.main}>
+        <div className={styles.welcome}>
+          <span>Paw Patrol / Field operations</span>
+          <h2>Every unit. One picture.</h2>
+          <p>
+            Your connection to dispatch, field observations and the teams responding alongside you.
+          </p>
+          <small>OFFICER WORKSPACE · ASSIGNED ACCESS</small>
+        </div>
         <section className={styles.card} aria-labelledby="sign-in-title">
           <div className={styles.intro}>
             <span className={styles.eyebrow}>Officer access</span>

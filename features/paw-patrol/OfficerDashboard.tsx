@@ -143,7 +143,6 @@ function HeartReadout({ value, device }: { value: number | null; device: boolean
       className={styles.heart}
       data-active={value !== null}
       role="img"
-      title="Animation indicates data availability, not heartbeat timing."
       aria-label={
         value === null
           ? "Heart rate unavailable. No current device reading."
@@ -151,9 +150,6 @@ function HeartReadout({ value, device }: { value: number | null; device: boolean
       }
     >
       <span className={styles.heartFace} aria-hidden="true">
-        <svg viewBox="0 0 48 40">
-          <path d="M8 0H16V4H20V8H28V4H32V0H40V4H44V8H48V20H44V24H40V28H36V32H32V36H28V40H20V36H16V32H12V28H8V24H4V20H0V8H4V4H8Z" />
-        </svg>
         <strong>{value ?? "—"}</strong>
       </span>
       <span aria-hidden="true">

@@ -21,7 +21,7 @@ import {
   Watch,
   X,
 } from "lucide-react";
-import { BentoCell, BentoLabel, BentoRing } from "@/components/ui/builder-os-bento";
+import { BentoCell, BentoLabel } from "@/components/ui/builder-os-bento";
 import type { MapTheme } from "../boston-map/types";
 import type { LiveTrackState } from "../live-track/types";
 import type { HeartRateConnection } from "../heart-rate/useHeartRate";
@@ -50,6 +50,7 @@ interface Props {
   theme: MapTheme;
   onToggleTheme: () => void;
   map: ReactNode;
+  situationPanel?: ReactNode;
   liveTrack: LiveTrackState;
   trackingEnabled: boolean;
   onToggleTracking: () => void;
@@ -100,12 +101,9 @@ function PixelHeartReadout({ bpm, source }: { bpm: number | null; source: "demo"
       data-active={active}
       role="img"
       aria-label={description}
-      title={`${description}. Animation indicates data availability, not heartbeat timing.`}
+      title={description}
     >
       <span className={styles.pixelHeartFace} aria-hidden="true">
-        <svg viewBox="0 0 48 40" width="48" height="40" className={styles.pixelHeartShape}>
-          <path d="M8 0H16V4H20V8H28V4H32V0H40V4H44V8H48V20H44V24H40V28H36V32H32V36H28V40H20V36H16V32H12V28H8V24H4V20H0V8H4V4H8Z" />
-        </svg>
         <span className={styles.pixelHeartNumber}>{active ? bpm : "--"}</span>
       </span>
       <span className={styles.pixelHeartSource} aria-hidden="true">
@@ -268,6 +266,7 @@ export function DispatchDashboard({
   theme,
   onToggleTheme,
   map,
+  situationPanel,
   liveTrack,
   trackingEnabled,
   onToggleTracking,
@@ -433,7 +432,11 @@ export function DispatchDashboard({
       <main id="workspace" className={styles.main}>
         <div className={styles.intro}>
           <div>
+            <p className={styles.sectionLabel}>Operations / Boston &amp; Cambridge</p>
             <h1>Command centre</h1>
+            <p className={styles.introNote}>
+              Patrol coverage, field reports and coordinated response.
+            </p>
           </div>
           <div className={styles.playback}>
             <div className={styles.clockControls}>
@@ -594,9 +597,12 @@ export function DispatchDashboard({
 
           <BentoCell className={styles.readinessCell} labelledBy="dispatch-status-title">
             <BentoLabel icon={Activity}>Fleet disposition</BentoLabel>
-            <h2 id="dispatch-status-title">At a glance</h2>
+            <h2 id="dispatch-status-title">Patrol status</h2>
             <div className={styles.disposition}>
-              <BentoRing value={onPatrol} total={PEOPLE.length} label="On patrol" />
+              <div className={styles.fleetTotal}>
+                <strong>{onPatrol}</strong>
+                <span>of {PEOPLE.length} on patrol</span>
+              </div>
               <dl>
                 <div>
                   <dt>
@@ -630,6 +636,7 @@ export function DispatchDashboard({
 
           <BentoCell className={styles.coverageCell} labelledBy="dispatch-inference-title">
             <InferencePreview events={events} status={busStatus} selectedSource={alertSource} />
+            {situationPanel}
             {selectedHotspotId && (
               <p className={styles.inferenceContext}>
                 Selected incident: {selectedHotspotId} · sample context only
@@ -639,7 +646,7 @@ export function DispatchDashboard({
 
           <BentoCell className={styles.connectionsCell} labelledBy="dispatch-tools-title">
             <BentoLabel icon={SlidersHorizontal}>Workspace controls</BentoLabel>
-            <h2 id="dispatch-tools-title">Tools</h2>
+            <h2 id="dispatch-tools-title">Response tools</h2>
             {hotspotTools && (
               <>
                 <div className={styles.toolActions}>

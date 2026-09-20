@@ -1,12 +1,12 @@
 .dashboard {
-  --officer-bg: #0a0c0f;
-  --officer-card: #121519;
-  --officer-raised: #1b2026;
-  --officer-border: #2b3139;
-  --officer-text: #f1f1ec;
-  --officer-muted: #a0a8b3;
-  --officer-accent: #ff9b62;
-  --officer-good: #7bcba5;
+  --officer-bg: var(--ops-bg);
+  --officer-card: var(--ops-surface);
+  --officer-raised: var(--ops-raised);
+  --officer-border: var(--ops-line);
+  --officer-text: var(--ops-text);
+  --officer-muted: var(--ops-muted);
+  --officer-accent: var(--ops-accent);
+  --officer-good: var(--ops-good);
   --bento-bg: var(--officer-bg);
   --bento-card: var(--officer-card);
   --bento-raised: var(--officer-raised);
@@ -47,13 +47,13 @@
     sans-serif;
 }
 .dashboard[data-theme="light"] {
-  --officer-bg: #eceeea;
-  --officer-card: #fafbf8;
-  --officer-raised: #e7ebe6;
-  --officer-border: #cdd3cc;
-  --officer-text: #1b282a;
-  --officer-muted: #53615f;
-  --officer-accent: #a24117;
+  --officer-bg: var(--ops-light-bg);
+  --officer-card: var(--ops-light-surface);
+  --officer-raised: var(--ops-light-raised);
+  --officer-border: var(--ops-light-line);
+  --officer-text: var(--ops-light-text);
+  --officer-muted: var(--ops-light-muted);
+  --officer-accent: var(--ops-light-accent);
   --officer-good: #247b52;
   color-scheme: light;
 }
@@ -99,7 +99,7 @@
   height: 28px;
   color: var(--officer-accent);
   border: 1px solid var(--officer-accent);
-  border-radius: 8px;
+  border-radius: 4px;
 }
 .brand strong {
   font-size: 14px;
@@ -147,7 +147,7 @@
   gap: 7px;
   min-height: 34px;
   padding: 6px 10px;
-  border-radius: 10px;
+  border-radius: 4px;
   color: var(--officer-text);
   font-size: 12px !important;
 }
@@ -177,14 +177,15 @@
 .main {
   max-width: 2000px;
   margin: auto;
-  padding: 12px 16px;
+  padding: 24px 28px;
 }
 .intro {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 24px;
 }
 .intro h1 {
   margin: 0;
@@ -205,7 +206,7 @@
   width: 36px;
   height: 36px;
   border: 1px solid var(--officer-border);
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--officer-card);
   color: var(--officer-text);
 }
@@ -234,7 +235,7 @@
   gap: 6px;
   min-height: 36px;
   padding: 8px 11px;
-  border-radius: 7px;
+  border-radius: 4px;
   background: var(--officer-accent);
   color: #17110b;
   font-size: 12px !important;
@@ -254,14 +255,14 @@
 .tracking {
   min-width: 0;
   border: 1px solid var(--officer-border);
-  border-radius: 10px;
+  border-radius: 4px;
   background: var(--officer-card);
 }
 .mapCard {
   display: flex;
   flex-direction: column;
   padding: 11px;
-  border-color: color-mix(in srgb, var(--officer-accent) 65%, var(--officer-border));
+  border-color: var(--officer-border);
 }
 .cardHeading {
   display: flex;
@@ -291,7 +292,7 @@
   min-height: 250px;
   overflow: hidden;
   border: 1px solid var(--officer-border);
-  border-radius: 7px;
+  border-radius: 4px;
 }
 .mapFrame :global(.map-panel) {
   position: absolute;
@@ -321,7 +322,7 @@
   gap: 6px;
   padding: 5px 7px;
   border: 1px solid var(--officer-border);
-  border-radius: 9px;
+  border-radius: 4px;
   background: color-mix(in srgb, var(--officer-card) 90%, transparent);
   color: var(--officer-text);
   font-size: 11px;
@@ -362,7 +363,7 @@
   gap: 2px;
   padding: 3px;
   border: 1px solid var(--officer-border);
-  border-radius: 8px;
+  border-radius: 4px;
   background: color-mix(in srgb, var(--officer-card) 90%, transparent);
   color: var(--officer-text);
   isolation: isolate;
@@ -403,7 +404,7 @@
   height: 40px;
   overflow: hidden;
   border: 1px solid var(--officer-border);
-  border-radius: 10px;
+  border-radius: 4px;
   background: #e7f0f4;
   color: #263450;
   font:
@@ -434,10 +435,8 @@
     monospace;
 }
 .heartFace {
-  position: relative;
   display: block;
-  width: 64px;
-  height: 54px;
+  text-align: right;
 }
 .heartFace svg {
   display: block;
@@ -452,15 +451,10 @@
   transform-origin: center;
 }
 .heartFace strong {
-  position: absolute;
-  z-index: 1;
-  inset: 0 0 7px;
-  display: grid;
-  place-items: center;
-  color: #fff;
+  color: var(--officer-text);
   font:
-    700 20px Arial,
-    sans-serif;
+    500 32px/1.2 ui-monospace,
+    monospace;
   font-variant-numeric: tabular-nums;
 }
 .tracking > summary {
@@ -484,8 +478,10 @@
 }
 .devicePanel > section {
   margin-top: 0;
-  padding: 10px;
-  border-color: var(--officer-border);
+  padding: 12px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .dashboard .devicePanel button:not(:disabled):hover {
   border-color: var(--officer-accent);
@@ -507,14 +503,14 @@
 }
 .overviewSlot > div > button {
   width: 100%;
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 12px;
   box-shadow: none;
 }
 .overviewSlot > div > section {
   margin-top: 8px;
   padding: 12px;
-  border-radius: 10px;
+  border-radius: 4px;
   box-shadow: none;
 }
 .tracking {
@@ -538,7 +534,7 @@
   min-height: 0;
   padding: 16px;
   border: 1px solid var(--officer-border);
-  border-radius: 10px;
+  border-radius: 4px;
   background: var(--officer-card);
   overflow-y: auto;
   scrollbar-width: thin;
@@ -595,10 +591,11 @@
   font-size: 11px;
 }
 .setupSection {
-  margin-bottom: 12px;
-  padding: 12px;
-  border: 1px solid var(--officer-border);
-  border-radius: 10px;
+  margin-bottom: 20px;
+  padding: 20px 0 0;
+  border: 0;
+  border-top: 1px solid var(--officer-border);
+  border-radius: 0;
 }
 .setupHeading {
   display: flex;
@@ -612,7 +609,7 @@
   flex: 0 0 24px;
   height: 24px;
   border: 1px solid var(--officer-border);
-  border-radius: 7px;
+  border-radius: 4px;
   color: var(--officer-accent);
   background: var(--officer-raised);
   font:
@@ -636,7 +633,7 @@
   color: var(--officer-text);
 }
 .setupSection :global(.capture-card__video) {
-  border-radius: 7px;
+  border-radius: 4px;
 }
 .setupSection :global(.capture-card__picker) {
   max-width: 100%;
@@ -670,7 +667,7 @@
   margin: 0 0 12px;
   padding: 9px 10px;
   border: 1px solid color-mix(in srgb, var(--officer-accent) 50%, var(--officer-border));
-  border-radius: 7px;
+  border-radius: 4px;
   background: color-mix(in srgb, var(--officer-accent) 6%, var(--officer-card));
   color: var(--officer-muted);
   font-size: 12px;
@@ -724,7 +721,7 @@
   width: min(292px, calc(100% - 18px));
   padding: 11px;
   border: 1px solid var(--officer-border);
-  border-radius: 10px;
+  border-radius: 4px;
   background: color-mix(in srgb, var(--officer-card) 92%, transparent);
   box-shadow: 0 4px 18px #0002;
   backdrop-filter: blur(20px);
@@ -912,7 +909,7 @@
 .accountLink {
   color: var(--officer-text);
   border: 1px solid var(--officer-border);
-  border-radius: 7px;
+  border-radius: 4px;
   padding: 8px 12px;
   font-size: 13px;
   text-decoration: none;
@@ -932,7 +929,27 @@
 .account button {
   padding: 8px 12px;
   border: 1px solid var(--officer-border);
-  border-radius: 7px;
+  border-radius: 4px;
   color: var(--officer-text);
   background: var(--officer-raised);
+}
+
+.setupSection :global(.capture-card) {
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.setupSection :global(.capture-card__button) {
+  border-radius: 4px;
+  background: var(--officer-accent);
+  color: var(--officer-bg);
+}
+.setupSection :global(.capture-card__button--quiet) {
+  background: transparent;
+  color: var(--officer-text);
+  border-color: var(--officer-border);
+}
+.dashboard[data-theme="light"]
+  .setupSection
+  :global(.capture-card__button:not(.capture-card__button--quiet)) {
+  color: #fff;
 }

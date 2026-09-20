@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Unicase, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
+import "./operations.css";
 
 const display = Cormorant_Unicase({
   weight: "700",

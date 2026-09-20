@@ -4,10 +4,10 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px 24px;
-  padding: 16px 24px;
-  border-bottom: 1px solid #d6ddd8;
-  background: #f5f7f4;
-  color: #1b282a;
+  padding: 8px 28px;
+  border-bottom: 1px solid var(--ops-line);
+  background: var(--ops-surface);
+  color: var(--ops-text);
   font:
     14px/1.5 Arial,
     Helvetica,
@@ -18,16 +18,16 @@
   gap: 2px;
 }
 .officerAccess strong {
-  font-size: 16px;
+  font-size: 12px;
 }
 .officerAccess span {
-  color: #53615f;
+  color: var(--ops-muted);
 }
 .officerAccess a {
   display: inline-flex;
   justify-content: center;
-  padding: 11px 16px;
-  border-radius: 7px;
+  padding: 7px 12px;
+  border-radius: 4px;
   background: #203c32;
   color: #fff;
   font-weight: 600;

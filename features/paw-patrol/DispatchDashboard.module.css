@@ -1,12 +1,12 @@
 .dashboard {
-  --bento-bg: #0a0c0f;
-  --bento-card: #121519;
-  --bento-raised: #1b2026;
-  --bento-border: #2b3139;
-  --bento-text: #f1f1ec;
-  --bento-muted: #a0a8b3;
-  --bento-accent: #ff9b62;
-  --bento-good: #7bcba5;
+  --bento-bg: var(--ops-bg);
+  --bento-card: var(--ops-surface);
+  --bento-raised: var(--ops-raised);
+  --bento-border: var(--ops-line);
+  --bento-text: var(--ops-text);
+  --bento-muted: var(--ops-muted);
+  --bento-accent: var(--ops-accent);
+  --bento-good: var(--ops-good);
   --ink: var(--bento-text);
   --muted: var(--bento-muted);
   --line: var(--bento-border);
@@ -30,13 +30,13 @@
 }
 
 .dashboard[data-theme="light"] {
-  --bento-bg: #eceeea;
-  --bento-card: #fafbf8;
-  --bento-raised: #e7ebe6;
-  --bento-border: #cdd3cc;
-  --bento-text: #1b282a;
-  --bento-muted: #53615f;
-  --bento-accent: #a24117;
+  --bento-bg: var(--ops-light-bg);
+  --bento-card: var(--ops-light-surface);
+  --bento-raised: var(--ops-light-raised);
+  --bento-border: var(--ops-light-line);
+  --bento-text: var(--ops-light-text);
+  --bento-muted: var(--ops-light-muted);
+  --bento-accent: var(--ops-light-accent);
   --bento-good: #247b52;
   color-scheme: light;
 }
@@ -66,12 +66,13 @@
   opacity: 0.45;
 }
 .header {
-  min-height: 52px;
-  padding: 8px 18px;
+  min-height: 64px;
+  padding: 10px 28px;
   display: flex;
   align-items: center;
   gap: 24px;
   border-bottom: 1px solid var(--bento-border);
+  background: var(--bento-card);
 }
 .brand {
   display: flex;
@@ -91,10 +92,8 @@
 .brandIcon {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--bento-accent);
-  border-radius: 9px;
+  width: 32px;
+  height: 36px;
   color: var(--bento-accent);
 }
 .navigation {
@@ -131,7 +130,7 @@
 .navigation .switcherTrigger {
   min-height: 36px;
   padding: 8px 12px;
-  border-radius: 12px;
+  border-radius: 4px;
   cursor: pointer;
 }
 .switcherTrigger > svg:last-child {
@@ -147,7 +146,7 @@
   width: 250px;
   max-width: calc(100vw - 32px);
   padding: 6px;
-  border-radius: 16px;
+  border-radius: 4px;
 }
 .switcherLabel {
   display: block;
@@ -163,7 +162,7 @@
   padding: 10px;
   gap: 10px;
   text-align: left;
-  border-radius: 10px;
+  border-radius: 4px;
   cursor: pointer;
 }
 .workspaceChoices button:hover,
@@ -218,20 +217,21 @@
 }
 .main {
   max-width: 2000px;
-  padding: 12px 16px;
+  padding: 28px;
   margin: auto;
 }
 .intro {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 24px;
 }
 .intro h1 {
-  font-size: clamp(23px, 2.4vw, 32px);
-  font-weight: 600;
-  line-height: 1.15;
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 500;
+  line-height: 1.12;
   letter-spacing: -0.045em;
 }
 .playback {
@@ -250,7 +250,7 @@
   width: 36px;
   height: 36px;
   border: 1px solid var(--bento-border);
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--bento-card);
   cursor: pointer;
 }
@@ -293,7 +293,7 @@
   gap: 7px;
   min-height: 36px;
   padding: 8px 13px;
-  border-radius: 7px;
+  border-radius: 4px;
   background: var(--bento-accent);
   color: #17110b !important;
   font-weight: 700 !important;
@@ -308,11 +308,11 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-template-rows: minmax(330px, calc(100dvh - 341px)) minmax(210px, auto);
-  gap: 12px;
+  grid-template-rows: minmax(450px, calc(100dvh - 240px)) minmax(240px, auto);
+  gap: 24px;
 }
 .grid[data-placing="true"] {
-  grid-template-rows: minmax(378px, calc(100dvh - 293px)) minmax(210px, auto);
+  grid-template-rows: minmax(498px, calc(100dvh - 192px)) minmax(240px, auto);
 }
 .grid[data-placing="true"] .mapCell {
   border-color: #ec5968;
@@ -320,9 +320,10 @@
 }
 .grid > section {
   gap: 0;
-  border-radius: 10px;
+  border-radius: 0;
   min-width: 0;
-  padding: 16px;
+  padding: 18px;
+  box-shadow: none;
 }
 .grid h2,
 .activityCell h2 {
@@ -368,7 +369,7 @@
   flex: 1;
   min-height: 250px;
   border: 1px solid var(--bento-border);
-  border-radius: 7px;
+  border-radius: 4px;
   overflow: hidden;
 }
 .mapFooter {
@@ -669,41 +670,19 @@
 .pixelHeart {
   display: inline-flex;
   flex-direction: column;
-  align-items: center;
-  vertical-align: middle;
-  width: 48px;
-  flex-shrink: 0;
-  gap: 2px;
+  align-items: flex-end;
+  width: 56px;
+  gap: 3px;
 }
 .pixelHeartFace {
-  position: relative;
   display: block;
   width: 48px;
-  height: 40px;
-}
-.pixelHeartShape {
-  display: block;
-  width: 48px;
-  height: 40px;
-  fill: #58616c;
-  shape-rendering: crispEdges;
-  transform-origin: center;
-}
-.pixelHeart[data-active="true"] .pixelHeartShape {
-  fill: #a83d4e;
-  animation: heartSignal 1s steps(1, end) infinite;
+  text-align: right;
 }
 .pixelHeartNumber {
-  position: absolute;
-  top: 12px;
-  right: 0;
-  left: 0;
-  color: #fff;
-  text-align: center;
+  color: var(--bento-text);
   font:
-    700 14px/18px ui-monospace,
-    SFMono-Regular,
-    Consolas,
+    500 22px/1.2 ui-monospace,
     monospace;
   font-variant-numeric: tabular-nums;
 }
@@ -711,23 +690,8 @@
   color: var(--bento-muted);
   white-space: nowrap;
   font:
-    11px/1.3 ui-monospace,
-    SFMono-Regular,
-    Consolas,
+    10px/1.3 ui-monospace,
     monospace;
-}
-@keyframes heartSignal {
-  0%,
-  60%,
-  100% {
-    opacity: 0.9;
-    transform: scale(0.97);
-  }
-  20%,
-  40% {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 .footnote {
   color: var(--bento-muted);
@@ -857,7 +821,7 @@
 }
 .areaBar {
   height: 3px;
-  border-radius: 10px;
+  border-radius: 4px;
   background: var(--bento-raised);
   overflow: hidden;
 }
@@ -883,9 +847,12 @@
   width: 100%;
   min-width: 0;
   min-height: 280px;
-  margin: 24px 0 0;
-  padding: 16px;
-  border-radius: 10px;
+  margin: 32px 0 0;
+  padding: 20px 0;
+  border: 0;
+  border-top: 1px solid var(--bento-border);
+  border-radius: 0;
+  background: transparent;
   gap: 0;
   overflow: visible;
 }
@@ -986,7 +953,7 @@
   padding: 9px 10px;
   text-align: left;
   border: 1px solid color-mix(in srgb, #ec5968 55%, var(--bento-border));
-  border-radius: 10px;
+  border-radius: 4px;
   background: color-mix(in srgb, #ec5968 7%, var(--bento-card));
   cursor: grab;
 }
@@ -1156,6 +1123,81 @@
   padding: 12px;
 }
 
+.sectionLabel {
+  margin-bottom: 8px;
+  color: var(--bento-muted);
+  font:
+    11px/1.5 ui-monospace,
+    monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.introNote {
+  margin-top: 8px;
+  color: var(--bento-muted);
+  font-size: 13px;
+}
+.fleetTotal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: flex-start;
+}
+.fleetTotal strong {
+  font-size: 56px;
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: -0.06em;
+  font-variant-numeric: tabular-nums;
+}
+.fleetTotal span {
+  color: var(--bento-muted);
+  font:
+    11px/1.5 ui-monospace,
+    monospace;
+}
+.grid :is(.readinessCell, .coverageCell, .connectionsCell) {
+  border: 0;
+  border-top: 2px solid var(--bento-border);
+  padding: 18px 0;
+  background: transparent;
+}
+.grid .rosterCell {
+  border: 0;
+  border-left: 1px solid var(--bento-border);
+  padding: 0 0 0 20px;
+  background: transparent;
+}
+.rosterCell .cardHeading {
+  align-items: flex-start;
+  padding-bottom: 12px;
+}
+.grid .mapCell {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.mapCell .cardHeading {
+  min-height: 38px;
+  margin-bottom: 12px;
+}
+.eventList summary strong {
+  font-size: 14px;
+}
+.eventList summary {
+  padding-block: 16px;
+}
+@media (max-width: 900px) {
+  .grid .rosterCell {
+    padding: 16px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--bento-border);
+  }
+  .introNote {
+    max-width: 32ch;
+  }
+}
+
 @keyframes pulse {
   50% {
     opacity: 0.4;
@@ -1297,7 +1339,7 @@
     display: none;
   }
   .rosterCell {
-    height: 330px;
+    height: 430px;
   }
   .rosterFilters {
     flex-wrap: nowrap;
@@ -1337,21 +1379,13 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pixelHeart[data-active="true"] .pixelHeartShape {
-    animation: none;
-  }
   .pulseDot[data-running="true"] {
     animation: none;
   }
 }
 @media (forced-colors: active) {
-  .pixelHeartShape,
-  .pixelHeart[data-active="true"] .pixelHeartShape {
-    fill: CanvasText;
-    animation: none;
-  }
   .pixelHeartNumber {
-    color: Canvas;
+    color: CanvasText;
   }
   .dashboard {
     --bento-bg: Canvas;
@@ -1428,7 +1462,7 @@
 .accountLink {
   color: var(--bento-text);
   border: 1px solid var(--bento-border);
-  border-radius: 7px;
+  border-radius: 4px;
   padding: 8px 12px;
   font-size: 13px;
   text-decoration: none;

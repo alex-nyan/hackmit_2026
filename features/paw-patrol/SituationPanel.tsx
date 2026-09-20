@@ -13,7 +13,9 @@ export function SituationPanel({
   publish,
   personId,
   heartRate,
+  inline = false,
 }: {
+  inline?: boolean;
   events: IncidentEvent[];
   status: BusStatus;
   publish: (draft: IncidentDraft) => Promise<boolean>;
@@ -90,6 +92,7 @@ export function SituationPanel({
     <>
       <aside
         className={styles.knowledge}
+        data-inline={inline}
         data-concern={concern}
         aria-label="Latest observation"
       >
@@ -103,11 +106,7 @@ export function SituationPanel({
                 ? "Last report is out of date"
                 : latest.title}
         </strong>
-        <p>
-          {fresh
-            ? latest?.detail
-            : "No recent camera or audio reports. Scene status unknown."}
-        </p>
+        <p>{fresh ? latest?.detail : "No recent camera or audio reports. Scene status unknown."}</p>
         {latest && (
           <small>
             Source {latest.personId} · {latest.observedAt ?? latest.at}

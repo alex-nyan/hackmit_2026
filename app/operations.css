@@ -1,0 +1,18 @@
+/* Shared palette for the operational workspaces. */
+:root {
+  --ops-bg: #101818;
+  --ops-surface: #172020;
+  --ops-raised: #202d2c;
+  --ops-line: #354441;
+  --ops-text: #eff1e9;
+  --ops-muted: #a7b4ae;
+  --ops-accent: #e8c47c;
+  --ops-good: #8ec5a5;
+  --ops-light-bg: #eaece5;
+  --ops-light-surface: #f8f9f3;
+  --ops-light-raised: #e2e7dc;
+  --ops-light-line: #c5cec2;
+  --ops-light-text: #202e29;
+  --ops-light-muted: #54655b;
+  --ops-light-accent: #78551b;
+}
