@@ -214,6 +214,17 @@
   min-height: 170px;
   background: #090d10;
 }
+.frame > div > p[role="status"] {
+  display: grid;
+  place-items: center;
+  min-height: 210px;
+  margin: 0;
+  padding: 24px;
+  color: #e8edf0;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
 .frame img,
 .frame video {
   display: block;
