@@ -83,11 +83,6 @@
     sans-serif;
   letter-spacing: -0.03em;
 }
-.intro p,
-.help {
-  color: var(--signin-muted);
-  margin: 0;
-}
 .form {
   display: grid;
   gap: 20px;
@@ -101,7 +96,6 @@
 .field label {
   font-weight: 600;
 }
-.field input,
 .field select {
   box-sizing: border-box;
   width: 100%;
@@ -117,18 +111,14 @@
     Helvetica,
     sans-serif;
 }
-.field input::placeholder {
-  color: var(--signin-muted);
-}
-.field input[aria-invalid="true"] {
+.field select[aria-invalid="true"] {
   border-color: #e89c92;
 }
-.field input:disabled,
 .field select:disabled {
   color: var(--signin-muted);
   cursor: not-allowed;
 }
-.page :is(a, input, select, button):focus-visible {
+.page :is(a, select, button):focus-visible {
   outline: 2px solid var(--signin-accent);
   outline-offset: 3px;
 }
@@ -179,12 +169,6 @@
   color: var(--signin-muted);
   border-color: var(--signin-border);
   cursor: not-allowed;
-}
-.help {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--signin-border);
-  font-size: 13px;
 }
 @media (max-width: 480px) {
   .header {
