@@ -80,8 +80,10 @@ uv run --no-sync uvicorn triage.app:create_app --factory \
   --host 127.0.0.1 --port 8090 --workers 1 --no-access-log
 ```
 
-The map still starts separately from the repository root with `pnpm run dev`.
-The optional `/capture` page calls a Next.js `/api/triage` proxy using the server's
+The original map and camera page start from the repository root with `npm run dev:map`
+at port 5173. The root `npm run dev` command starts the separate Dispatch, Officer,
+and Hospital demo workspaces on ports 5176–5178 instead.
+The optional `http://localhost:5173/capture` page calls a Next.js `/api/triage` proxy using the server's
 `TRIAGE_URL` and `TRIAGE_API_TOKEN`; see the root README for setup. The dashboard
 has no user login, so enabling this proxy grants submission access to everyone
 who can reach it. Use a trusted LAN or authenticated reverse proxy. A production

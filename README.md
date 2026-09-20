@@ -145,8 +145,10 @@ and no location history is kept by the dashboard.
 
 ## Camera hazard triage (optional)
 
-`/capture` opens a phone-oriented page that sends camera frames to the hazard
-triage service in `services/triage`. Add to `.env.local`:
+Start the original app with `npm run dev:map`, then open
+<http://localhost:5173/capture> for the phone-oriented camera page. It sends frames
+to the hazard triage service in `services/triage`; it is separate from the three
+demo workspaces on ports 5176–5178. Add to the root `.env.local`:
 
 ```dotenv
 TRIAGE_URL=http://127.0.0.1:8090
@@ -332,8 +334,8 @@ testing, and the remaining production integration requirements.
 
 ## Paw Patrol dashboard (consult update)
 
-The dashboard is in [`apps/paw-patrol`](apps/paw-patrol), on branch
-`codex/paw-patrol-dashboard`. It preserves the root tracking app and triage backend;
+The dashboard is in [`apps/paw-patrol`](apps/paw-patrol).
+It preserves the root tracking app and triage backend;
 its demonstration is not yet wired to their live feeds.
 
 The root quick start launches all three workspaces. For the original combined demo

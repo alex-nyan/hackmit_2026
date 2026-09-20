@@ -12,12 +12,12 @@ The launcher starts three separate Next.js processes, prints labeled logs and
 opens no external connections beyond those already used by the apps (such as
 Mapbox). Open the printed links in your browser:
 
-| Service          | Local URL               | What it opens                              |
-| ---------------- | ----------------------- | ------------------------------------------ |
-| `dispatch`       | <http://localhost:5176> | Command/dispatch workspace                 |
-| `officer`        | <http://localhost:5177> | Officer workspace                          |
-| `hospital`       | <http://localhost:5178> | Hospital receiving workspace               |
-| `map` (optional) | <http://localhost:5173> | Original map and optional Traccar tracking |
+| Service          | Local URL               | What it opens                                             |
+| ---------------- | ----------------------- | --------------------------------------------------------- |
+| `dispatch`       | <http://localhost:5176> | Command/dispatch workspace                                |
+| `officer`        | <http://localhost:5177> | Officer workspace                                         |
+| `hospital`       | <http://localhost:5178> | Hospital receiving workspace                              |
+| `map` (optional) | <http://localhost:5173> | Original map, Traccar tracking and `/capture` camera page |
 
 Start only the services you need:
 
@@ -73,7 +73,9 @@ and switchable workspaces, stop the launcher and run `npm run dev` from
 
 The vision service is intentionally separate from frontend startup. Follow its
 [runbook](hazard-triage.md) to start the authenticated API and models; the dashboard
-does not yet consume its results or initiate real dispatch.
+workspaces do not yet consume its results or initiate real dispatch. The original
+app's <http://localhost:5173/capture> page can submit camera frames through its
+server-side `/api/triage` proxy when configured in the root `.env.local`.
 
 ## Troubleshooting
 
