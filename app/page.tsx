@@ -1,3 +1,4 @@
+import { SharedWorkspace } from "@/features/officer-instance/SharedWorkspace";
 import { PawPatrol } from "@/features/paw-patrol/PawPatrol";
 import { parseWorkspace, WORKSPACE_LABELS } from "@/features/paw-patrol/workspace";
 import { connection } from "next/server";
@@ -23,5 +24,7 @@ export default async function Home() {
   if (mode !== "demo" && mode !== "live")
     throw new Error("PAW_PATROL_DATA_MODE must be demo or live.");
   if (mode === "live") return <LiveWorkspace />;
+  if (process.env.PAW_PATROL_BROADCAST_ENABLED !== "false")
+    return <SharedWorkspace role={workspace ?? "dispatch"} />;
   return <PawPatrol workspace={workspace} />;
 }
