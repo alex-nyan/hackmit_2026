@@ -1,12 +1,16 @@
 "use client";
 
-import { describeTranscript } from "./audio";
+import { describeTranscript, type TranscriptionResult } from "./audio";
+import type { TriageResult } from "./types";
 import { useAudioTranscription } from "./useAudioTranscription";
 import { useCameraTriage } from "./useCameraTriage";
 import { useCaptureDevices } from "./useCaptureDevices";
 
 interface CapturePanelProps {
   sourceId: string;
+  /** Receives each accepted result so a workspace can publish it as an incident. */
+  onResult?: (result: TriageResult) => void;
+  onTranscript?: (result: TranscriptionResult) => void;
 }
 
 /**
@@ -14,11 +18,11 @@ interface CapturePanelProps {
  * the hand; this is the same pipeline beside the map, which is how a Continuity
  * Camera is actually used: phone as the lens, laptop as the console.
  */
-export function CapturePanel({ sourceId }: CapturePanelProps) {
+export function CapturePanel({ sourceId, onResult, onTranscript }: CapturePanelProps) {
   const { devices, cameraId, setCameraId, refreshDevices } = useCaptureDevices();
 
-  const { state, videoRef, start, stop } = useCameraTriage({ sourceId, cameraId });
-  const audio = useAudioTranscription(sourceId);
+  const { state, videoRef, start, stop } = useCameraTriage({ sourceId, cameraId, onResult });
+  const audio = useAudioTranscription(sourceId, onTranscript);
   const running = state.state === "running";
   const busy = running || state.state === "requesting-camera";
   const listening =

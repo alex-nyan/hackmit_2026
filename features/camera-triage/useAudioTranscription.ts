@@ -55,14 +55,22 @@ function readAsDataUrl(blob: Blob): Promise<string> {
 }
 
 /** Records complete, independently decodable clips, with at most one upload. */
-export function useAudioTranscription(sourceId: string) {
+export function useAudioTranscription(
+  sourceId: string,
+  onResult?: (result: TranscriptionResult) => void,
+) {
   const [state, setState] = useState<AudioState>({ state: "off" });
   const sessionRef = useRef<AudioSession | null>(null);
   const sourceIdRef = useRef(sourceId);
+  const onResultRef = useRef(onResult);
 
   useEffect(() => {
     sourceIdRef.current = sourceId;
   }, [sourceId]);
+
+  useEffect(() => {
+    onResultRef.current = onResult;
+  }, [onResult]);
 
   const stop = useCallback(() => {
     const session = sessionRef.current;
@@ -118,11 +126,21 @@ export function useAudioTranscription(sourceId: string) {
         }
 
         const result = (await response.json()) as TranscriptionResult;
-        setState((current) =>
-          sessionRef.current === session && current.state === "recording"
+        const current = sessionRef.current === session;
+        setState((previous) =>
+          current && previous.state === "recording"
             ? { state: "recording", lastResult: result, lastError: null }
-            : current,
+            : previous,
         );
+        // Only for the live session: a clip that finished after stop was
+        // pressed must not publish anything.
+        if (current) {
+          try {
+            onResultRef.current?.(result);
+          } catch {
+            // Reported by the subscriber, not here.
+          }
+        }
       } catch {
         reportError("Could not reach the transcription route.");
       } finally {

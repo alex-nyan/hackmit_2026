@@ -47,12 +47,25 @@ import {
   sampleHeartRate,
   stamp,
 } from "./scenario";
-import { useScenario } from "./useScenario";
+import { useScenario, type DemoAction } from "./useScenario";
 import { vehicleAt } from "./vehicles/vehicleMotion";
 import { useDemoTools } from "./useDemoTools";
 import { sceneAt, emsStatus, type MistRecord } from "./consult";
 import { SceneCoordination, TacticalBrief, MistHandoff, emptyTactical } from "./ConsultPanels";
 import { WORKSPACE_LABELS, WORKSPACE_VIEWS, type Workspace } from "./workspace";
+import { useIncidentBus } from "./useIncidentBus";
+import { hazardIncident, transcriptIncident } from "./hazardSignal";
+import { draftMist, hasDraft, type MistDraft } from "./draftMist";
+import type { IncidentDraft } from "./incidents";
+import {
+  BusIndicator,
+  MistDraftCard,
+  NotConcluded,
+  PreArrival,
+  SharedTimeline,
+} from "./Provenance";
+import type { TriageResult } from "../camera-triage/types";
+import type { TranscriptionResult } from "../camera-triage/audio";
 
 const AnatomyViewer = dynamic(() => import("../anatomy/AnatomyViewer"), {
   ssr: false,
@@ -98,6 +111,10 @@ function HeartChart({ time, id }: { time: number; id: string }) {
 
 export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }) {
   const { time, running, readClock, dispatch, sceneOverride, panics, audit } = useScenario();
+  // The only state shared across workspaces. Everything else stays local.
+  const bus = useIncidentBus();
+  const [draftDismissed, setDraftDismissed] = useState(false);
+  const [appliedDraft, setAppliedDraft] = useState<MistDraft | null>(null);
   const [records, setRecords] = useState<Record<string, MistRecord>>({});
   const [session, setSession] = useState(0);
   const [tactical, setTactical] = useState(emptyTactical);
@@ -142,6 +159,93 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
     complete = time === DURATION;
   const selectedCase = medical && person.id === "P-01";
   const scene = sceneAt(time, sceneOverride);
+
+  const { publish } = bus;
+  /**
+   * Mirrors a local action onto the shared log before applying it.
+   *
+   * The reducer stays the single owner of this workspace's own state; the bus
+   * carries the same fact to the others. Publication is best-effort on purpose:
+   * a demo whose panic button stops working because a fetch failed is worse
+   * than one that tells you the workspaces are out of sync.
+   */
+  const sharedDispatch = useCallback(
+    (action: DemoAction) => {
+      const shared: Record<string, () => IncidentDraft> = {
+        panic: () => ({
+          id: `panic-${action.type === "panic" ? action.personId : ""}-${time}`,
+          kind: "panic",
+          origin: "operator",
+          scenarioAt: time,
+          personId: action.type === "panic" ? action.personId : null,
+          title: `Assistance requested · ${action.type === "panic" ? action.personId : ""}`,
+          detail:
+            "Manual assistance request from the officer workspace. No injury, loss of consciousness or treatment need is claimed by this action.",
+          source: "Officer workspace",
+          provenance: null,
+          requiresHumanReview: true,
+        }),
+        acknowledge: () => ({
+          id: `ack-${action.type === "acknowledge" ? action.personId : ""}-${time}`,
+          kind: "acknowledge",
+          origin: "operator",
+          scenarioAt: time,
+          personId: action.type === "acknowledge" ? action.personId : null,
+          title: `Acknowledged · ${action.type === "acknowledge" ? action.personId : ""}`,
+          detail:
+            "Command has seen the assistance request. Acknowledgement is not a scene assessment and does not authorize entry.",
+          source: "Command desk",
+          provenance: null,
+          requiresHumanReview: false,
+        }),
+        scene: () => ({
+          id: `scene-${action.type === "scene" ? action.status : ""}-${time}`,
+          kind: "scene",
+          origin: "operator",
+          scenarioAt: time,
+          personId: null,
+          title: `Scene reported ${action.type === "scene" ? action.status : ""}`,
+          detail:
+            action.type === "scene" && action.status === "cleared"
+              ? "Command recorded a clearance authorizing patient access in this demonstration. No real scene was assessed."
+              : "EMS stages outside the scene until a clearance report is recorded.",
+          source: "Command desk",
+          provenance: null,
+          requiresHumanReview: true,
+        }),
+      };
+      const build = shared[action.type];
+      if (build) void publish(build());
+      dispatch(action);
+    },
+    [dispatch, publish, time],
+  );
+
+  const captureContext = useCallback(
+    () => ({ personId: selectedId, scenarioAt: time, sourceLabel: "Officer body camera" }),
+    [selectedId, time],
+  );
+
+  const onHazard = useCallback(
+    (result: TriageResult) => {
+      const incident = hazardIncident(result, captureContext());
+      // Most frames carry nothing worth interrupting anyone for.
+      if (incident) void publish(incident);
+    },
+    [captureContext, publish],
+  );
+
+  const onTranscript = useCallback(
+    (result: TranscriptionResult) => {
+      const incident = transcriptIncident(result, captureContext());
+      if (incident) void publish(incident);
+    },
+    [captureContext, publish],
+  );
+
+  const modelDraft = draftMist(bus.events, person.id);
+  const draftAvailable = hasDraft(modelDraft) && !draftDismissed && !records[person.id];
+
   const events = [
     ...EVENTS.filter((e) => e.at <= time && !(sceneOverride && e.at === 56)),
     ...audit,
@@ -156,6 +260,10 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
     setRecords({});
     setTactical(emptyTactical);
     setSession((s) => s + 1);
+    setDraftDismissed(false);
+    setAppliedDraft(null);
+    // Clears the shared log in every workspace, not only this one.
+    void bus.clear();
   }
   function play() {
     if (complete) {
@@ -403,13 +511,14 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
                   : "90-second automatic scenario"}
           </span>
         </div>
+        <BusIndicator status={bus.status} count={bus.events.length} />
         <SceneCoordination
           time={time}
           scene={scene}
           person={person}
           panics={panics}
           command={view === "command"}
-          dispatch={dispatch}
+          dispatch={sharedDispatch}
         />
         {hardware && (
           <section className="hardware-panel panel">
@@ -666,6 +775,31 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
                 annotation={annotation}
               />
             </div>
+            <section className="panel evidence-panel">
+              <div className="panel-heading">
+                <h2>Body camera · live</h2>
+                <span className="tag">REAL CAPTURE</span>
+              </div>
+              <div className="evidence-content">
+                <Camera size={34} />
+                <div>
+                  <h3>This camera opens the incident</h3>
+                  <p>
+                    Frames from this device go to the triage service. A reported weapon or person
+                    down publishes to the shared log, so Command and the receiving desk see it
+                    without a radio call. The service has no &quot;safe&quot; result to return and
+                    every output needs a person to review it.
+                  </p>
+                </div>
+              </div>
+              <div className="evidence-capture">
+                <CapturePanel
+                  sourceId={`officer-${person.id}`}
+                  onResult={onHazard}
+                  onTranscript={onTranscript}
+                />
+              </div>
+            </section>
             <section className="panel device-strip">
               <Smartphone size={20} />
               <strong>iPhone 16 Pro Max</strong>
@@ -698,11 +832,24 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               </p>
               {selectedCase ? (
                 <>
-                  <div className="arrival">
-                    <span>{complete ? "Received in demo" : "Sample arrival"}</span>
-                    <strong>{complete ? "Complete" : `${Math.ceil((90 - time) / 3)} min`}</strong>
-                    <small>Scripted estimate · not a real ETA</small>
-                  </div>
+                  <PreArrival
+                    time={time}
+                    duration={DURATION}
+                    arrived={complete}
+                    landed={[
+                      { label: "Scene status reported", present: scene.status !== "unknown" },
+                      {
+                        label: "Mechanism drafted from scene camera",
+                        present: Boolean(modelDraft.mechanism),
+                      },
+                      { label: "Scene audio reviewed", present: Boolean(modelDraft.symptoms) },
+                      { label: "Heart-rate series available", present: true },
+                      {
+                        label: "Clinician-entered handoff saved",
+                        present: Boolean(records[person.id]),
+                      },
+                    ]}
+                  />
                   <dl className="details">
                     <div>
                       <dt>Demo case</dt>
@@ -789,13 +936,33 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
         )}
 
         {view === "hospital" && selectedCase && (
-          <MistHandoff
-            key={`${session}-${person.id}`}
-            person={person}
-            time={time}
-            scene={scene}
-            saved={records[person.id]}
-            onSave={(record) => setRecords((current) => ({ ...current, [person.id]: record }))}
+          <>
+            {draftAvailable && (
+              <MistDraftCard
+                draft={modelDraft}
+                onApply={() => setAppliedDraft(modelDraft)}
+                onDismiss={() => setDraftDismissed(true)}
+              />
+            )}
+            <MistHandoff
+              // Remounting is what seeds the editable form from an applied
+              // draft; the form owns its state once a person is typing in it.
+              key={`${session}-${person.id}-${appliedDraft ? "drafted" : "blank"}`}
+              person={person}
+              time={time}
+              scene={scene}
+              saved={records[person.id]}
+              seed={appliedDraft}
+              onSave={(record) => setRecords((current) => ({ ...current, [person.id]: record }))}
+            />
+          </>
+        )}
+
+        {view === "hospital" && (
+          <NotConcluded
+            events={bus.events}
+            personId={person.id}
+            hasSavedRecord={Boolean(records[person.id])}
           />
         )}
 
@@ -856,6 +1023,13 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
           <div className="progress-track">
             <div style={{ width: `${(time / DURATION) * 100}%` }} />
           </div>
+        </section>
+        <section className="activity-panel panel">
+          <div className="panel-heading">
+            <h2>Shared incident log</h2>
+            <span className="tag">ALL WORKSPACES</span>
+          </div>
+          <SharedTimeline events={bus.events} />
         </section>
         <section className="activity-panel panel">
           <div className="panel-heading">

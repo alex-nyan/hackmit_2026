@@ -12,6 +12,7 @@ import {
   type PanicReport,
   type SceneReport,
 } from "./consult";
+import type { MistDraft } from "./draftMist";
 import { sampleHeartRate, stamp, type Person } from "./scenario";
 import type { DemoAction } from "./useScenario";
 import styles from "./ConsultPanels.module.css";
@@ -186,15 +187,31 @@ export function MistHandoff({
   time,
   scene,
   saved,
+  seed,
   onSave,
 }: {
   person: Person;
   time: number;
   scene: SceneReport;
   saved?: MistRecord;
+  /**
+   * Unconfirmed model text a person chose to pull into the form. It seeds the
+   * editable fields and nothing else: it is never saved, never shown as the
+   * record, and the reporter stays whoever presses save.
+   */
+  seed?: MistDraft | null;
   onSave: (record: MistRecord) => void;
 }) {
-  const [draft, setDraft] = useState<MistRecord>(() => saved ?? emptyMist(time));
+  const [draft, setDraft] = useState<MistRecord>(() => {
+    const base = saved ?? emptyMist(time);
+    if (!seed) return base;
+    return {
+      ...base,
+      mechanism: seed.mechanism || base.mechanism,
+      symptoms: seed.symptoms || base.symptoms,
+      // Injuries is deliberately never seeded. See draftMist.ts.
+    };
+  });
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
   const [copyFallback, setCopyFallback] = useState(false);
