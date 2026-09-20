@@ -1,0 +1,308 @@
+.viewer {
+  --anatomy-night: #343e8a;
+  --anatomy-ocean: #37619b;
+  --anatomy-butter: #efdb98;
+  --anatomy-cream: #fcf7ed;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e8e2d6;
+  border-radius: 22px;
+  background: var(--anatomy-cream);
+  color: var(--anatomy-night);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.header {
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 23px 24px 0;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #687290;
+  font-size: 14px;
+}
+
+.header h3 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.modelBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  color: var(--anatomy-ocean);
+  font-size: 14px;
+}
+
+.stage {
+  position: relative;
+  height: clamp(370px, 48vh, 540px);
+  min-height: 370px;
+  margin-top: 8px;
+}
+
+.canvasHost {
+  position: absolute;
+  inset: 0;
+}
+
+.canvasHost canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.canvasHost canvas:active {
+  cursor: grabbing;
+}
+
+.viewer button:focus-visible,
+.canvasHost canvas:focus-visible {
+  outline: 3px solid var(--anatomy-ocean);
+  outline-offset: -3px;
+}
+
+.status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 30px 48px;
+  background: var(--anatomy-cream);
+  text-align: center;
+}
+
+.status strong {
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.status > span {
+  max-width: 290px;
+  color: #687290;
+}
+
+.spinner {
+  animation: anatomy-spin 1.3s linear infinite;
+}
+
+.retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 10px 17px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--anatomy-night);
+  color: #fff;
+  cursor: pointer;
+}
+
+.orientation {
+  position: absolute;
+  bottom: 13px;
+  left: 24px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: rgb(252 247 237 / 90%);
+  color: #687290;
+  pointer-events: none;
+}
+
+.zoomControls {
+  position: absolute;
+  right: 20px;
+  bottom: 12px;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid #dedddc;
+  border-radius: 12px;
+  background: #fffdf8;
+  box-shadow: 0 3px 9px rgb(52 62 138 / 4%);
+}
+
+.zoomControls button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--anatomy-night);
+  cursor: pointer;
+}
+
+.zoomControls button + button {
+  border-top: 1px solid #e9e5dc;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 24px 0;
+}
+
+.presets {
+  display: inline-flex;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid #e9e3d6;
+  border-radius: 11px;
+  background: #f3eddf;
+}
+
+.presets button {
+  min-height: 38px;
+  padding: 7px 17px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #687290;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.presets button[aria-pressed="true"] {
+  background: #fffdf8;
+  color: var(--anatomy-night);
+  box-shadow: 0 1px 4px rgb(52 62 138 / 7%);
+}
+
+.reset {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 0 8px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--anatomy-ocean);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.viewer button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.viewer button:not(:disabled):hover {
+  filter: brightness(0.94);
+}
+
+.help {
+  margin: 14px 20px 5px;
+  color: #687290;
+  text-align: center;
+  font-size: 14px;
+}
+
+.modelNote {
+  margin: 0 20px 22px;
+  color: #687290;
+  text-align: center;
+  font-size: 14px;
+}
+
+.annotation {
+  display: flex;
+  gap: 12px;
+  margin: 0 20px 20px;
+  padding: 16px;
+  border: 1px solid #e9dcae;
+  border-radius: 13px;
+  background: #f8efd3;
+}
+
+.annotationDot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: #997634;
+}
+
+.annotation strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.annotation p {
+  margin: 4px 0 8px;
+  color: #606780;
+}
+
+.annotationNote {
+  display: block;
+  color: #71674f;
+  font-size: 14px;
+}
+
+@keyframes anatomy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 20px 17px 0;
+  }
+  .header h3 {
+    font-size: 23px;
+  }
+  .modelBadge {
+    font-size: 14px;
+  }
+  .modelBadge svg {
+    display: none;
+  }
+  .stage {
+    height: 390px;
+  }
+  .toolbar {
+    padding-inline: 16px;
+  }
+  .presets button {
+    min-width: 51px;
+    padding-inline: 11px;
+  }
+  .annotation {
+    margin-inline: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

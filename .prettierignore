@@ -1,6 +1,6 @@
 node_modules/
-apps/paw-patrol/
 .next/
+.next-*/
 out/
 dist/
 coverage/
@@ -17,6 +17,8 @@ services/triage/models/
 services/triage/.runtime/
 services/triage/uv.lock
 services/triage/contracts/
-
 # Generated deterministically from canonical Python schemas.
 shared/contracts/generated.ts
+docs/paw-patrol/anatomy-export-audit.json
+features/paw-patrol/vehicles/street-routes.json
+public/models/

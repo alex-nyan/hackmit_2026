@@ -62,3 +62,9 @@ The reproducible `scripts.live_smoke` runs real HTTP/SSE against a separate loop
 The [live pipeline runbook](live-pipeline.md) gives concrete replay, operator, device, model, HTTPS, patient enrollment, interface and validation instructions. The native README distinguishes available host checks from required Xcode/device verification. The demo server has a bounded graceful-shutdown timeout for open SSE connections.
 
 All five software implementation phases have been reviewed and committed. Outstanding qualification remains: full native SDK/device builds and permission/transport tests; representative domain model accuracy and hard-negative evaluation; concurrent-load latency, battery and thermal measurements; deployment privacy/security and field/clinical acceptance. No software test result in this record establishes those properties. No public deployment, external handoff, real device capture, or model download was performed during implementation.
+
+**PR integration review — unified root app.**
+
+Main moved the dashboard to the repository root and added incident callbacks after the original five phases. The merge resolution moves live routes and components into that active app, preserves canonical response validation before the callbacks, and updates setup paths. Regression tests verify that valid audio results reach subscribers while malformed or late responses do not. Legacy nested build caches are ignored by lint without changing running development servers.
+
+The combined implementation passed 389 frontend tests, 13 launcher tests, 234 backend tests (one optional model smoke skipped), all ten real HTTP/SSE smoke checks, type checking, lint, formatting and a production build. Native/device and model qualification limits above still apply.

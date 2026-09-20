@@ -5,9 +5,13 @@ export type {
   Detection,
   Hazard,
   VisionAssessment,
+  ModelProvenance,
   TriageRequest as TriageRequestBody,
   TriageResult,
 } from "../../shared/contracts";
+
+export type HazardCategory = import("../../shared/contracts").Hazard["category"];
+export type HazardSeverity = import("../../shared/contracts").Hazard["severity"];
 
 export type CaptureState =
   | { state: "idle" }

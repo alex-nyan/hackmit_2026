@@ -24,7 +24,7 @@ cd services/triage
 uv run --no-sync python -m scripts.live_demo replay
 ```
 
-Set these **server-side** values in `apps/paw-patrol/.env.local`, preserving existing Mapbox configuration:
+Set these **server-side** values in `.env.local`, preserving existing Mapbox configuration:
 
 ```dotenv
 PAW_PATROL_DATA_MODE=live

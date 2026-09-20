@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ContractValidationError, parseTriageResult } from "../../shared/contracts";
 import { trackConstraint } from "./devices";
 import { buildTriageRequest, nextDelayMs } from "./frame";
-import type { CaptureState } from "./types";
+import type { CaptureState, TriageResult } from "./types";
 
 const BASE_INTERVAL_MS = 2000;
 const CAPTURE_WIDTH = 1280;
@@ -16,6 +16,11 @@ interface Options {
   incidentId?: string | null;
   /** Explicit capture device, so a Continuity Camera can be chosen over the webcam. */
   cameraId?: string | null;
+  /**
+   * Called once per accepted result. Held in a ref so a caller that rebuilds
+   * the callback each render does not cancel the request in flight.
+   */
+  onResult?: (result: TriageResult) => void;
 }
 
 /**
@@ -24,16 +29,21 @@ interface Options {
  * only after the previous request settles; a fixed interval would queue frames
  * until they aged past the service's staleness limit.
  */
-export function useCameraTriage({ sourceId, incidentId, cameraId }: Options) {
+export function useCameraTriage({ sourceId, incidentId, cameraId, onResult }: Options) {
   const [state, setState] = useState<CaptureState>({ state: "idle" });
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<symbol | null>(null);
   const optionsRef = useRef({ sourceId, incidentId });
+  const onResultRef = useRef(onResult);
 
   useEffect(() => {
     optionsRef.current = { sourceId, incidentId };
   }, [sourceId, incidentId]);
+
+  useEffect(() => {
+    onResultRef.current = onResult;
+  }, [onResult]);
 
   const stop = useCallback(() => {
     sessionRef.current = null;
@@ -176,6 +186,12 @@ export function useCameraTriage({ sourceId, incidentId, cameraId }: Options) {
             ? { state: "running", lastResult: result, lastError: null }
             : current,
         );
+        // A subscriber's own failure must not abort the capture loop.
+        try {
+          onResultRef.current?.(result);
+        } catch {
+          // Reported by the subscriber, not here.
+        }
       }
       return "ok" as const;
     }

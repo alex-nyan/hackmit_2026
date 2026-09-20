@@ -15,10 +15,33 @@ The map is a port of the working local preview, not a redesign. Its geographic
 scope is Greater Boston; the original reference document's NUS coordinates and
 energy overlays have intentionally not been carried over.
 
+## One app, two maps
+
+The repository is a single Next.js app. `app/page.tsx` is the Paw Patrol dashboard
+and `app/map/page.tsx` is the standalone Boston map; both draw on the same
+`features/boston-map` primitives, and both reach the same server bridges under
+`app/api`. The dashboard is pinned to one role by `PAW_PATROL_WORKSPACE`, which
+also selects its `distDir` and TypeScript project so three concurrent dev servers
+cannot overwrite one another's output.
+
+The two maps differ in what they add on top of the shared building layer:
+
+- `BostonMap.tsx` (`/map`) is the plain map: buildings, selection and live units.
+- `OperationsMap.tsx` (`/`) adds the scenario clock, 3D patrol vehicle meshes and
+  route lines, and drives them from one `requestAnimationFrame` loop that never
+  sets React state per frame. It reuses the same `buildingLayer`, `liveLayer` and
+  `buildingSelection` modules rather than forking them, so a fix to freshness or
+  footprint maths lands in both.
+
+Styling is split the same way: `app/globals.css` holds the dashboard design system
+plus the shared capture, fleet and building widgets, and `app/map/map.css` is
+imported only by `/map`, so the map's neutral chrome and the dashboard's palette
+never fight over the cascade.
+
 ## Boundaries
 
-- `app/page.tsx` composes the map feature. Future dashboard routes can be added
-  without putting unrelated business logic in the map renderer.
+- `app/page.tsx` composes the dashboard; `app/map/page.tsx` composes the map.
+  Neither puts business logic in the map renderer.
 - `BostonMapShell.tsx` owns the selected area, theme, and visible load feedback.
 - `BostonMap.tsx` owns the Mapbox instance, events, resize observer, and cleanup.
   Mapbox is loaded on the client only. React rerenders do not recreate the map.
@@ -75,12 +98,20 @@ the whole.
 Not every tile carries a feature id. Without one there is nothing to attach state
 to, so the building is still reported but not highlighted.
 
+On the dashboard map the same click handler also owns unit selection. A patrol
+vehicle wins any pixel it shares with the building behind it, because the vehicles
+are Three.js meshes that `queryRenderedFeatures` cannot see — they are picked by
+projecting their current positions to screen space, so the building query only runs
+once no unit is within reach.
+
 ## Live GPS
 
-The dashboard shows every unit reporting to a shared [Traccar](https://www.traccar.org)
+Both maps show every unit reporting to a shared [Traccar](https://www.traccar.org)
 server, so a team can see each other simultaneously. Tracking is **opt-in**:
 nothing is requested until the viewer presses the locate button, and turning it off
-aborts the in-flight request and drops the positions.
+aborts the in-flight request and drops the positions. On the dashboard the real
+units are drawn over the simulated patrol vehicles and are never merged with them;
+the scenario clock and the Traccar poll stay separate sources.
 
 The fleet costs two upstream requests regardless of its size — one for devices, one
 for latest positions — and positions are grouped by device in a single pass. Adding
