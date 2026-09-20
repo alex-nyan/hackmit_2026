@@ -3,27 +3,27 @@
   --font-display:
     ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-prose: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --ops-bg: #101b1b;
-  --ops-surface: #172424;
-  --ops-raised: #213232;
-  --ops-line: #344646;
-  --ops-text: #f0f5f2;
-  --ops-muted: #a6bbb5;
-  --ops-accent: #a3e6c0;
-  --ops-good: #8edbb0;
-  --ops-light-bg: #f0f3ef;
+  --ops-bg: #111111;
+  --ops-surface: #1b1b1b;
+  --ops-raised: #282828;
+  --ops-line: #404040;
+  --ops-text: #fafafa;
+  --ops-muted: #aaaaaa;
+  --ops-accent: #eeeeee;
+  --ops-good: #cccccc;
+  --ops-light-bg: #f5f5f5;
   --ops-light-surface: #ffffff;
-  --ops-light-raised: #e6ede7;
-  --ops-light-line: #ccd8cf;
-  --ops-light-text: #18372b;
-  --ops-light-muted: #536b5f;
-  --ops-light-accent: #246347;
-  --night: #173a30;
-  --ocean: #346d67;
-  --butter: #e2efd9;
-  --cream: #f5f7f2;
-  --sage: #badac4;
-  --focus: #67b98f;
+  --ops-light-raised: #ededed;
+  --ops-light-line: #d4d4d4;
+  --ops-light-text: #171717;
+  --ops-light-muted: #626262;
+  --ops-light-accent: #171717;
+  --night: #171717;
+  --ocean: #444444;
+  --butter: #eeeeee;
+  --cream: #fafafa;
+  --sage: #dddddd;
+  --focus: #aaaaaa;
 }
 body {
   background: var(--ops-bg);
@@ -42,7 +42,7 @@ select,
 textarea,
 summary {
   touch-action: manipulation;
-  -webkit-tap-highlight-color: #a3e6c030;
+  -webkit-tap-highlight-color: #eeeeee30;
 }
 input,
 select,
@@ -62,8 +62,8 @@ summary {
   outline-offset: 4px;
 }
 ::selection {
-  background: #a3e6c0;
-  color: #10231d;
+  background: #eeeeee;
+  color: #111111;
 }
 .skip-link {
   z-index: 1000;
@@ -101,7 +101,7 @@ summary {
   justify-content: center;
   min-height: 48px;
   background: var(--ops-accent);
-  color: #10231d;
+  color: #111111;
   border-radius: 8px;
 }
 .unlock__button:hover {

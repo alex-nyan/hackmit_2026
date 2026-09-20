@@ -1,12 +1,12 @@
 .page {
-  --signin-bg: #fff4df;
-  --signin-paper: #fffbf0;
-  --signin-ink: #123f3c;
-  --signin-muted: #56685f;
-  --signin-line: #b8c1a7;
-  --signin-orange: #ef6946;
-  --signin-mint: #c5dccc;
-  --focus: #123f3c;
+  --signin-bg: #f5f5f5;
+  --signin-paper: #ffffff;
+  --signin-ink: #171717;
+  --signin-muted: #626262;
+  --signin-line: #cccccc;
+  --signin-orange: #222222;
+  --signin-mint: #e5e5e5;
+  --focus: #171717;
   min-height: 100dvh;
   overflow: clip;
   background: var(--signin-bg);
@@ -108,6 +108,7 @@
   transform: rotate(14deg);
 }
 .artwork {
+  filter: grayscale(1);
   display: block;
   width: 100%;
   height: auto;
@@ -126,7 +127,7 @@
   border: 1.5px solid var(--signin-ink);
   border-radius: 14px 19px 15px 18px;
   background: var(--signin-paper);
-  box-shadow: 0 6px 0 rgb(18 63 60 / 5%);
+  box-shadow: 0 6px 0 rgb(0 0 0 / 5%);
 }
 .card::before {
   content: "";
@@ -240,7 +241,7 @@
   padding: 12px 14px;
   border: 1px solid var(--signin-line);
   border-radius: 7px;
-  background: #f2ecd9;
+  background: #eeeeee;
   font-size: 13px;
   overflow-wrap: anywhere;
 }
@@ -268,7 +269,7 @@
   border: 1.5px solid var(--signin-ink);
   border-radius: 8px 10px 7px 9px;
   background: var(--signin-orange);
-  color: #092b28;
+  color: #ffffff;
   box-shadow: 3px 3px 0 var(--signin-ink);
   font:
     700 15px/1.4 Arial,
@@ -281,7 +282,7 @@
     box-shadow 160ms ease;
 }
 .submit:hover:not(:disabled) {
-  background: #f5805f;
+  background: #444444;
   box-shadow: 4px 5px 0 var(--signin-ink);
   transform: translate(-1px, -2px);
 }
@@ -292,7 +293,7 @@
 .submit:disabled {
   opacity: 1;
   border-color: var(--signin-line);
-  background: #e6e6d7;
+  background: #e5e5e5;
   color: var(--signin-muted);
   box-shadow: none;
   cursor: not-allowed;
@@ -362,6 +363,7 @@
     font-size: clamp(54px, 11vw, 72px);
   }
   .artwork {
+    filter: grayscale(1);
     margin-top: -14px;
   }
   .card {

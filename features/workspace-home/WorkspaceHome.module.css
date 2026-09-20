@@ -26,8 +26,8 @@
   width: 38px;
   height: 42px;
   color: var(--ops-accent);
-  background: #a3e6c011;
-  border: 1px solid #a3e6c033;
+  background: #eeeeee11;
+  border: 1px solid #eeeeee33;
   border-radius: 12px;
 }
 .product {
@@ -112,11 +112,11 @@
 }
 .primary {
   background: var(--ops-accent);
-  color: #10231d;
+  color: #111111;
   padding: 12px 18px;
 }
 .primary:hover {
-  background: #c6f5da;
+  background: #dddddd;
 }
 .secondary {
   color: var(--ops-text);
@@ -158,7 +158,7 @@
   height: 310px;
   position: relative;
   overflow: hidden;
-  background-image: radial-gradient(#73898035 1px, transparent 1px);
+  background-image: radial-gradient(#88888835 1px, transparent 1px);
   background-size: 18px 18px;
 }
 .orbit,
@@ -166,7 +166,7 @@
   position: absolute;
   width: 320px;
   height: 320px;
-  border: 1px solid #a3e6c01a;
+  border: 1px solid #eeeeee1a;
   border-radius: 50%;
   left: 50%;
   top: 50%;
@@ -180,7 +180,7 @@
   position: absolute;
   width: 1px;
   height: 100%;
-  background: #a3e6c022;
+  background: #eeeeee22;
   left: 50%;
 }
 .hub {
@@ -193,10 +193,10 @@
   gap: 8px;
   width: 180px;
   padding: 20px 10px;
-  border: 1px solid #a3e6c04a;
+  border: 1px solid #eeeeee4a;
   border-radius: 16px;
-  background: #142923;
-  box-shadow: 0 0 60px #a3e6c00c;
+  background: #252525;
+  box-shadow: 0 0 60px #eeeeee0c;
 }
 .hub svg {
   color: var(--ops-accent);
@@ -288,7 +288,7 @@
 }
 .card:hover {
   background: var(--ops-raised);
-  border-color: #a3e6c066;
+  border-color: #eeeeee66;
   transform: translateY(-3px);
 }
 .cardTop {
@@ -308,9 +308,9 @@
   place-items: center;
   width: 48px;
   height: 48px;
-  background: #a3e6c00d;
+  background: #eeeeee0d;
   color: var(--ops-accent);
-  border: 1px solid #a3e6c024;
+  border: 1px solid #eeeeee24;
   border-radius: 12px;
 }
 .role {

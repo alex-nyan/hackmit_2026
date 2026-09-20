@@ -533,7 +533,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 8px 32px #10231d0a;
+  box-shadow: 0 8px 32px #1111110a;
 }
 .heart {
   width: 340px;
@@ -613,8 +613,8 @@
 /* Shared response-console presentation. */
 
 .viewport:has(.feedStatus[data-live="true"]) :is(.identity, .heart) {
-  background: #172424f5;
-  border-color: #526760;
+  background: #1b1b1bf5;
+  border-color: #555555;
   text-shadow: none;
 }
 .workspaceIntro {

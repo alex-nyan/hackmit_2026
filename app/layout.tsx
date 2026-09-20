@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./operations.css";
 
-export const viewport: Viewport = { themeColor: "#101b1b" };
+export const viewport: Viewport = { themeColor: "#111111" };
 
 export const metadata: Metadata = {
   title: "Paw Patrol · Connected response",

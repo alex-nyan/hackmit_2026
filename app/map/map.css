@@ -287,12 +287,12 @@
   --radius: 10px;
 }
 .map-app--dark {
-  --surface: #172424f5;
-  --raised: #213232;
-  --line: #344646;
-  --ink: #f0f5f2;
-  --muted: #a6bbb5;
-  --accent: #a3e6c0;
+  --surface: #1b1b1bf5;
+  --raised: #282828;
+  --line: #404040;
+  --ink: #fafafa;
+  --muted: #aaaaaa;
+  --accent: #eeeeee;
 }
 .map-brand {
   min-height: 44px;
