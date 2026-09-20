@@ -184,6 +184,13 @@ export function OfficerDashboard({
   const [previewDemo, setPreviewDemo] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [hadVerifiedSignals, setHadVerifiedSignals] = useState(false);
+  const [setupPersonId, setSetupPersonId] = useState(person.id);
+  if (setupPersonId !== person.id) {
+    setSetupPersonId(person.id);
+    setHadVerifiedSignals(false);
+    setPreviewDemo(false);
+    setSetupOpen(false);
+  }
   const [leftWidth, setLeftWidth] = useState(40);
   const [resizing, setResizing] = useState(false);
   const layout = useRef<HTMLDivElement>(null);
