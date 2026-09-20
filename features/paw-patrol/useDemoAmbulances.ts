@@ -196,6 +196,40 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
     [enabled, makeLog, publish, readClock, reconcile],
   );
 
+  const holdMedics = useCallback(
+    (missionId: string): boolean => {
+      if (!enabled) return false;
+      const previous = reconcile(current.current, readClock().time);
+      const mission = previous.missions.find((entry) => entry.id === missionId);
+      if (!mission || mission.status !== "engaged") {
+        publish({
+          ...previous,
+          message: "Only an engaged demo team at an active hotspot can receive this STOP command.",
+        });
+        return false;
+      }
+      const at = new Date().toISOString();
+      publish({
+        missions: previous.missions.map((entry) =>
+          entry.id === missionId
+            ? { ...entry, status: "staged", engagedAt: null, updatedAt: at }
+            : entry,
+        ),
+        logs: [
+          ...previous.logs,
+          makeLog(
+            mission.hotspotId,
+            "Demo medics placed on STOP by operator",
+            `The operator revoked engagement for the simulated team from ${mission.stationName} at this hotspot. The team is holding at its demo staging point and needs a new explicit authorization before engagement. No real crew was contacted.`,
+          ),
+        ],
+        message: `STOP sent to the demo team for ${mission.hotspotId}. New authorization is required to engage.`,
+      });
+      return true;
+    },
+    [enabled, makeLog, publish, readClock, reconcile],
+  );
+
   useEffect(() => {
     if (!enabled) return;
     const timer = setInterval(() => {
@@ -211,6 +245,7 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
     logs: state.logs,
     dispatchAmbulance,
     engageMedics,
+    holdMedics,
     message: state.message,
     sampleAmbulance: sampleDemoAmbulance,
   };

@@ -1,13 +1,16 @@
 "use client";
 
+import { useId, useState } from "react";
 import {
+  Ambulance,
+  Sun,
+  Moon,
   Bluetooth,
   ChevronDown,
   Pause,
   Play,
   RotateCcw,
-  ShieldAlert,
-  ShieldCheck,
+  FileText,
   SlidersHorizontal,
 } from "lucide-react";
 import type { HeartRateConnection } from "../heart-rate/useHeartRate";
@@ -20,6 +23,7 @@ import styles from "./HospitalWorkspace.module.css";
 import { HospitalHeartMonitor } from "./HospitalHeartMonitor";
 import { HospitalDispatchHandoff } from "./HospitalDispatchHandoff";
 import type { DemoAmbulanceMission } from "./demoAmbulance";
+import { AmbulanceSignalBar } from "./AmbulanceSignalBar";
 
 // Scene reports in the existing demo bus use these exact titles. Neither model
 // detections nor missing observations can create an access clearance.
@@ -63,6 +67,8 @@ export function HospitalWorkspace({
   onPause,
   onReset,
   handoff,
+  theme = "dark",
+  onToggleTheme,
 }: {
   person: Person;
   onSelect: (id: string) => void;
@@ -75,13 +81,23 @@ export function HospitalWorkspace({
   onPlay: () => void;
   onPause: () => void;
   onReset: () => void;
+  theme?: "light" | "dark";
+  onToggleTheme?: () => void;
   handoff?: {
     missions: DemoAmbulanceMission[];
     status: "connecting" | "synced" | "offline";
     updatedAt: string | null;
   };
 }) {
+  const missionSelectId = useId();
+  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
+  const mission = handoff?.missions.find((item) => item.id === selectedMissionId) ?? null;
   const access = hospitalAccess(events, person.id, busStatus);
+  const officerReport = access.cleared
+    ? "Reported clear"
+    : access.label === "Hold · Scene unsafe"
+      ? "Reported unsafe"
+      : "Unconfirmed";
   const audio = events
     .filter((event) => event.kind === "transcript" && event.personId === person.id)
     .sort(byNewest)[0];
@@ -90,19 +106,64 @@ export function HospitalWorkspace({
   const reconnect = ["disconnected", "error"].includes(heartRate.status);
   return (
     <>
-      <div className={styles.workspaceIntro}>
-        <div>
-          <p>CONNECTED RESPONSE / HOSPITAL</p>
-          <h1>Ready for the handoff</h1>
-        </div>
-        <span>Review incoming observations and confirm scene clearance before responding.</span>
+      <div className={styles.ambulanceLanding}>
+        <header className={styles.ambulanceHeading}>
+          <div>
+            <span className={styles.ambulanceEyebrow}>
+              <Ambulance size={15} aria-hidden="true" /> MEDICAL RESPONSE
+            </span>
+            <h1>Ambulance dashboard</h1>
+          </div>
+          <div className={styles.headingControls}>
+            {onToggleTheme && (
+              <button
+                type="button"
+                className={styles.themeButton}
+                aria-label="Toggle ambulance theme"
+                onClick={onToggleTheme}
+              >
+                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+            )}
+            <div className={styles.missionSelection}>
+              <label htmlFor={missionSelectId}>Incident / ambulance</label>
+              <select
+                id={missionSelectId}
+                value={selectedMissionId ?? ""}
+                onChange={(event) => setSelectedMissionId(event.target.value || null)}
+              >
+                <option value="">Select a dispatched ambulance</option>
+                {selectedMissionId && !mission && (
+                  <option value={selectedMissionId}>Selected handoff unavailable</option>
+                )}
+                {handoff?.missions.map((item, index) => (
+                  <option key={item.id} value={item.id}>
+                    {item.hotspotId} · Ambulance {index + 1} ·{" "}
+                    {item.status === "staged"
+                      ? "Holding"
+                      : item.status === "engaged"
+                        ? "Authorized"
+                        : item.status === "cancelled"
+                          ? "Cancelled"
+                          : "En route"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </header>
+        <AmbulanceSignalBar
+          mission={mission}
+          selected={selectedMissionId !== null}
+          status={handoff?.status ?? "offline"}
+          updatedAt={handoff?.updatedAt ?? null}
+        />
       </div>
       <section
         className={styles.viewport}
         data-cleared={access.cleared}
         aria-label="Officer camera and audio"
       >
-        <h1 className="sr-only">Officer care</h1>
         <OfficerFeed personId={person.id} input={media} />
         <div className={styles.identity}>
           <strong>{person.name}</strong>
@@ -116,15 +177,11 @@ export function HospitalWorkspace({
         <div
           className={styles.access}
           role="status"
-          aria-label="Scene access"
+          aria-label="Officer source report, not ambulance entry authorization"
           title={access.detail}
         >
-          {access.cleared ? (
-            <ShieldCheck size={16} aria-hidden="true" />
-          ) : (
-            <ShieldAlert size={16} aria-hidden="true" />
-          )}
-          <span>{access.label}</span>
+          <FileText size={16} aria-hidden="true" />
+          <span>Officer report: {officerReport} · not entry authorization</span>
         </div>
         <a
           className={styles.scrollHint}
@@ -136,7 +193,12 @@ export function HospitalWorkspace({
       </section>
 
       <div className={styles.utilities} id="hospital-connections">
-        {handoff && <HospitalDispatchHandoff {...handoff} />}
+        {handoff && (
+          <HospitalDispatchHandoff
+            {...handoff}
+            selection={{ id: selectedMissionId, onSelect: setSelectedMissionId }}
+          />
+        )}
         <details className={styles.connections}>
           <summary>
             <SlidersHorizontal size={18} aria-hidden="true" />

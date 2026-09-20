@@ -1,17 +1,29 @@
 .hospital {
-  --ink: var(--ops-light-text);
-  --muted: var(--ops-light-muted);
-  --focus: var(--ops-light-accent);
-  --surface: var(--ops-light-surface);
-  --raised: var(--ops-light-raised);
-  --line: var(--ops-light-line);
+  --hospital-bg: var(--ops-bg);
+  --ink: var(--ops-text);
+  --muted: var(--ops-muted);
+  --focus: var(--ops-accent);
+  --surface: var(--ops-surface);
+  --raised: var(--ops-raised);
+  --line: var(--ops-line);
   position: relative;
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
-  background: var(--ops-light-bg);
+  background: var(--hospital-bg);
+  color-scheme: dark;
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
+}
+.hospital[data-hospital-theme="light"] {
+  --hospital-bg: var(--ops-light-bg);
+  --ink: var(--ops-light-text);
+  --muted: var(--ops-light-muted);
+  --focus: var(--ops-light-accent);
+  --line: var(--ops-light-line);
+  --surface: var(--ops-light-surface);
+  --raised: var(--ops-light-raised);
+  color-scheme: light;
 }
 .hospital h1,
 .hospital h2,
@@ -53,9 +65,9 @@
 .hospital :global(.topbar nav) {
   --nav-track: transparent;
   --nav-track-line: none;
-  --nav-hover: rgb(55 97 155 / 9%);
+  --nav-hover: var(--raised);
   --pill-ink: var(--ink);
-  --pill-bg: rgb(55 97 155 / 11%);
+  --pill-bg: var(--raised);
   --pill-shadow: none;
 }
 .hospital :global(.wordmark) {
@@ -81,12 +93,15 @@
 
 .viewport {
   position: relative;
-  width: 100%;
-  height: calc(100dvh - 64px);
+  height: max(440px, calc(100dvh - 360px));
   min-height: 400px;
   isolation: isolate;
   overflow: hidden;
-  background: var(--ops-light-bg);
+  background: var(--surface);
+  width: calc(100% - 24px);
+  margin: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
 }
 .viewport::after {
   content: "";
@@ -94,15 +109,12 @@
   inset: 0;
   z-index: 5;
   pointer-events: none;
-  border-bottom: 3px solid #ac4e50;
-}
-.viewport[data-cleared="true"]::after {
-  border-color: #27804d;
+  border: 1px solid var(--line);
 }
 .videoStage {
   position: absolute;
   inset: 0;
-  background: var(--ops-light-bg);
+  background: var(--surface);
 }
 .video,
 .videoHidden {
@@ -124,7 +136,7 @@
   gap: 14px;
   padding: 24px;
   text-align: center;
-  color: #586778;
+  color: var(--muted);
 }
 .videoEmpty p {
   font-size: 14px;
@@ -198,12 +210,6 @@
 }
 .viewport:has(.feedStatus[data-live="true"]) .gridLine {
   stroke: rgb(255 255 255 / 32%);
-}
-.viewport:has(.feedStatus[data-live="true"]) .access {
-  color: #ffd0d8;
-}
-.viewport[data-cleared="true"]:has(.feedStatus[data-live="true"]) .access {
-  color: #a8efc8;
 }
 .identity {
   top: 24px;
@@ -316,10 +322,11 @@
   gap: 8px;
   padding: 0;
   font-size: 12px;
-  color: #843644;
+  color: var(--muted);
+  max-width: calc(100% - 48px);
 }
-.viewport[data-cleared="true"] .access {
-  color: #246142;
+.access > svg {
+  flex-shrink: 0;
 }
 .scrollHint {
   position: absolute;
@@ -338,8 +345,8 @@
   background: rgb(255 255 255 / 35%);
 }
 .utilities {
-  max-width: 1200px;
-  padding: 32px 24px 12px;
+  max-width: none;
+  padding: 12px;
   margin: 0 auto;
   scroll-margin-top: 16px;
 }
@@ -403,7 +410,8 @@
   border: 1px solid var(--line);
   padding: 10px 14px;
   min-height: 42px;
-  background: #e6ecf4;
+  background: var(--raised);
+  color: var(--ink);
   border-radius: 8px;
   font-size: 13px;
 }
@@ -438,11 +446,90 @@
 }
 .hospital button:hover:not(:disabled),
 .connections > summary:hover {
-  background: #dde6f0;
+  background: var(--raised);
   color: var(--ink);
 }
 
+.ambulanceLanding {
+  padding: 12px;
+}
+.headingControls {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+}
+.themeButton {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  flex: 0 0 auto;
+}
+.ambulanceHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.ambulanceHeading h1 {
+  margin: 3px 0 0;
+  font-size: clamp(23px, 2.4vw, 32px);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+}
+.ambulanceEyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font:
+    10px ui-monospace,
+    monospace;
+  letter-spacing: 0.09em;
+}
+.missionSelection {
+  display: grid;
+  gap: 5px;
+  min-width: 280px;
+  max-width: 440px;
+}
+.missionSelection label {
+  color: var(--muted);
+  font-size: 11px;
+}
+.missionSelection select {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 8px 10px;
+  font-size: 13px;
+  width: 100%;
+}
+.missionSelection select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 @media (max-width: 600px) {
+  .ambulanceHeading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .missionSelection {
+    min-width: 0;
+    max-width: none;
+  }
+  .headingControls .missionSelection {
+    flex: 1;
+  }
   .identity {
     top: 16px;
     left: 16px;
@@ -524,7 +611,6 @@
   font-size: 18px;
 }
 .viewport {
-  height: calc(100dvh - 76px);
   min-height: 580px;
 }
 .identity,
@@ -626,7 +712,7 @@
   border-bottom: 1px solid var(--line);
 }
 .workspaceIntro p {
-  color: var(--ops-light-accent);
+  color: var(--focus);
   font-size: 10px;
   letter-spacing: 0.12em;
   margin-bottom: 8px;
@@ -641,9 +727,6 @@
   font-size: 13px;
   line-height: 1.7;
   color: var(--muted);
-}
-.viewport {
-  height: calc(100dvh - 190px);
 }
 @media (max-width: 600px) {
   .workspaceIntro {

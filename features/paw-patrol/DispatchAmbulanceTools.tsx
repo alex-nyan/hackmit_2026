@@ -175,10 +175,22 @@ export function DispatchAmbulanceTools({
                       </>
                     )}
                     {mission.status === "engaged" && (
-                      <p>
-                        Operator authorization recorded for this flag. The health dashboard receives
-                        this demo handoff; no real crew is contacted.
-                      </p>
+                      <>
+                        <p>
+                          Operator authorization recorded for this flag. The health dashboard
+                          receives this demo handoff; no real crew is contacted.
+                        </p>
+                        <button
+                          className={styles.primary}
+                          onClick={() => {
+                            setFeedbackTarget(mission.hotspotId);
+                            ambulance.holdMedics(mission.id);
+                            setConfirmEngagement(false);
+                          }}
+                        >
+                          <ShieldAlert size={15} /> Send STOP / hold medics
+                        </button>
+                      </>
                     )}
                   </>
                 ) : (

@@ -4,12 +4,14 @@ import { useEffect, useId, useState } from "react";
 import { Ambulance, ArrowRight, Clock3, MapPin, Radio, ShieldAlert } from "lucide-react";
 import type { DemoAmbulanceMission } from "./demoAmbulance";
 import { InferencePreview } from "./InferencePreview";
+import { hasCurrentAmbulanceAuthorization } from "./AmbulanceSignalBar";
 import styles from "./HospitalDispatchHandoff.module.css";
 
 interface Props {
   missions: DemoAmbulanceMission[];
   status: "connecting" | "synced" | "offline";
   updatedAt: string | null;
+  selection?: { id: string | null; onSelect: (id: string | null) => void };
 }
 
 const SNAPSHOT_MAX_AGE_MS = 15_000;
@@ -32,11 +34,13 @@ function EventTime({ value, empty = "Not recorded" }: { value: string | null; em
 }
 
 /** Read-only browser-demo context. Never alters hospital access or patient selection. */
-export function HospitalDispatchHandoff({ missions, status, updatedAt }: Props) {
+export function HospitalDispatchHandoff({ missions, status, updatedAt, selection }: Props) {
   const headingId = useId();
   const selectId = useId();
   const inferenceId = useId();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
+  const selectedId = selection === undefined ? localSelectedId : selection.id;
+  const setSelectedId = selection?.onSelect ?? setLocalSelectedId;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1_000);
@@ -46,7 +50,7 @@ export function HospitalDispatchHandoff({ missions, status, updatedAt }: Props) 
   // A chosen incident must never silently change if it disappears from a snapshot.
   const mission = selectedId
     ? missions.find((item) => item.id === selectedId)
-    : missions.length === 1
+    : selection === undefined && missions.length === 1
       ? missions[0]
       : undefined;
   const snapshotAt = updatedAt ? Date.parse(updatedAt) : NaN;
@@ -55,15 +59,20 @@ export function HospitalDispatchHandoff({ missions, status, updatedAt }: Props) 
     status === "synced" &&
     Number.isFinite(snapshotAt) &&
     snapshotAge >= -1_000 &&
-    snapshotAge <= SNAPSHOT_MAX_AGE_MS;
+    snapshotAge < SNAPSHOT_MAX_AGE_MS;
+  const authorized = hasCurrentAmbulanceAuthorization(mission ?? null, status, updatedAt, now);
   const displayStage = !fresh
     ? "HOLD · updates unconfirmed"
     : mission
-      ? STAGE_LABELS[mission.status]
+      ? mission.status === "engaged" && !authorized
+        ? "HOLD · authorization unconfirmed"
+        : STAGE_LABELS[mission.status]
       : "HOLD · select a demo incident";
-  const authorized = fresh && mission?.status === "engaged";
   const stage =
-    !fresh || !mission || mission.status === "cancelled"
+    !fresh ||
+    !mission ||
+    mission.status === "cancelled" ||
+    (mission.status === "engaged" && !authorized)
       ? -1
       : mission.status === "en-route"
         ? 0

@@ -1,0 +1,258 @@
+.signal {
+  --signal-color: #ce3047;
+  --signal-fill: #8e1427;
+  --signal-surface: var(--surface, #f7f9fc);
+  --signal-ink: var(--ink, #233247);
+  --signal-muted: var(--muted, #526176);
+  --signal-line: var(--line, #ccd5df);
+  display: grid;
+  grid-template-columns: minmax(0, 2.3fr) minmax(240px, 1fr);
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--signal-color);
+  border-radius: 14px;
+  background: var(--signal-surface);
+  color: var(--signal-ink);
+  font:
+    13px/1.4 Arial,
+    Helvetica,
+    sans-serif;
+}
+
+.signal[data-authorized="true"] {
+  --signal-color: #248853;
+  --signal-fill: #0d6536;
+}
+
+.primary {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: color-mix(in srgb, var(--signal-color) 7%, var(--signal-surface));
+}
+
+.header,
+.footer,
+.eyebrow,
+.relay {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.header {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 12px 18px 0;
+  gap: 6px 14px;
+}
+
+.eyebrow {
+  color: var(--signal-muted);
+  font:
+    10px/1.4 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  letter-spacing: 0.08em;
+}
+
+.simulation {
+  border: 1px solid var(--signal-line);
+  border-radius: 5px;
+  padding: 3px 6px;
+  color: var(--signal-muted);
+  font:
+    9px/1.4 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  letter-spacing: 0.025em;
+}
+
+.signalBody {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+  min-width: 0;
+  padding: 15px 18px 17px;
+}
+
+.word {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  min-width: 225px;
+  min-height: 108px;
+  padding: 12px 17px;
+  border-radius: 9px;
+  background: var(--signal-fill);
+  color: #fff;
+}
+
+.word svg {
+  width: 36px;
+  height: 36px;
+  stroke-width: 2.2;
+  flex: 0 0 auto;
+}
+
+.word strong {
+  font-size: clamp(50px, 5.4vw, 78px);
+  font-weight: 850;
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+
+.instructions {
+  min-width: 0;
+}
+
+.instructions h2 {
+  margin: 0;
+  font-size: clamp(18px, 1.8vw, 26px);
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.instructions p {
+  margin: 8px 0 6px;
+  max-width: 460px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.instructions > span {
+  font-size: 11px;
+  color: var(--signal-muted);
+}
+
+.footer {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 9px 18px;
+  border-top: 1px solid color-mix(in srgb, var(--signal-color) 20%, var(--signal-line));
+  color: var(--signal-muted);
+  font:
+    10px/1.4 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+}
+
+.assignment {
+  color: var(--signal-ink);
+  font-weight: 650;
+}
+
+.relay {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.observations {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 15px 18px;
+  border-left: 1px solid var(--signal-line);
+}
+
+.observations h3 {
+  margin: 13px 0 7px;
+  font-size: 16px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.observations p {
+  margin: 0 0 9px;
+  color: var(--signal-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.contextTime {
+  margin-bottom: 8px;
+  color: var(--signal-muted);
+  font:
+    9px/1.4 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+}
+
+.review {
+  margin-top: auto;
+  padding-top: 10px;
+  color: var(--signal-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+@media (max-width: 1040px) {
+  .signal {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .observations {
+    border-left: 0;
+    border-top: 1px solid var(--signal-line);
+    padding: 12px 18px;
+  }
+  .observations h3 {
+    margin-top: 7px;
+  }
+  .review {
+    padding-top: 4px;
+  }
+}
+
+@media (max-width: 580px) {
+  .header {
+    padding: 12px 12px 0;
+  }
+  .signalBody {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+  }
+  .word {
+    min-width: 0;
+    min-height: 86px;
+  }
+  .word strong {
+    font-size: 64px;
+  }
+  .word svg {
+    width: 34px;
+    height: 34px;
+  }
+  .instructions h2 {
+    font-size: 21px;
+  }
+  .instructions p {
+    font-size: 13px;
+  }
+  .footer,
+  .observations {
+    padding: 10px 12px;
+  }
+}
+
+@media (forced-colors: active) {
+  .signal,
+  .word {
+    border: 2px solid CanvasText;
+  }
+  .word {
+    background: Canvas;
+    color: CanvasText;
+  }
+}

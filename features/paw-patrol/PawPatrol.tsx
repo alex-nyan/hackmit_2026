@@ -721,7 +721,10 @@ export function PawPatrol({
   }
 
   return (
-    <div className={`paw-app ${view === "hospital" ? hospitalStyles.hospital : ""}`}>
+    <div
+      className={`paw-app ${view === "hospital" ? hospitalStyles.hospital : ""}`}
+      data-hospital-theme={view === "hospital" ? theme : undefined}
+    >
       <a className="skip-link" href="#workspace">
         Skip to workspace
       </a>
@@ -1004,6 +1007,8 @@ export function PawPatrol({
 
         {view === "hospital" && (
           <HospitalWorkspace
+            theme={theme}
+            onToggleTheme={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
             person={person}
             onSelect={setSelectedId}
             heartRate={heartRate}
