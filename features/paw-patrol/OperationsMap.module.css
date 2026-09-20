@@ -155,7 +155,8 @@
    reported person of interest. Emergency and movement change the rhythm, not
    the colour. */
 .beacon {
-  position: relative;
+  /* Mapbox translates this root from the canvas origin, outside document flow. */
+  position: absolute;
   z-index: 2;
   display: block;
   width: 15px;
