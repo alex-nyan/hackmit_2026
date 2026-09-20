@@ -1,15 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { describeTranscript } from "./audio";
+import { NO_DEVICES, findContinuityDevice, splitDevices, type CaptureDevices } from "./devices";
 import styles from "./CameraTriageView.module.css";
 import { useAudioTranscription } from "./useAudioTranscription";
 import { useCameraTriage } from "./useCameraTriage";
 
 export function CameraTriageView() {
   const [sourceId, setSourceId] = useState("unit-01");
-  const { state, videoRef, start, stop } = useCameraTriage({ sourceId });
+  const [devices, setDevices] = useState<CaptureDevices>(NO_DEVICES);
+  const [cameraId, setCameraId] = useState<string | null>(null);
+
+  // Continuity Camera comes and goes as the phone becomes eligible, so the
+  // list is refreshed on every devicechange rather than read once.
+  const refreshDevices = useCallback(async () => {
+    if (!navigator?.mediaDevices?.enumerateDevices) return;
+    const found = splitDevices(await navigator.mediaDevices.enumerateDevices());
+    setDevices(found);
+    setCameraId((current) => current ?? findContinuityDevice(found.cameras)?.deviceId ?? null);
+  }, []);
+
+  useEffect(() => {
+    if (!navigator?.mediaDevices) return;
+    const onChange = () => void refreshDevices();
+    navigator.mediaDevices.addEventListener("devicechange", onChange);
+    const initial = setTimeout(onChange, 0);
+    return () => {
+      clearTimeout(initial);
+      navigator.mediaDevices.removeEventListener("devicechange", onChange);
+    };
+  }, [refreshDevices]);
+  const { state, videoRef, start, stop } = useCameraTriage({ sourceId, cameraId });
   const audio = useAudioTranscription(sourceId);
   const running = state.state === "running";
   const listening =
@@ -41,6 +64,23 @@ export function CameraTriageView() {
             {active ? "Stop" : "Start"}
           </button>
         </div>
+
+        {devices.cameras.length > 1 && (
+          <select
+            className={styles.picker}
+            value={cameraId ?? ""}
+            onChange={(event) => setCameraId(event.target.value || null)}
+            disabled={active}
+            aria-label="Camera"
+          >
+            <option value="">Default camera</option>
+            {devices.cameras.map((device) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label || "Camera"}
+              </option>
+            ))}
+          </select>
+        )}
 
         <div className={styles.row}>
           <button

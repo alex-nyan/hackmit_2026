@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { trackConstraint } from "./devices";
 import { buildTriageRequest, nextDelayMs } from "./frame";
 import type { CaptureState, TriageResult } from "./types";
 
@@ -12,6 +13,8 @@ const JPEG_QUALITY = 0.72;
 interface Options {
   sourceId: string;
   incidentId?: string | null;
+  /** Explicit capture device, so a Continuity Camera can be chosen over the webcam. */
+  cameraId?: string | null;
 }
 
 /**
@@ -20,7 +23,7 @@ interface Options {
  * only after the previous request settles; a fixed interval would queue frames
  * until they aged past the service's staleness limit.
  */
-export function useCameraTriage({ sourceId, incidentId }: Options) {
+export function useCameraTriage({ sourceId, incidentId, cameraId }: Options) {
   const [state, setState] = useState<CaptureState>({ state: "idle" });
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -59,7 +62,9 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
     setState({ state: "requesting-camera" });
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: CAPTURE_WIDTH } },
+        video: cameraId
+          ? trackConstraint(cameraId)
+          : { facingMode: "environment", width: { ideal: CAPTURE_WIDTH } },
         audio: false,
       });
       if (sessionRef.current !== session) {
@@ -89,7 +94,7 @@ export function useCameraTriage({ sourceId, incidentId }: Options) {
             : "No usable camera was found.",
       });
     }
-  }, []);
+  }, [cameraId]);
 
   useEffect(() => {
     if (state.state !== "running") return;
