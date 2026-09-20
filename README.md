@@ -136,8 +136,9 @@ attaches the token and forwards to `/v1/triage`.
 
 The timeout covers the service's default inference deadlines plus overhead.
 Increase it if the service uses a longer provider timeout (maximum 3600 seconds).
-The dashboard has no user login: anyone who can reach `/api/triage` can submit a
-frame using the configured service credential. Keep this demo on a trusted LAN,
+The dashboard has no user login: anyone who can reach `/api/triage` or
+`/api/transcribe` can submit media using the configured service credential.
+Keep this demo on a trusted LAN,
 or put authenticated access in front of the dashboard before exposing it publicly.
 
 ### Camera access needs HTTPS
@@ -155,6 +156,42 @@ The first run downloads mkcert and installs a local certificate authority, which
 enable full trust under Settings → General → About → Certificate Trust Settings;
 without that second step Safari still refuses the camera.
 
+### Audio transcription
+
+The page can also record ten-second audio clips and send them to
+`/v1/transcribe`. It is **off by default on the service**; enable it and install
+the optional dependency:
+
+```bash
+cd services/triage
+uv sync --locked --extra yolo --extra whisper
+TRIAGE_TRANSCRIPTION_ENABLED=true uv run --no-sync uvicorn triage.app:create_app --factory \
+  --host 127.0.0.1 --port 8090 --workers 1 --no-access-log
+```
+
+`TRIAGE_WHISPER_MODEL` defaults to `base` on CPU with `int8`. The service starts
+and serves triage normally without the dependency, reporting transcription as
+unavailable rather than failing.
+
+Keep `--extra yolo` when adding Whisper to the existing camera service so syncing
+does not remove its detector dependencies. For a deployment with YOLO disabled,
+`--extra whisper` alone is sufficient. Whisper loads on first use and may download
+the configured model; set `TRIAGE_WHISPER_MODEL` to a provisioned local model
+directory to avoid that first-request download.
+
+The page prefers `audio/mp4` when the browser supports it, then falls back to
+WebM or Ogg. Each ten-second recording is finalized as a complete file before
+upload; clips are dropped while an earlier upload is in flight. Stop and
+backgrounding release the microphone and cancel pending uploads.
+
+`TRIAGE_TIMEOUT_SECONDS` in the dashboard environment also controls the
+transcription proxy's timeout; increase it for slower local models.
+
+A transcript is a model hypothesis, not a record of speech. Empty text means
+nothing was recognised, which is **not** the same as nothing having been said —
+the payload carries `transcript_semantics` and `requires_human_review` so a
+caller cannot quietly treat it as evidence.
+
 ### What it does and does not do
 
 Frames go out one at a time. The service admits a single frame concurrently and
@@ -166,9 +203,9 @@ or `insufficient_evidence`, and `requires_human_review` is always true. Treat th
 output as a prompt for a person, and the confidence values as uncalibrated model
 scores rather than probabilities.
 
-**iOS suspends camera capture when the tab is backgrounded or the screen locks.**
-A browser page cannot keep recording from a pocket; it needs to stay in the
-foreground.
+**iOS suspends camera and microphone capture when the tab is backgrounded or the
+screen locks.** A browser page cannot keep recording from a pocket; it needs to
+stay in the foreground. Only a native app can do otherwise.
 
 ## What is included
 
@@ -181,8 +218,8 @@ foreground.
 - Responsive layout, loading feedback, missing-token and failed-load states.
 - Optional live fleet tracking from a Traccar server: every unit on one map,
   opt-in and server-authenticated.
-- Optional camera hazard triage at `/capture`, proxied so the service token
-  stays on the server.
+- Optional camera hazard triage and audio transcription at `/capture`, proxied so
+  the service token stays on the server.
 - Isolated map feature modules, TypeScript, tests, and CI checks.
 
 There are intentionally **no energy overlays, mock metrics, heatmap circles,

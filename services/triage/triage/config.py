@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     image_max_side: int = Field(default=1568, ge=128, le=2048)
     max_frame_age_seconds: int = Field(default=300, ge=1, le=86_400)
     max_concurrency: int = Field(default=1, ge=1, le=8)
+    transcription_enabled: bool = False
+    whisper_model: str = "base"
+    whisper_device: str = "cpu"
+    whisper_compute_type: str = "int8"
+    whisper_beam_size: int = Field(default=1, ge=1, le=10)
+    max_audio_bytes: int = Field(default=8_000_000, ge=1024, le=8_000_000)
+    max_audio_seconds: float = Field(default=120, ge=1, le=900)
+    max_clip_age_seconds: int = Field(default=900, ge=1, le=86_400)
     database_path: Path = Path("data/triage.sqlite3")
     retention_hours: int = Field(default=24, ge=1, le=168)
     max_records: int = Field(default=10_000, ge=1, le=100_000)

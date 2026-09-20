@@ -16,11 +16,13 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from starlette.requests import ClientDisconnect
 
+from triage.audio import AudioError, prepared_audio
 from triage.config import Settings
 from triage.images import ImageError, prepare_image
 from triage.pipeline import TriagePipeline
-from triage.schemas import TriageRequest
+from triage.schemas import TranscriptionRequest, TranscriptionResult, TriageRequest
 from triage.store import ResultStore, StoreError
+from triage.transcription import TranscriptionError, TranscriptionService
 
 logger = logging.getLogger("triage.audit")
 KEY_PATTERN = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
@@ -89,9 +91,10 @@ async def bounded_body(request: Request, limit: int) -> bytes:
     return bytes(body)
 
 
-def create_app(settings: Settings | None = None, pipeline=None) -> FastAPI:
+def create_app(settings: Settings | None = None, pipeline=None, transcription=None) -> FastAPI:
     settings = settings or Settings()
     pipeline = pipeline or TriagePipeline(settings)
+    transcription = transcription or TranscriptionService(settings)
     admission = Admission(settings.max_concurrency)
     in_flight_keys: set[str] = set()
     store = None
@@ -268,6 +271,104 @@ def create_app(settings: Settings | None = None, pipeline=None) -> FastAPI:
                         "status": status,
                         "code": code,
                         "replayed": replay,
+                        "duration_ms": round((time.monotonic() - started) * 1000, 2),
+                    },
+                    separators=(",", ":"),
+                )
+            )
+
+    @app.post("/v1/transcribe")
+    async def transcribe(request: Request):
+        request_id = str(uuid.uuid4())
+        started = time.monotonic()
+        admitted = False
+        status, code = 503, "transcription_unavailable"
+        try:
+            authenticate(request)
+            if not settings.transcription_enabled:
+                raise RequestError(503, "transcription_disabled")
+            if request.headers.get("content-encoding", "identity").lower() != "identity":
+                raise RequestError(415, "unsupported_content_encoding")
+            media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+            if media_type != "application/json":
+                raise RequestError(415, "json_required")
+            # Transcription competes with vision for the same native model budget.
+            if not admission.acquire():
+                raise RequestError(429, "service_busy")
+            admitted = True
+
+            try:
+                async with asyncio.timeout(settings.request_read_timeout_seconds):
+                    body = await bounded_body(request, settings.max_request_bytes)
+            except TimeoutError:
+                raise RequestError(408, "request_read_timeout") from None
+
+            try:
+                payload = TranscriptionRequest.model_validate_json(body)
+            except (ValidationError, ValueError):
+                raise RequestError(422, "invalid_request") from None
+
+            age = (datetime.now(UTC) - payload.captured_at).total_seconds()
+            if age > settings.max_clip_age_seconds:
+                raise RequestError(422, "stale_clip")
+            if age < -30:
+                raise RequestError(422, "future_clip")
+
+            with prepared_audio(payload, settings) as audio:
+                result, models, timings = await finish_before_cancel(
+                    asyncio.create_task(transcription.process(audio, payload.language))
+                )
+                digest = audio.sha256
+
+            processed_at = datetime.now(UTC)
+            payload_out = TranscriptionResult(
+                request_id=request_id,
+                source_id=payload.source_id,
+                incident_id=payload.incident_id,
+                captured_at=payload.captured_at,
+                processed_at=processed_at,
+                audio_sha256=digest,
+                text=result.text,
+                speech_detected=bool(result.text),
+                language=result.language,
+                language_probability=result.language_probability,
+                duration_seconds=result.duration_seconds,
+                segments=result.segments,
+                models=models,
+                warnings=result.warnings,
+                timings_ms=timings,
+            )
+            status, code = 200, "transcription_completed"
+            return JSONResponse(
+                payload_out.model_dump(mode="json"),
+                headers={"X-Request-ID": request_id, "Cache-Control": "no-store"},
+            )
+        except RequestError as error:
+            status, code = error.status, error.code
+            return error_response(error, request_id)
+        except AudioError as error:
+            status, code = 422, error.code
+            return error_response(RequestError(status, code), request_id)
+        except TranscriptionError as error:
+            status = 503 if error.code != "audio_too_long" else 422
+            code = error.code
+            return error_response(RequestError(status, code), request_id)
+        except ClientDisconnect:
+            status, code = 400, "client_disconnected"
+            return error_response(RequestError(status, code), request_id)
+        except Exception:
+            status, code = 503, "transcription_unavailable"
+            return error_response(RequestError(status, code), request_id)
+        finally:
+            if admitted:
+                admission.release()
+            logger.info(
+                json.dumps(
+                    {
+                        "event": "transcription_request",
+                        "request_id": request_id,
+                        "status": status,
+                        "code": code,
                         "duration_ms": round((time.monotonic() - started) * 1000, 2),
                     },
                     separators=(",", ":"),

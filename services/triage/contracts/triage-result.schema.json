@@ -144,7 +144,8 @@
           "enum": [
             "ollama",
             "openai_compatible",
-            "ultralytics"
+            "ultralytics",
+            "faster_whisper"
           ],
           "title": "Provider",
           "type": "string"

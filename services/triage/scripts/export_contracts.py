@@ -4,7 +4,12 @@ import argparse
 import json
 from pathlib import Path
 
-from triage.schemas import TriageRequest, TriageResult
+from triage.schemas import (
+    TranscriptionRequest,
+    TranscriptionResult,
+    TriageRequest,
+    TriageResult,
+)
 
 
 def main():
@@ -12,7 +17,13 @@ def main():
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     directory = Path(__file__).resolve().parents[1] / "contracts"
-    for name, contract in [("triage-request", TriageRequest), ("triage-result", TriageResult)]:
+    contracts = [
+        ("triage-request", TriageRequest),
+        ("triage-result", TriageResult),
+        ("transcription-request", TranscriptionRequest),
+        ("transcription-result", TranscriptionResult),
+    ]
+    for name, contract in contracts:
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             **contract.model_json_schema(),
