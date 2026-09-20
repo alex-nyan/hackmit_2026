@@ -10,7 +10,6 @@ import {
   Pause,
   Play,
   RotateCcw,
-  FileText,
   SlidersHorizontal,
 } from "lucide-react";
 import type { HeartRateConnection } from "../heart-rate/useHeartRate";
@@ -18,9 +17,9 @@ import { PEOPLE, type Person } from "./scenario";
 import { byNewest, type IncidentEvent } from "./incidents";
 import { BusIndicator, SharedTimeline } from "./Provenance";
 import type { BusStatus } from "./useIncidentBus";
-import { OfficerFeed, type OfficerMediaInput } from "./OfficerFeed";
+import type { OfficerMediaInput } from "./OfficerFeed";
 import styles from "./HospitalWorkspace.module.css";
-import { HospitalHeartMonitor } from "./HospitalHeartMonitor";
+import { HospitalAssessment } from "./HospitalAssessment";
 import { HospitalDispatchHandoff } from "./HospitalDispatchHandoff";
 import type { DemoAmbulanceMission } from "./demoAmbulance";
 import { AmbulanceSignalBar } from "./AmbulanceSignalBar";
@@ -159,38 +158,16 @@ export function HospitalWorkspace({
           updatedAt={handoff?.updatedAt ?? null}
         />
       </div>
-      <section
-        className={styles.viewport}
-        data-cleared={access.cleared}
-        aria-label="Officer camera and audio"
-      >
-        <OfficerFeed personId={person.id} input={media} />
-        <div className={styles.identity}>
-          <strong>{person.name}</strong>
-          <span>{person.id}</span>
-        </div>
-        <HospitalHeartMonitor
-          key={`${person.id}-${session}`}
-          personId={person.id}
-          connection={heartRate}
-        />
-        <div
-          className={styles.access}
-          role="status"
-          aria-label="Officer source report, not ambulance entry authorization"
-          title={access.detail}
-        >
-          <FileText size={16} aria-hidden="true" />
-          <span>Officer report: {officerReport} · not entry authorization</span>
-        </div>
-        <a
-          className={styles.scrollHint}
-          href="#hospital-connections"
-          aria-label="Scroll to connections"
-        >
-          <ChevronDown size={20} />
-        </a>
-      </section>
+      <HospitalAssessment
+        person={person}
+        onSelect={onSelect}
+        heartRate={heartRate}
+        session={session}
+        events={events}
+        busStatus={busStatus}
+        media={media}
+        theme={theme}
+      />
 
       <div className={styles.utilities} id="hospital-connections">
         {handoff && (
@@ -311,6 +288,9 @@ export function HospitalWorkspace({
               <p>Audio reports will appear here.</p>
             )}
           </section>
+          <p title={access.detail}>
+            Officer report: {officerReport} · not ambulance entry authorization
+          </p>
           <BusIndicator status={busStatus} count={events.length} />
           <h2>Shared incident log</h2>
           <SharedTimeline events={events} />

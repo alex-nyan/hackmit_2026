@@ -242,6 +242,28 @@
   width: 320px;
   padding: 0;
 }
+.assessmentVitals .heart {
+  position: static;
+  width: 100%;
+  padding: 0;
+}
+.assessmentVitals .reading strong {
+  font-size: 42px;
+}
+.assessmentVitals .trend {
+  margin-top: 16px;
+}
+.clinicalScene .panelHeading {
+  bottom: 12px;
+  right: 12px;
+}
+.clinicalScene .feedStatus {
+  display: inline-flex;
+  padding: 5px 8px;
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 5px;
+}
 .monitorHeading {
   display: flex;
   justify-content: space-between;

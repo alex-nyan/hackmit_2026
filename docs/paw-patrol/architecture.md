@@ -54,8 +54,30 @@ fictional identities and does not imply sex, injury location or an actual body s
 AbortController and timeout; delayed parse completions dispose themselves. ResizeObserver
 maintains aspect, camera presets use spherical interpolation, and unmount disposes GPU
 resources, controls, animation loops and listeners. Full-body fitting uses actual bounds.
-There is no region picker: source anatomy is one continuous body mesh plus two eyes.
-Text annotations explicitly state the location has not been mapped.
+The default viewer still preserves the original non-interactive presentation. The
+ambulance workspace opts into nine approximate external surface regions. Raycasting
+and keyboard region buttons drive the same selection; vertex colours distinguish
+selection from a review marker. These zones are not individual organs, internal
+anatomy segmentation, a diagnosis, or the 2,234-mesh Human Atlas dataset.
+
+`HospitalAssessment` keeps body, notes and camera choices scoped to the selected
+person and resets them on profile/session changes. Received incident records have
+no structured anatomical location, so `bodyEvidence` leaves them unlocalized.
+Pulse and free text never generate a body-region finding. Offline/older records
+are marked stale. Demo markers require explicit opt-in; manual review notes remain
+local to this view and are not published or sent to the AI pipeline.
+
+`HospitalSceneFeed` reads the existing frame relay and labels it as updating stills,
+not continuous video. An explicit source picker cannot change patient identity.
+Missing sources never silently substitute another camera, and failed/stale frames
+cannot display a current-frame label. An existing person-matched remote MediaStream
+continues through `OfficerFeed` without starting capture or owning its tracks.
+Neither observations nor body markers change the separate ambulance STOP/GO signal.
+
+The Officer dashboard opens to briefing/map presentation. Pairing controls remain
+mounted behind the compact Setup button; hiding setup does not disconnect devices.
+The existing capture permission, explicit stop, person-reset and document-hidden
+privacy behaviour remains unchanged.
 
 ## Future integration boundary
 

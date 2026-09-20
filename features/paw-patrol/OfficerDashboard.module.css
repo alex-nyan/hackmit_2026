@@ -561,6 +561,24 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.setupButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 1px solid var(--officer-border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--officer-muted);
+  font-size: 10px !important;
+}
+.setupButton:hover,
+.setupButton[aria-expanded="true"] {
+  background: var(--officer-raised);
+  color: var(--officer-text);
+}
 .connectionStrip {
   display: flex;
   flex-wrap: wrap;
@@ -581,6 +599,7 @@
 .connectionStrip > span[data-connected="true"] {
   color: var(--officer-good);
 }
+.connectionStrip[hidden],
 .setup[hidden],
 .briefing[hidden] {
   display: none !important;

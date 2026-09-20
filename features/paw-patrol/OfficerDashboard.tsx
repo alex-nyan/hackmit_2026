@@ -21,6 +21,7 @@ import {
   RotateCcw,
   Shield,
   Signal,
+  SlidersHorizontal,
   Smartphone,
   Sun,
   Watch,
@@ -183,11 +184,9 @@ export function OfficerDashboard({
   const id = useId();
   const [previewDemo, setPreviewDemo] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
-  const [hadVerifiedSignals, setHadVerifiedSignals] = useState(false);
   const [setupPersonId, setSetupPersonId] = useState(person.id);
   if (setupPersonId !== person.id) {
     setSetupPersonId(person.id);
-    setHadVerifiedSignals(false);
     setPreviewDemo(false);
     setSetupOpen(false);
   }
@@ -205,14 +204,10 @@ export function OfficerDashboard({
     heartRate.bpm !== null &&
     Number.isFinite(heartRate.bpm) &&
     heartRate.bpm > 0;
-  const ready = watchConnected && phoneConnected;
-  // Preserve a working briefing if a verified signal later goes stale.
-  if (ready && !hadVerifiedSignals) {
-    setHadVerifiedSignals(true);
-    setPreviewDemo(false);
-  }
-  const previewEnabled = previewDemo && !ready;
-  const briefing = (ready || hadVerifiedSignals || previewDemo) && !setupOpen;
+  // Presentation is independent of pairing. Setup only hides controls: capture
+  // stays mounted below and all connection state remains owned by its hooks.
+  const previewEnabled = previewDemo;
+  const briefing = !setupOpen;
   useEffect(() => {
     informationPane.current?.scrollTo({ top: 0, behavior: "instant" });
   }, [briefing]);
@@ -338,23 +333,28 @@ export function OfficerDashboard({
                     ? previewEnabled
                       ? "DEMO PREVIEW"
                       : "OFFICER INFORMATION"
-                    : "DEVICE ONBOARDING"}
+                    : "PRE-DEMO CONFIGURATION"}
                 </span>
                 <h2 id={`${id}-information-title`}>
-                  {briefing ? "Incident briefing" : "Connection setup"}
+                  {briefing ? "Incident briefing" : "Device setup"}
                 </h2>
               </div>
-              {briefing && (
-                <button
-                  type="button"
-                  className={styles.textButton}
-                  onClick={() => setSetupOpen(true)}
-                >
-                  Device setup
-                </button>
-              )}
+              <button
+                type="button"
+                className={styles.setupButton}
+                aria-expanded={setupOpen}
+                aria-controls={`${id}-setup`}
+                onClick={() => setSetupOpen((value) => !value)}
+              >
+                <SlidersHorizontal size={13} aria-hidden="true" />
+                {setupOpen ? "Close setup" : "Setup"}
+              </button>
             </div>
-            <div className={styles.connectionStrip} aria-label="Device signal status">
+            <div
+              className={styles.connectionStrip}
+              aria-label="Device signal status"
+              hidden={!setupOpen}
+            >
               <span data-connected={watchConnected}>
                 <Watch size={14} aria-hidden="true" />
                 Watch · {watchLabel}
@@ -367,9 +367,10 @@ export function OfficerDashboard({
                 Local iPhone camera · {phoneConnected ? "Active" : "Not connected"}
               </span>
             </div>
-            <div className={styles.setup} hidden={briefing}>
+            <div id={`${id}-setup`} className={styles.setup} hidden={briefing}>
               <p className={styles.setupHint}>
-                Connect your watch and camera to open the briefing.
+                Configure devices before presenting. Returning to the briefing keeps active sessions
+                running; use Stop / Mute or Disconnect to end them.
               </p>
               <section className={styles.setupSection} aria-labelledby={`${id}-watch`}>
                 <div className={styles.setupHeading}>
@@ -402,29 +403,32 @@ export function OfficerDashboard({
                   type="button"
                   className={styles.primary}
                   onClick={() => {
-                    if (!ready && !hadVerifiedSignals) setPreviewDemo(true);
+                    setPreviewDemo(false);
                     setSetupOpen(false);
                   }}
                 >
-                  {ready || hadVerifiedSignals
-                    ? "Open incident briefing"
-                    : "Preview demo workspace"}
+                  Return to briefing
                 </button>
-                <small>Demo preview works without devices.</small>
+                <button
+                  type="button"
+                  className={styles.textButton}
+                  onClick={() => {
+                    setPreviewDemo(true);
+                    setSetupOpen(false);
+                  }}
+                >
+                  Show sample context
+                </button>
+                <small>Samples are labelled and never mark devices connected.</small>
               </div>
             </div>
             <div className={styles.briefing} hidden={!briefing}>
-              {!ready && (
+              {previewEnabled && (
                 <p className={styles.demoNotice} role="status">
-                  {previewEnabled
-                    ? "Demo preview · devices not connected."
-                    : "Device disconnected. Open setup to reconnect."}
+                  Demo preview · sample context is not a received observation.
                 </p>
               )}
               <div className={styles.incidentPanel}>{incidentPanel(previewEnabled)}</div>
-              <p className={styles.captureHint}>
-                Capture continues in the background. Open device setup to stop it.
-              </p>
             </div>
             <div className={styles.support}>
               <div className={styles.overviewSlot}>{overview}</div>

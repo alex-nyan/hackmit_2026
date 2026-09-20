@@ -7,11 +7,17 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import styles from "./AnatomyViewer.module.css";
+import { BODY_REGIONS, classifyBodyRegion, type BodyRegionId } from "./bodyRegions";
 
 export interface AnatomyViewerProps {
   personId: string;
   personName: string;
   annotation?: { label: string; detail: string } | null;
+  interactive?: boolean;
+  theme?: "light" | "dark";
+  selectedRegion?: BodyRegionId | null;
+  onSelectRegion?: (region: BodyRegionId | null) => void;
+  highlightedRegions?: BodyRegionId[];
 }
 
 type View = "front" | "side" | "back";
@@ -20,10 +26,13 @@ type ViewerActions = {
   view: (view: View) => void;
   zoom: (factor: number) => void;
   reset: () => void;
+  highlight: (selected: BodyRegionId | null, concerns: readonly BodyRegionId[]) => void;
+  theme: (theme: "light" | "dark") => void;
 };
 
 const MODEL_URL = "/models/officer-body.glb";
 const LOAD_TIMEOUT_MS = 20_000;
+const NO_HIGHLIGHTS: BodyRegionId[] = [];
 
 /** Dispose shared model resources once, including embedded GLB image bitmaps. */
 function disposeModels(roots: THREE.Object3D[]) {
@@ -72,14 +81,42 @@ export function AnatomyViewer(props: AnatomyViewerProps) {
 function ViewerSession({
   personName,
   annotation,
+  interactive = false,
+  theme = "dark",
+  selectedRegion,
+  onSelectRegion,
+  highlightedRegions = NO_HIGHLIGHTS,
   onRetry,
 }: AnatomyViewerProps & { onRetry: () => void }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<ViewerActions | null>(null);
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [activeView, setActiveView] = useState<View | "custom">("front");
+  const [localSelection, setLocalSelection] = useState<BodyRegionId | null>(null);
+  const selection = selectedRegion === undefined ? localSelection : selectedRegion;
+  const selectRef = useRef<(id: BodyRegionId | null) => void>(() => {});
   const headingId = useId();
   const helpId = useId();
+
+  const chooseRegion = (id: BodyRegionId | null) => {
+    if (selectedRegion === undefined) setLocalSelection(id);
+    onSelectRegion?.(id);
+  };
+
+  useEffect(() => {
+    selectRef.current = (id) => {
+      if (selectedRegion === undefined) setLocalSelection(id);
+      onSelectRegion?.(id);
+    };
+  }, [onSelectRegion, selectedRegion]);
+
+  useEffect(() => {
+    actionsRef.current?.highlight(selection, highlightedRegions);
+  }, [selection, highlightedRegions, status]);
+
+  useEffect(() => {
+    actionsRef.current?.theme(theme);
+  }, [theme, status]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -97,6 +134,10 @@ function ViewerSession({
     let timeout: ReturnType<typeof setTimeout> | undefined;
     let contextLost: ((event: Event) => void) | undefined;
     let keyboard: ((event: KeyboardEvent) => void) | undefined;
+    let pointerDown: ((event: PointerEvent) => void) | undefined;
+    let pointerMove: ((event: PointerEvent) => void) | undefined;
+    let pointerUp: ((event: PointerEvent) => void) | undefined;
+    let pointerCancel: (() => void) | undefined;
 
     const release = () => {
       if (released) return;
@@ -112,6 +153,10 @@ function ViewerSession({
       if (renderer) {
         if (contextLost) renderer.domElement.removeEventListener("webglcontextlost", contextLost);
         if (keyboard) renderer.domElement.removeEventListener("keydown", keyboard);
+        if (pointerDown) renderer.domElement.removeEventListener("pointerdown", pointerDown);
+        if (pointerMove) renderer.domElement.removeEventListener("pointermove", pointerMove);
+        if (pointerUp) renderer.domElement.removeEventListener("pointerup", pointerUp);
+        if (pointerCancel) renderer.domElement.removeEventListener("pointercancel", pointerCancel);
         renderer.dispose();
         renderer.forceContextLoss();
         renderer.domElement.remove();
@@ -128,7 +173,7 @@ function ViewerSession({
     async function initialize() {
       try {
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color("#fcf7ed");
+        scene.background = new THREE.Color(interactive ? "#111a23" : "#fcf7ed");
         const camera = new THREE.PerspectiveCamera(34, 1, 0.01, 1000);
         renderer = new THREE.WebGLRenderer({
           antialias: true,
@@ -142,7 +187,9 @@ function ViewerSession({
         renderer.domElement.tabIndex = 0;
         renderer.domElement.setAttribute(
           "aria-label",
-          "Interactive anatomy model. Use arrow keys to rotate, plus or minus to zoom, and Home to reset.",
+          interactive
+            ? "Interactive body surface. Click a region to select it, or use the region buttons below. Arrow keys rotate, plus or minus zoom, and Home resets."
+            : "Interactive anatomy model. Use arrow keys to rotate, plus or minus to zoom, and Home to reset.",
         );
         renderer.domElement.setAttribute("aria-describedby", helpId);
         host!.appendChild(renderer.domElement);
@@ -272,6 +319,9 @@ function ViewerSession({
           } else if (event.key === "Home") {
             event.preventDefault();
             reset();
+          } else if (interactive && event.key === "Escape") {
+            event.preventDefault();
+            selectRef.current(null);
           }
         };
         renderer.domElement.addEventListener("keydown", keyboard);
@@ -339,6 +389,111 @@ function ViewerSession({
         body.add(model.scene);
         body.position.copy(center).multiplyScalar(-1);
         scene.add(body);
+        body.updateMatrixWorld(true);
+
+        // Colour the real mesh surface, not an invented skeleton or organ overlay.
+        const surfaces: {
+          regions: BodyRegionId[];
+          colors: THREE.BufferAttribute;
+        }[] = [];
+        if (interactive) {
+          const vertex = new THREE.Vector3();
+          model.scene.traverse((object) => {
+            if (!(object instanceof THREE.Mesh)) return;
+            const positions = object.geometry.getAttribute("position");
+            if (!positions) return;
+            const colors = new THREE.BufferAttribute(new Float32Array(positions.count * 3), 3);
+            const regions: BodyRegionId[] = [];
+            for (let i = 0; i < positions.count; i += 1) {
+              vertex.fromBufferAttribute(positions, i).applyMatrix4(object.matrixWorld);
+              regions.push(classifyBodyRegion(vertex.x / size.y, vertex.y / size.y + 0.5));
+            }
+            object.geometry.setAttribute("color", colors);
+            const materials = Array.isArray(object.material) ? object.material : [object.material];
+            materials.forEach((material) => {
+              if (material instanceof THREE.MeshStandardMaterial) {
+                material.vertexColors = true;
+                material.color.set("#ffffff");
+                material.roughness = 0.7;
+                material.metalness = 0.08;
+                material.needsUpdate = true;
+              }
+            });
+            surfaces.push({ regions, colors });
+          });
+
+          const raycaster = new THREE.Raycaster();
+          const pointer = new THREE.Vector2();
+          let press: { x: number; y: number; id: number; moved: boolean } | null = null;
+          pointerDown = (event) => {
+            // A pinch or any non-primary gesture must never choose a medical region.
+            if (!event.isPrimary || event.button !== 0) {
+              press = null;
+              return;
+            }
+            press = { x: event.clientX, y: event.clientY, id: event.pointerId, moved: false };
+          };
+          pointerMove = (event) => {
+            if (
+              press &&
+              press.id === event.pointerId &&
+              Math.hypot(event.clientX - press.x, event.clientY - press.y) > 6
+            ) {
+              press.moved = true;
+            }
+          };
+          pointerCancel = () => {
+            press = null;
+          };
+          pointerUp = (event) => {
+            const start = press;
+            press = null;
+            if (
+              !start ||
+              start.moved ||
+              start.id !== event.pointerId ||
+              Math.hypot(event.clientX - start.x, event.clientY - start.y) > 6
+            )
+              return;
+            const rect = renderer!.domElement.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) return;
+            pointer.set(
+              ((event.clientX - rect.left) / rect.width) * 2 - 1,
+              -((event.clientY - rect.top) / rect.height) * 2 + 1,
+            );
+            raycaster.setFromCamera(pointer, camera);
+            const hit = raycaster.intersectObject(model.scene, true)[0];
+            if (hit)
+              selectRef.current(
+                classifyBodyRegion(hit.point.x / size.y, hit.point.y / size.y + 0.5),
+              );
+          };
+          renderer.domElement.addEventListener("pointerdown", pointerDown);
+          renderer.domElement.addEventListener("pointermove", pointerMove);
+          renderer.domElement.addEventListener("pointerup", pointerUp);
+          renderer.domElement.addEventListener("pointercancel", pointerCancel);
+        }
+        const highlight = (selected: BodyRegionId | null, concerns: readonly BodyRegionId[]) => {
+          const neutral = new THREE.Color("#a4b2be");
+          const cyan = new THREE.Color("#26c5ef");
+          const red = new THREE.Color("#df4c64");
+          const selectedConcern = new THREE.Color("#f98293");
+          surfaces.forEach(({ colors, regions }) => {
+            regions.forEach((region, index) => {
+              const concern = concerns.includes(region);
+              const color = concern
+                ? region === selected
+                  ? selectedConcern
+                  : red
+                : region === selected
+                  ? cyan
+                  : neutral;
+              colors.setXYZ(index, color.r, color.g, color.b);
+            });
+            colors.needsUpdate = true;
+          });
+        };
+        highlight(null, []);
         distance = fitDistance();
         camera.near = Math.max(size.length() / 1000, 0.001);
         camera.far = Math.max(distance * 15, size.length() * 20);
@@ -348,7 +503,16 @@ function ViewerSession({
         controls.minDistance = size.length() * 0.3;
         controls.maxDistance = distance * 2.5;
         controls.update();
-        actionsRef.current = { view: selectView, zoom, reset };
+        actionsRef.current = {
+          view: selectView,
+          zoom,
+          reset,
+          highlight,
+          theme: (nextTheme) => {
+            if (interactive)
+              scene.background = new THREE.Color(nextTheme === "dark" ? "#111a23" : "#edf2f4");
+          },
+        };
         clearTimeout(timeout);
         setStatus({ kind: "ready" });
         frame = requestAnimationFrame(animate);
@@ -368,19 +532,23 @@ function ViewerSession({
       mounted = false;
       release();
     };
-  }, [helpId]);
+  }, [helpId, interactive]);
 
   const ready = status.kind === "ready";
 
   return (
-    <section className={styles.viewer} aria-labelledby={headingId}>
+    <section
+      className={`${styles.viewer} ${interactive ? styles.interactive : ""}`}
+      data-theme={theme}
+      aria-labelledby={headingId}
+    >
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Body overview</p>
+          <p className={styles.eyebrow}>{interactive ? "Body region review" : "Body overview"}</p>
           <h3 id={headingId}>{personName}</h3>
         </div>
         <span className={styles.modelBadge}>
-          <Move3D size={15} aria-hidden="true" /> 3D anatomy
+          <Move3D size={15} aria-hidden="true" /> {interactive ? "Surface model" : "3D anatomy"}
         </span>
       </header>
 
@@ -456,11 +624,58 @@ function ViewerSession({
           <RotateCcw size={15} aria-hidden="true" /> Reset
         </button>
       </div>
+      {interactive && (
+        <div className={styles.regionPicker}>
+          <div className={styles.selectionStatus} aria-live="polite" aria-atomic="true">
+            <strong>
+              {BODY_REGIONS.find((region) => region.id === selection)?.label ??
+                "Select a body region"}
+            </strong>
+            {selection && (
+              <button type="button" onClick={() => chooseRegion(null)}>
+                Clear selection
+              </button>
+            )}
+          </div>
+          <div className={styles.regionButtons} role="group" aria-label="Select body region">
+            {BODY_REGIONS.map((region) => (
+              <button
+                key={region.id}
+                type="button"
+                aria-pressed={selection === region.id}
+                data-concern={highlightedRegions.includes(region.id) || undefined}
+                aria-label={`${region.label}${highlightedRegions.includes(region.id) ? ", concern reported; review evidence" : ""}`}
+                onClick={() => chooseRegion(region.id)}
+              >
+                {highlightedRegions.includes(region.id) && (
+                  <CircleAlert size={12} aria-hidden="true" />
+                )}
+                {region.label}
+              </button>
+            ))}
+          </div>
+          <div className={styles.legend}>
+            <span>
+              <i className={styles.selectedKey} />
+              Selected
+            </span>
+            <span>
+              <i className={styles.concernKey} />
+              Reported concern
+            </span>
+            <span>Unmarked ≠ assessed</span>
+          </div>
+        </div>
+      )}
       <p className={styles.help} id={helpId}>
-        Drag to rotate · Scroll or pinch to zoom
+        {interactive
+          ? "Click body or choose a region · Drag to rotate · Scroll to zoom"
+          : "Drag to rotate · Scroll or pinch to zoom"}
       </p>
       <p className={styles.modelNote}>
-        Generic anatomical representation · not a scan of this person
+        {interactive
+          ? "Approximate surface regions · not a patient scan or diagnosis"
+          : "Generic anatomical representation · not a scan of this person"}
       </p>
 
       {annotation && (
