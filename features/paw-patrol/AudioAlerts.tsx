@@ -56,7 +56,21 @@ export function useAudioAlerts(events: IncidentEvent[]) {
         sources.add(event.source);
         return true;
       })
-      .slice(0, 12);
+      .slice(0, 12)
+      .map((event) => {
+        if (event.location || !event.audioSafetySignal) return event;
+        // Keep the phrase alert as the primary report, but retain the exact
+        // source/capture-matched GPS annotation from its contextual assessment.
+        const context = events.find(
+          (item) =>
+            item.id === event.audioSafetySignal?.assessment_id &&
+            item.source === event.source &&
+            item.observedAt === event.observedAt &&
+            item.audioAssessment?.input_kind === "microphone" &&
+            event.audioSafetySignal?.input_kind === "microphone",
+        );
+        return context?.location ? { ...event, location: context.location } : event;
+      });
   }, [events, now]);
 }
 

@@ -68,7 +68,7 @@ export async function publishAudioAssessment(
     source: sourceId,
     observedAt: capturedAt,
     title: phraseReview
-      ? `AI context · independent phrase review required · ${personId}`
+      ? `${concern ? "Audio concern" : "AI context"} · independent phrase review required · ${personId}`
       : `${concern ? "Audio concern" : "Audio assessment"} · ${audioAssessmentLabel(assessment)} · ${personId}`,
     detail:
       `${phraseReview ? "Independent phrase alert requires human review. Model context: " : ""}${assessment.summary} Recommendation: ${ACTION_LABELS[assessment.recommended_action]}. Uncertainty: ${assessment.uncertainty}`.slice(

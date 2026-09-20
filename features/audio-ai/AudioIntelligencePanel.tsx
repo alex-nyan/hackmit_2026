@@ -65,14 +65,21 @@ export function AudioIntelligencePanel({
       clearInterval(timer);
     };
   }, []);
-  const assessments = events
+  const unpairedAssessments = events
     .filter(
       (event) =>
         event.audioAssessment &&
         !events.some((item) => item.audioSafetySignal?.assessment_id === event.id),
     )
-    .slice(-6)
     .reverse();
+  // An urgent report must remain reachable for acknowledgment even after six
+  // newer routine clips arrive. The shared log still bounds overall retention.
+  const assessments = unpairedAssessments.filter(
+    (event, index) =>
+      index < 6 ||
+      (event.audioAssessment?.status === "urgent_threat" &&
+        !events.some((item) => item.id === `review-${event.id}`)),
+  );
 
   async function analyze() {
     setBusy(true);
