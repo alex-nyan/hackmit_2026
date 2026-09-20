@@ -462,3 +462,216 @@
 .vehicleDirection[data-emergency="true"] [data-car-outline] {
   stroke: #ae6c3e;
 }
+
+/* Opt-in command-centre demo flags; no effect on other workspaces. */
+.canvas[data-hotspot-drag-over="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border: 2px solid rgb(255 88 102 / 80%);
+  box-shadow: inset 0 0 28px rgb(255 59 80 / 15%);
+  pointer-events: none;
+}
+.hotspotFlag {
+  position: absolute;
+  z-index: 5;
+  width: 44px;
+  height: 54px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 3px 5px rgb(80 8 19 / 55%));
+}
+.hotspotFlag svg {
+  display: block;
+  width: 44px;
+  height: 54px;
+}
+.hotspotFlag span {
+  position: absolute;
+  top: 100%;
+  left: -7px;
+  padding: 2px 5px;
+  border: 1px solid #ff9ba2;
+  border-radius: 4px;
+  background: #8a1b2a;
+  color: #fff;
+  font: 700 9px/1.3 monospace;
+  white-space: nowrap;
+}
+.hotspotFlag:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 5px;
+}
+.hotspotGlow {
+  position: absolute;
+  z-index: 1;
+  width: 130px;
+  height: 130px;
+  pointer-events: none;
+}
+.hotspotGlow::before,
+.hotspotGlow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+.hotspotGlow::before {
+  background: radial-gradient(
+    circle,
+    rgb(239 45 64 / 52%),
+    rgb(239 45 64 / 25%) 38%,
+    transparent 71%
+  );
+}
+.hotspotGlow::after {
+  inset: 24%;
+  border: 2px solid #ff3b50;
+  box-shadow: 0 0 12px rgb(255 59 80 / 48%);
+  animation: hotspot-ripple 2.8s ease-out infinite;
+}
+@keyframes hotspot-ripple {
+  from {
+    transform: scale(0.7);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+.hotspotPlacement,
+.hotspotDetails {
+  position: absolute;
+  top: 12px;
+  z-index: 7;
+  max-width: calc(100% - 24px);
+  padding: 12px;
+  border: 1px solid #b55360;
+  border-radius: 10px;
+  background: #fff9f7;
+  color: #39252b;
+  box-shadow: 0 6px 24px rgb(55 10 18 / 18%);
+  font:
+    12px/1.45 Arial,
+    sans-serif;
+}
+.hotspotPlacement {
+  left: 12px;
+  display: flex;
+  gap: 10px;
+}
+.hotspotPlacement[data-ready="false"] {
+  top: auto;
+  bottom: 56px;
+}
+.hotspotPlacement > svg {
+  flex-shrink: 0;
+  width: 30px;
+  height: 38px;
+}
+.hotspotPlacement strong {
+  font-size: 13px;
+}
+.hotspotPlacement p,
+.hotspotDetails p {
+  margin: 5px 0 0;
+}
+.hotspotDetails {
+  right: 12px;
+  width: 285px;
+  max-height: calc(100% - 68px);
+  overflow-y: auto;
+}
+.hotspotDetailTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hotspotDetailTitle svg {
+  width: 28px;
+  height: 36px;
+  flex-shrink: 0;
+}
+.hotspotDetailTitle span {
+  font: 700 9px/1.4 monospace;
+  letter-spacing: 0.06em;
+}
+.hotspotDetailTitle h3 {
+  margin: 1px 0 0;
+  font-size: 17px;
+  color: inherit;
+}
+.hotspotCoordinates {
+  font: 10px/1.5 monospace;
+}
+.hotspotActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+.hotspotActions button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #c4959c;
+  border-radius: 6px;
+  background: #fff;
+  color: #46252e;
+  font:
+    600 11px/1.3 Arial,
+    sans-serif;
+  cursor: pointer;
+}
+.hotspotActions button:hover {
+  background: #fae6e9;
+}
+.hotspotActions button:focus-visible {
+  outline: 3px solid #b6253a;
+  outline-offset: 2px;
+}
+.hotspotActions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.hotspotActions .hotspotResolve {
+  background: #a72137;
+  border-color: #a72137;
+  color: #fff;
+}
+.hotspotActions .hotspotResolve:hover {
+  background: #811a2b;
+}
+.root[data-theme="dark"] .hotspotPlacement,
+.root[data-theme="dark"] .hotspotDetails {
+  background: #241e24;
+  color: #fff0f1;
+}
+.root[data-theme="dark"] .hotspotActions button:not(.hotspotResolve) {
+  background: #352832;
+  color: #fff0f1;
+  border-color: #76535d;
+}
+.root[data-theme="dark"] .hotspotActions button:not(.hotspotResolve):hover {
+  background: #4c303d;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hotspotGlow::after {
+    animation: none;
+    opacity: 0.6;
+    transform: none;
+  }
+}
+@media (forced-colors: active) {
+  .hotspotGlow::after {
+    animation: none;
+    opacity: 1;
+    border-color: Highlight;
+  }
+  .hotspotFlag {
+    filter: none;
+  }
+}

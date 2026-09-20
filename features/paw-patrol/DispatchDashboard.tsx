@@ -7,7 +7,6 @@ import {
   Activity,
   ChevronDown,
   HeartPulse,
-  MapPin,
   Moon,
   Pause,
   Play,
@@ -31,6 +30,9 @@ import { vehicleAt } from "./vehicles/vehicleMotion";
 import { describeOrigin, type IncidentEvent } from "./incidents";
 import type { BusStatus } from "./useIncidentBus";
 import type { Workspace } from "./workspace";
+import type { useDemoHotspots } from "./useDemoHotspots";
+import { PixelHotspotFlag } from "./PixelHotspotFlag";
+import { InferencePreview } from "./InferencePreview";
 import styles from "./DispatchDashboard.module.css";
 
 interface Props {
@@ -51,6 +53,13 @@ interface Props {
   joinPanel: ReactNode;
   events: IncidentEvent[];
   busStatus: BusStatus;
+  hotspotTools?: ReturnType<typeof useDemoHotspots> & {
+    placing: boolean;
+    dragPoint: { x: number; y: number; dropping: boolean } | null;
+    onDrag: (point: { x: number; y: number; dropping: boolean }) => void;
+    onBegin: () => void;
+    onCancel: () => void;
+  };
   localHeartRate: {
     personId: string;
     connection: Pick<HeartRateConnection, "mode" | "status" | "bpm" | "receivedAt">;
@@ -237,7 +246,7 @@ function WorkspaceSwitcher({ onViewChange }: { onViewChange: (view: View) => voi
   );
 }
 
-/** Presentation of the existing roster and subscriptions; no writes or new data source. */
+/** Command-only presentation; hotspot dispatches remain local demo state. */
 export function DispatchDashboard({
   workspace,
   onViewChange,
@@ -257,11 +266,35 @@ export function DispatchDashboard({
   events,
   busStatus,
   localHeartRate,
+  hotspotTools,
 }: Props) {
   const [query, setQuery] = useState("");
   const [area, setArea] = useState("all");
   const [filter, setFilter] = useState<"all" | "requests">("all");
   const [showAllEvents, setShowAllEvents] = useState(false);
+  const mapFrame = useRef<HTMLDivElement>(null);
+  const flagButton = useRef<HTMLButtonElement>(null);
+  const flagGesture = useRef<{ x: number; y: number; pointerId: number; dragging: boolean } | null>(
+    null,
+  );
+  const ignoreFlagClickUntil = useRef(0);
+  useEffect(() => {
+    if (!hotspotTools?.placing) return;
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        const pointerId = flagGesture.current?.pointerId;
+        flagGesture.current = null;
+        ignoreFlagClickUntil.current = Date.now() + 500;
+        if (pointerId !== undefined && flagButton.current?.hasPointerCapture(pointerId)) {
+          flagButton.current.releasePointerCapture(pointerId);
+        }
+        hotspotTools.onCancel();
+        flagButton.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", cancel);
+    return () => document.removeEventListener("keydown", cancel);
+  }, [hotspotTools]);
   const person = PEOPLE.find((officer) => officer.id === selectedId) ?? PEOPLE[0];
   const selectedDeviceMode =
     localHeartRate.personId === person.id && localHeartRate.connection.mode === "device";
@@ -285,7 +318,10 @@ export function DispatchDashboard({
   const acknowledged = PEOPLE.filter(
     (officer) => requestStates.get(officer.id) === "acknowledged",
   ).length;
-  const onPatrol = PEOPLE.length - knownRequests - acknowledged;
+  const responding = PEOPLE.filter(
+    (officer) => !requestStates.has(officer.id) && hotspotTools?.unitStatus(officer.id),
+  ).length;
+  const onPatrol = PEOPLE.length - knownRequests - acknowledged - responding;
   const visible = PEOPLE.filter((officer) => {
     const matchesText = `${officer.name} ${officer.id} ${officer.area}`
       .toLowerCase()
@@ -297,6 +333,27 @@ export function DispatchDashboard({
     );
   });
   const newest = useMemo(() => [...events].sort((a, b) => b.seq - a.seq), [events]);
+  const timeline = [
+    ...newest.map((event) => ({
+      id: `report-${event.seq}`,
+      at: event.at,
+      title: event.title,
+      detail: event.detail,
+      origin: event.origin,
+      label: `${describeOrigin(event)} · ${event.personId ?? "Unassigned"}`,
+      source: event.source,
+      provenance: event.provenance,
+      requiresHumanReview: event.requiresHumanReview,
+    })),
+    ...[...(hotspotTools?.logs ?? [])].reverse().map((event) => ({
+      ...event,
+      origin: "demo-hotspot",
+      label: `Local demo · ${event.hotspotId}`,
+      source: "Command Centre simulation · this tab only",
+      provenance: undefined,
+      requiresHumanReview: false,
+    })),
+  ].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   const liveCount =
     liveTrack.state === "tracking"
       ? liveTrack.devices.filter((device) => device.fix?.freshness === "live").length
@@ -323,7 +380,7 @@ export function DispatchDashboard({
       ? "Assistance requested"
       : state === "acknowledged"
         ? "Request acknowledged · not resolved"
-        : "On patrol";
+        : (hotspotTools?.unitStatus(id) ?? "On patrol");
   }
 
   return (
@@ -387,13 +444,15 @@ export function DispatchDashboard({
           </div>
         </div>
 
-        <div className={styles.grid}>
+        <div className={styles.grid} data-placing={hotspotTools?.placing || undefined}>
           <BentoCell className={styles.mapCell} labelledBy="dispatch-map-title">
             <div className={styles.cardHeading}>
               <h2 id="dispatch-map-title">Patrol map</h2>
               <span className={styles.smallBadge}>{PEOPLE.length} demo units</span>
             </div>
-            <div className={styles.mapFrame}>{map}</div>
+            <div className={styles.mapFrame} ref={mapFrame}>
+              {map}
+            </div>
             <div className={styles.mapFooter}>
               <span>
                 <i aria-hidden="true" /> Demo patrol vehicles
@@ -463,7 +522,9 @@ export function DispatchDashboard({
                       <span className={styles.officerStatusLine}>
                         <span
                           className={styles.officerStatus}
-                          data-attention={requestStates.has(officer.id)}
+                          data-attention={
+                            requestStates.has(officer.id) || !!hotspotTools?.unitStatus(officer.id)
+                          }
                         >
                           {officerStatus(officer.id)}
                         </span>
@@ -472,7 +533,14 @@ export function DispatchDashboard({
                     </span>
                     <span className={styles.officerSpeed} title="Simulated patrol speed · demo">
                       <span className="sr-only">Demo speed: </span>
-                      <strong>{Math.round(vehicleAt(officer.id, time).speedMps * 3.6)}</strong>
+                      <strong>
+                        {Math.round(
+                          (
+                            hotspotTools?.sampleVehicle(officer.id, time) ??
+                            vehicleAt(officer.id, time)
+                          ).speedMps * 3.6,
+                        )}
+                      </strong>
                       <small>km/h</small>
                     </span>
                     <span className={styles.officerArea} title="Assigned patrol area · demo">
@@ -529,8 +597,8 @@ export function DispatchDashboard({
                   <dd>{acknowledged}</dd>
                 </div>
                 <div>
-                  <dt>Assignment data</dt>
-                  <dd>—</dd>
+                  <dt>Hotspot responders · demo</dt>
+                  <dd>{responding}</dd>
                 </div>
               </dl>
             </div>
@@ -540,139 +608,121 @@ export function DispatchDashboard({
             </p>
           </BentoCell>
 
-          <BentoCell className={styles.coverageCell} labelledBy="dispatch-areas-title">
-            <BentoLabel icon={MapPin}>Roster distribution</BentoLabel>
-            <h2 id="dispatch-areas-title">Patrol areas</h2>
-            <p className={styles.cardDescription}>Filter the roster by assigned demo area.</p>
-            <div className={styles.areaList}>
-              {AREAS.map((name) => {
-                const count = PEOPLE.filter((officer) => officer.area === name).length;
-                return (
-                  <button
-                    type="button"
-                    key={name}
-                    aria-pressed={area === name}
-                    onClick={() => setArea((value) => (value === name ? "all" : name))}
-                  >
-                    <span>{name}</span>
-                    <span className={styles.areaBar} aria-hidden="true">
-                      <i style={{ width: `${(count / PEOPLE.length) * 100}%` }} />
-                    </span>
+          <BentoCell className={styles.coverageCell} labelledBy="dispatch-inference-title">
+            <InferencePreview />
+          </BentoCell>
+
+          <BentoCell className={styles.connectionsCell} labelledBy="dispatch-tools-title">
+            <BentoLabel icon={SlidersHorizontal}>Workspace controls</BentoLabel>
+            <h2 id="dispatch-tools-title">Tools</h2>
+            {hotspotTools && (
+              <>
+                <button
+                  ref={flagButton}
+                  type="button"
+                  className={styles.hotspotTool}
+                  aria-pressed={hotspotTools.placing}
+                  aria-label="Place demo hotspot"
+                  onClick={() => {
+                    if (Date.now() < ignoreFlagClickUntil.current) return;
+                    if (hotspotTools.placing) hotspotTools.onCancel();
+                    else {
+                      hotspotTools.onBegin();
+                      requestAnimationFrame(() => {
+                        if (window.innerWidth <= 900) {
+                          mapFrame.current?.scrollIntoView({
+                            block: "center",
+                            behavior: "instant",
+                          });
+                        }
+                        mapFrame.current
+                          ?.querySelector<HTMLButtonElement>("[data-hotspot-centre]")
+                          ?.focus({ preventScroll: true });
+                      });
+                    }
+                  }}
+                  onPointerDown={(event) => {
+                    if (event.button !== 0 || !event.isPrimary || flagGesture.current) return;
+                    flagGesture.current = {
+                      x: event.clientX,
+                      y: event.clientY,
+                      pointerId: event.pointerId,
+                      dragging: false,
+                    };
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }}
+                  onPointerMove={(event) => {
+                    const gesture = flagGesture.current;
+                    if (!gesture || event.pointerId !== gesture.pointerId) return;
+                    if (
+                      !gesture.dragging &&
+                      Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) < 6
+                    )
+                      return;
+                    if (!gesture.dragging) {
+                      gesture.dragging = true;
+                      hotspotTools.onBegin();
+                    }
+                    event.preventDefault();
+                    hotspotTools.onDrag({ x: event.clientX, y: event.clientY, dropping: false });
+                  }}
+                  onPointerUp={(event) => {
+                    const gesture = flagGesture.current;
+                    if (gesture && event.pointerId !== gesture.pointerId) return;
+                    flagGesture.current = null;
+                    if (gesture?.dragging) {
+                      ignoreFlagClickUntil.current = Date.now() + 500;
+                      hotspotTools.onDrag({ x: event.clientX, y: event.clientY, dropping: true });
+                    }
+                  }}
+                  onPointerCancel={(event) => {
+                    if (flagGesture.current && event.pointerId !== flagGesture.current.pointerId)
+                      return;
+                    flagGesture.current = null;
+                    hotspotTools.onCancel();
+                  }}
+                  onLostPointerCapture={(event) => {
+                    if (flagGesture.current && event.pointerId !== flagGesture.current.pointerId)
+                      return;
+                    if (flagGesture.current?.dragging) hotspotTools.onCancel();
+                    flagGesture.current = null;
+                  }}
+                >
+                  <PixelHotspotFlag />
+                  <span>
                     <strong>
-                      {count}
-                      <small> units</small>
+                      {hotspotTools.placing ? "Choose a map location" : "Hotspot flag"}
                     </strong>
-                  </button>
-                );
-              })}
-            </div>
-            <p className={styles.footnote}>
-              {AREAS.length} roster areas · not measured geographic coverage
-            </p>
-          </BentoCell>
-
-          <BentoCell className={styles.activityCell} labelledBy="dispatch-events-title">
-            <div className={styles.cardHeading}>
-              <div>
-                <BentoLabel icon={Radio}>Received reports</BentoLabel>
-                <h2 id="dispatch-events-title">Activity feed</h2>
-              </div>
-              <span
-                className={styles.connectionState}
-                data-connected={busStatus === "live"}
-                role="status"
-              >
-                {busStatus === "live"
-                  ? "Log connected"
-                  : busStatus === "connecting"
-                    ? "Connecting"
-                    : "Log offline"}
-              </span>
-            </div>
-            <p className={styles.cardDescription}>
-              This deployment only. Model outputs still require human review.
-              {busStatus !== "live" &&
-                newest.length > 0 &&
-                " Showing last received reports; updates are unavailable."}
-            </p>
-            {newest.length === 0 ? (
-              <div className={styles.emptyState}>
-                <Radio size={24} strokeWidth={1.4} />
-                <strong>
-                  {busStatus === "live" ? "No reports received" : "Waiting for the incident log"}
-                </strong>
-                <p>
-                  {busStatus === "live"
-                    ? "Published assistance requests and AI observations will appear here. No report does not mean no incident."
-                    : "The log is not current. This is not an all-clear."}
+                    <small>Drag onto map or click to place</small>
+                    <small>Nearby demo units respond · no real alerts</small>
+                  </span>
+                  <span className={styles.hotspotCount}>
+                    {hotspotTools.hotspots.filter((hotspot) => hotspot.resolvedAt === null).length}
+                    <small>active</small>
+                  </span>
+                </button>
+                <p className={styles.hotspotMessage} role="status" aria-live="polite">
+                  {hotspotTools.placing
+                    ? "Hold near a map edge to pan. Release to place; Escape cancels."
+                    : hotspotTools.message ||
+                      "Click a placed flag to resolve it. Demo history resets on reload."}
                 </p>
-              </div>
-            ) : (
-              <ol className={styles.eventList}>
-                {(showAllEvents ? newest : newest.slice(0, 4)).map((event) => (
-                  <li key={event.seq}>
-                    <details>
-                      <summary>
-                        <span
-                          className={styles.eventDot}
-                          data-origin={event.origin}
-                          aria-hidden="true"
-                        />
-                        <span>
-                          <strong>{event.title}</strong>
-                          <small>
-                            {describeOrigin(event)} · {event.personId ?? "Unassigned"}
-                          </small>
-                        </span>
-                        <ChevronDown size={14} aria-hidden="true" />
-                      </summary>
-                      <div className={styles.eventDetails}>
-                        <p>{event.detail}</p>
-                        <span>
-                          {event.source} · <time dateTime={event.at}>{event.at}</time>
-                        </span>
-                        {event.provenance && (
-                          <span>
-                            {event.provenance.provider} / {event.provenance.model} · unconfirmed
-                            model output
-                          </span>
-                        )}
-                        {event.requiresHumanReview && <strong>Human review required</strong>}
-                      </div>
-                    </details>
-                  </li>
-                ))}
-              </ol>
+              </>
             )}
-            {newest.length > 4 && (
-              <button
-                className={styles.textButton}
-                type="button"
-                onClick={() => setShowAllEvents((value) => !value)}
-              >
-                {showAllEvents ? "Show recent reports" : `Show all ${newest.length} reports`}{" "}
-                <ChevronDown size={14} />
-              </button>
-            )}
-          </BentoCell>
-
-          <BentoCell className={styles.connectionsCell} labelledBy="dispatch-connections-title">
-            <BentoLabel icon={Signal}>Separate live data</BentoLabel>
-            <h2 id="dispatch-connections-title">Live connections</h2>
-            <div className={styles.connectionCount}>
-              <strong>{trackingKnown ? liveCount : "—"}</strong>
-              <span>
-                fresh GPS fixes<small>{trackingLabel}</small>
-              </span>
-            </div>
-            <p className={styles.cardDescription}>
-              Real devices are not included in the 15-person demo roster.
-            </p>
             <details className={styles.connectionDetails}>
               <summary>
                 Tracking & device setup <ChevronDown size={15} aria-hidden="true" />
               </summary>
               <div>
+                <div className={styles.connectionCount}>
+                  <strong>{trackingKnown ? liveCount : "—"}</strong>
+                  <span>
+                    fresh GPS fixes<small>{trackingLabel}</small>
+                  </span>
+                </div>
+                <p className={styles.cardDescription}>
+                  Real devices are not included in the 15-person demo roster.
+                </p>
                 <button
                   type="button"
                   className={styles.textButton}
@@ -691,6 +741,104 @@ export function DispatchDashboard({
             </details>
           </BentoCell>
         </div>
+
+        {hotspotTools?.placing && hotspotTools.dragPoint && !hotspotTools.dragPoint.dropping && (
+          <div
+            className={styles.draggingFlag}
+            aria-hidden="true"
+            style={{ left: hotspotTools.dragPoint.x, top: hotspotTools.dragPoint.y }}
+          >
+            <PixelHotspotFlag />
+            <span>Drop hotspot</span>
+          </div>
+        )}
+
+        <BentoCell className={styles.activityCell} labelledBy="dispatch-events-title">
+          <div className={styles.cardHeading}>
+            <div>
+              <BentoLabel icon={Radio}>Incident log</BentoLabel>
+              <h2 id="dispatch-events-title">Activity feed</h2>
+            </div>
+            <span
+              className={styles.connectionState}
+              data-connected={busStatus === "live"}
+              role="status"
+            >
+              {busStatus === "live"
+                ? "Log connected"
+                : busStatus === "connecting"
+                  ? "Connecting"
+                  : "Received reports offline"}
+            </span>
+          </div>
+          <p className={styles.cardDescription}>
+            Local demo actions stay in this tab and reset on reload. Received reports remain
+            separate; model outputs require human review.
+            {busStatus !== "live" &&
+              newest.length > 0 &&
+              " Showing last received reports; updates are unavailable."}
+          </p>
+          {timeline.length === 0 ? (
+            <div className={styles.emptyState}>
+              <Radio size={24} strokeWidth={1.4} />
+              <strong>
+                {busStatus === "live" ? "No reports received" : "Waiting for the incident log"}
+              </strong>
+              <p>
+                {busStatus === "live"
+                  ? "Published assistance requests and AI observations will appear here. No report does not mean no incident."
+                  : "The log is not current. This is not an all-clear."}
+              </p>
+            </div>
+          ) : (
+            <ol className={styles.eventList}>
+              {(showAllEvents ? timeline : timeline.slice(0, 8)).map((event) => (
+                <li key={event.id}>
+                  <details>
+                    <summary>
+                      <span
+                        className={styles.eventDot}
+                        data-origin={event.origin}
+                        aria-hidden="true"
+                      />
+                      <span>
+                        <strong>{event.title}</strong>
+                        <small>{event.label}</small>
+                      </span>
+                      <time className={styles.eventTime} dateTime={event.at}>
+                        {event.at.slice(11, 19)} UTC
+                      </time>
+                      <ChevronDown size={14} aria-hidden="true" />
+                    </summary>
+                    <div className={styles.eventDetails}>
+                      <p>{event.detail}</p>
+                      <span>
+                        {event.source} · <time dateTime={event.at}>{event.at}</time>
+                      </span>
+                      {event.provenance && (
+                        <span>
+                          {event.provenance.provider} / {event.provenance.model} · unconfirmed model
+                          output
+                        </span>
+                      )}
+                      {event.requiresHumanReview && <strong>Human review required</strong>}
+                    </div>
+                  </details>
+                </li>
+              ))}
+            </ol>
+          )}
+          {timeline.length > 8 && (
+            <button
+              className={styles.textButton}
+              type="button"
+              onClick={() => setShowAllEvents((value) => !value)}
+            >
+              {showAllEvents ? "Show recent entries" : `Show all ${timeline.length} entries`}{" "}
+              <ChevronDown size={14} />
+            </button>
+          )}
+        </BentoCell>
       </main>
     </div>
   );

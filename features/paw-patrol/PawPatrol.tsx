@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Shield,
@@ -29,6 +29,7 @@ import { LiveTrackPanel, UnitCard, useLiveTrack, type LiveDevice } from "@/featu
 import { JoinCard, type JoinLink } from "@/features/join";
 import { OperationsMap } from "./OperationsMap";
 import { DispatchDashboard } from "./DispatchDashboard";
+import { useDemoHotspots } from "./useDemoHotspots";
 import { OfficerOverview } from "./OfficerOverview";
 import { GlassEffect } from "@/components/ui/liquid-glass";
 import glassStyles from "./OfficerGlass.module.css";
@@ -193,6 +194,32 @@ export function PawPatrol({
   const [recenterKey, setRecenterKey] = useState(0);
   const [dispatchAreaFocusKey, setDispatchAreaFocusKey] = useState(0);
   const [following, setFollowing] = useState(false);
+  const [placingHotspot, setPlacingHotspot] = useState(false);
+  const [hotspotDrag, setHotspotDrag] = useState<{
+    x: number;
+    y: number;
+    dropping: boolean;
+  } | null>(null);
+  const cancelHotspotPlacement = () => {
+    setPlacingHotspot(false);
+    setHotspotDrag(null);
+  };
+  const unavailableHotspotUnits = useMemo(
+    () => [
+      ...new Set(
+        bus.events
+          .filter((event) => event.kind === "panic" || event.kind === "acknowledge")
+          .flatMap((event) => (event.personId ? [event.personId] : [])),
+      ),
+    ],
+    [bus.events],
+  );
+  const hotspots = useDemoHotspots({
+    time,
+    readClock,
+    enabled: dispatchDashboard,
+    unavailableIds: unavailableHotspotUnits,
+  });
   const [hardware, setHardware] = useState(false);
   const [evidence, setEvidence] = useState<"camera" | "audio" | null>(null);
   // The camera and microphone stay opt-in. Tracking does not: it was opt-in
@@ -432,6 +459,23 @@ export function PawPatrol({
           fixRequest={fixRequest}
           onSelectLiveDevice={setOpenDeviceId}
           onBuildingSelect={handleBuildingSelect}
+          hotspot={
+            dispatchDashboard
+              ? {
+                  placing: placingHotspot,
+                  dragPoint: hotspotDrag,
+                  hotspots: hotspots.hotspots,
+                  onPlace: (point) => {
+                    hotspots.place(point);
+                    cancelHotspotPlacement();
+                    dispatch({ type: "play" });
+                  },
+                  onCancel: cancelHotspotPlacement,
+                  onResolve: hotspots.resolve,
+                  sampleVehicle: hotspots.sampleVehicle,
+                }
+              : undefined
+          }
         />
         {view !== "officer" && (
           <div className="map-overlay">
@@ -522,6 +566,19 @@ export function PawPatrol({
         events={bus.events}
         busStatus={bus.status}
         localHeartRate={{ personId: person.id, connection: heartRate }}
+        hotspotTools={{
+          ...hotspots,
+          placing: placingHotspot,
+          dragPoint: hotspotDrag,
+          onDrag: setHotspotDrag,
+          onBegin: () => {
+            setFollowing(false);
+            setBuilding(null);
+            setOpenDeviceId(null);
+            setPlacingHotspot(true);
+          },
+          onCancel: cancelHotspotPlacement,
+        }}
       />
     );
   }
