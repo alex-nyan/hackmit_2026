@@ -4,8 +4,6 @@ import { useCallback, useState } from "react";
 import Link from "next/link";
 import {
   Shield,
-  Radio,
-  HeartPulse,
   Play,
   Pause,
   RotateCcw,
@@ -34,6 +32,7 @@ import { WorkspaceMapShell } from "./WorkspaceMapShell";
 import { OfficerOverview } from "./OfficerOverview";
 import { GlassEffect } from "@/components/ui/liquid-glass";
 import glassStyles from "./OfficerGlass.module.css";
+import { WorkspaceNav } from "./WorkspaceNav";
 import officerStyles from "./OfficerWorkspace.module.css";
 import hospitalStyles from "./HospitalWorkspace.module.css";
 import { HospitalWorkspace } from "./HospitalWorkspace";
@@ -71,7 +70,7 @@ import {
 /** Stable identity so a poll that finds nothing does not rerun the map effect. */
 const EMPTY_DEVICES: LiveDevice[] = [];
 
-const VIEW_NAMES = {
+const VIEW_NAMES: Record<View, string> = {
   command: "Command",
   officer: "Officer",
   hospital: "Hospital",
@@ -513,35 +512,16 @@ export function PawPatrol({
           <Shield />
           <span>Paw Patrol{view === "command" && <small>CONNECTED RESPONSE</small>}</span>
         </Link>
-        <nav aria-label="Workspace">
-          {workspace ? (
-            <span className="nav-item active" aria-current="page">
-              {fixedView === "command" ? (
-                <Radio />
-              ) : fixedView === "officer" ? (
-                <Shield />
-              ) : (
-                <HeartPulse />
-              )}
-              {WORKSPACE_LABELS[workspace]}
-            </span>
-          ) : (
-            (["command", "officer", "hospital"] as const).map((v) => (
-              <button
-                key={v}
-                className={`nav-item ${view === v ? "active" : ""}`}
-                aria-pressed={view === v}
-                onClick={() => setView(v)}
-              >
-                {v === "command" ? <Radio /> : v === "officer" ? <Shield /> : <HeartPulse />}
-                {VIEW_NAMES[v]}
-              </button>
-            ))
-          )}
-        </nav>
+        <WorkspaceNav
+          view={view}
+          labels={VIEW_NAMES}
+          pinnedLabel={workspace ? WORKSPACE_LABELS[workspace] : null}
+          onSelect={setView}
+        />
         {view !== "hospital" && (
           <button
             className="hardware-toggle"
+            data-live={heartRate.status === "receiving"}
             aria-label={view === "officer" ? "Devices" : "Devices offline"}
             onClick={() => setHardware(!hardware)}
             aria-expanded={hardware}
