@@ -188,14 +188,6 @@
     monospace;
 }
 
-.review {
-  margin-top: auto;
-  padding-top: 10px;
-  color: var(--signal-muted);
-  font-size: 10px;
-  line-height: 1.4;
-}
-
 @media (max-width: 1040px) {
   .signal {
     grid-template-columns: minmax(0, 1fr);
@@ -207,9 +199,6 @@
   }
   .observations h3 {
     margin-top: 7px;
-  }
-  .review {
-    padding-top: 4px;
   }
 }
 

@@ -370,23 +370,13 @@
   font-size: 12px;
 }
 
-.interactive .help,
-.interactive .modelNote,
 .interactive .status > span {
   color: var(--body-muted);
   font-size: 11px;
 }
 
-.interactive .help {
-  margin: 10px 12px 3px;
-}
-
-.interactive .modelNote {
-  margin: 0 12px 12px;
-}
-
 .regionPicker {
-  margin: 10px 12px 0;
+  margin: 10px 12px 12px;
   padding-top: 10px;
   border-top: 1px solid var(--body-line);
 }

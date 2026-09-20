@@ -16,10 +16,10 @@ interface Props {
 
 const SNAPSHOT_MAX_AGE_MS = 15_000;
 const STAGE_LABELS: Record<DemoAmbulanceMission["status"], string> = {
-  "en-route": "En route · demo",
-  staged: "Arrived at staging · HOLD",
-  engaged: "Operator authorized · demo",
-  cancelled: "Cancelled · demo",
+  "en-route": "En route",
+  staged: "Arrived · HOLD",
+  engaged: "Entry authorized",
+  cancelled: "Cancelled",
 };
 
 function coordinates(point: [number, number]) {
@@ -67,7 +67,7 @@ export function HospitalDispatchHandoff({ missions, status, updatedAt, selection
       ? mission.status === "engaged" && !authorized
         ? "HOLD · authorization unconfirmed"
         : STAGE_LABELS[mission.status]
-      : "HOLD · select a demo incident";
+      : "HOLD · select an incident";
   const stage =
     !fresh ||
     !mission ||
@@ -92,27 +92,23 @@ export function HospitalDispatchHandoff({ missions, status, updatedAt, selection
         <span className={styles.connection} data-fresh={fresh} role="status">
           <Radio size={13} aria-hidden="true" />
           {fresh
-            ? "Browser demo connected"
+            ? "Connected"
             : status === "connecting"
               ? "Connecting · HOLD"
               : "Updates unavailable · HOLD"}
         </span>
       </header>
-      <p className={styles.disclaimer}>
-        Browser demo handoff; not a real dispatch or scene clearance.
-      </p>
-
       {missions.length > 0 || selectedId ? (
         <>
           <div className={styles.selection}>
-            <label htmlFor={selectId}>Demo incident / ambulance</label>
+            <label htmlFor={selectId}>Incident / ambulance</label>
             <select
               id={selectId}
               value={mission?.id ?? ""}
               onChange={(event) => setSelectedId(event.target.value || null)}
             >
               <option value="" disabled>
-                Choose a demo incident
+                Choose an incident
               </option>
               {missions.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -121,8 +117,7 @@ export function HospitalDispatchHandoff({ missions, status, updatedAt, selection
               ))}
             </select>
             <small>
-              {missions.length} {missions.length === 1 ? "handoff" : "handoffs"} · independent of
-              the officer camera selection
+              {missions.length} {missions.length === 1 ? "ambulance" : "ambulances"}
             </small>
           </div>
 
@@ -138,54 +133,46 @@ export function HospitalDispatchHandoff({ missions, status, updatedAt, selection
                 </div>
                 <small>
                   {!fresh
-                    ? `Last reported: ${STAGE_LABELS[mission.status]}. No current authorization is implied.`
+                    ? "Waiting for current status."
                     : authorized
-                      ? "Command-centre operator action, simulation only. Hospital scene-access rules are unchanged."
+                      ? "Command Centre authorized entry."
                       : mission.status === "cancelled"
-                        ? "This simulated mission is no longer active."
-                        : "Arrival is not permission to enter. Wait for an explicit operator action in the demo."}
+                        ? "Mission ended."
+                        : "Wait for Command Centre authorization."}
                 </small>
               </div>
               <ol className={styles.progress} aria-label="Demo ambulance handoff stages">
-                {["En route", "Arrival · HOLD", "Operator authorized · demo"].map(
-                  (label, index) => (
-                    <li
-                      key={label}
-                      data-current={stage === index}
-                      data-complete={stage > index}
-                      aria-current={stage === index ? "step" : undefined}
-                    >
-                      <span aria-hidden="true">{index + 1}</span>
-                      <strong>{label}</strong>
-                    </li>
-                  ),
-                )}
+                {["En route", "Arrived · HOLD", "Entry authorized"].map((label, index) => (
+                  <li
+                    key={label}
+                    data-current={stage === index}
+                    data-complete={stage > index}
+                    aria-current={stage === index ? "step" : undefined}
+                  >
+                    <span aria-hidden="true">{index + 1}</span>
+                    <strong>{label}</strong>
+                  </li>
+                ))}
               </ol>
               <div className={styles.body}>
                 <div className={styles.context}>
                   <div className={styles.routeHeading}>
                     <MapPin size={14} aria-hidden="true" />
-                    <h3>Demo route &amp; staging</h3>
+                    <h3>Route</h3>
                   </div>
                   <div className={styles.route}>
-                    <div>
-                      <span>Fictional origin</span>
+                    <div role="group" aria-label="Origin">
                       <strong>{mission.stationName}</strong>
                       <code>{coordinates(mission.stationPoint)}</code>
                     </div>
                     <ArrowRight size={17} aria-hidden="true" />
-                    <div>
-                      <span>Staging point · hold here</span>
+                    <div role="group" aria-label="Holding location">
                       <strong>{mission.hotspotId}</strong>
                       <code>{coordinates(mission.stagingPoint)}</code>
                     </div>
                   </div>
-                  <p className={styles.routeNote}>
-                    Hotspot: <code>{coordinates(mission.hotspotPoint)}</code> · Simulation timing is
-                    not a real ETA.
-                  </p>
                   <h3 className={styles.timelineHeading}>
-                    <Clock3 size={14} aria-hidden="true" /> Event timestamps
+                    <Clock3 size={14} aria-hidden="true" /> Timeline
                   </h3>
                   <dl className={styles.timestamps}>
                     <div>
@@ -195,19 +182,19 @@ export function HospitalDispatchHandoff({ missions, status, updatedAt, selection
                       </dd>
                     </div>
                     <div>
-                      <dt>Mission update</dt>
+                      <dt>Updated</dt>
                       <dd>
                         <EventTime value={mission.updatedAt} />
                       </dd>
                     </div>
                     <div>
-                      <dt>Operator authorization</dt>
+                      <dt>Authorized</dt>
                       <dd>
                         <EventTime value={mission.engagedAt} empty="Not authorized" />
                       </dd>
                     </div>
                     <div>
-                      <dt>Last handoff sync</dt>
+                      <dt>Last synced</dt>
                       <dd>
                         <EventTime value={updatedAt} />
                       </dd>
@@ -216,25 +203,20 @@ export function HospitalDispatchHandoff({ missions, status, updatedAt, selection
                 </div>
                 <aside className={styles.sample} aria-labelledby={inferenceId}>
                   <InferencePreview titleId={inferenceId} />
-                  <p>
-                    UI preview only — not an observation of this incident or the selected officer.
-                  </p>
+                  <p>Sample context · not linked to this incident or officer.</p>
                 </aside>
               </div>
             </>
           ) : (
             <p className={styles.empty} role="status">
               {selectedId
-                ? "The selected demo handoff is no longer in the current snapshot. Choose an incident to continue; no other incident has been substituted."
-                : "Choose an incident above to inspect its own staging status and context."}
+                ? "Selected ambulance unavailable. Choose another incident."
+                : "Select an incident to view its ambulance."}
             </p>
           )}
         </>
       ) : (
-        <p className={styles.empty}>
-          No demo ambulance handoffs received. Dispatch a simulated ambulance from Command Centre to
-          populate this panel. Existing officer care and scene-access controls are unchanged.
-        </p>
+        <p className={styles.empty}>No handoff received.</p>
       )}
     </section>
   );

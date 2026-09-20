@@ -71,11 +71,6 @@
   border-color: var(--focus);
   color: var(--focus);
 }
-.contextNote {
-  color: var(--muted);
-  font-size: 10px;
-  margin-bottom: 9px;
-}
 .layout {
   display: grid;
   grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.25fr);

@@ -150,7 +150,6 @@ export function AmbulanceSignalBar({
             <p>Awaiting observations for the selected incident.</p>
           </>
         )}
-        <span className={styles.review}>Human review required · AI does not authorize entry</span>
       </aside>
     </section>
   );

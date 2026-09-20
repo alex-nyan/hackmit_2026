@@ -191,7 +191,7 @@ function ViewerSession({
             ? "Interactive body surface. Click a region to select it, or use the region buttons below. Arrow keys rotate, plus or minus zoom, and Home resets."
             : "Interactive anatomy model. Use arrow keys to rotate, plus or minus to zoom, and Home to reset.",
         );
-        renderer.domElement.setAttribute("aria-describedby", helpId);
+        if (!interactive) renderer.domElement.setAttribute("aria-describedby", helpId);
         host!.appendChild(renderer.domElement);
 
         contextLost = (event) => {
@@ -667,16 +667,16 @@ function ViewerSession({
           </div>
         </div>
       )}
-      <p className={styles.help} id={helpId}>
-        {interactive
-          ? "Click body or choose a region · Drag to rotate · Scroll to zoom"
-          : "Drag to rotate · Scroll or pinch to zoom"}
-      </p>
-      <p className={styles.modelNote}>
-        {interactive
-          ? "Approximate surface regions · not a patient scan or diagnosis"
-          : "Generic anatomical representation · not a scan of this person"}
-      </p>
+      {!interactive && (
+        <>
+          <p className={styles.help} id={helpId}>
+            Drag to rotate · Scroll or pinch to zoom
+          </p>
+          <p className={styles.modelNote}>
+            Generic anatomical representation · not a scan of this person
+          </p>
+        </>
+      )}
 
       {annotation && (
         <aside className={styles.annotation}>

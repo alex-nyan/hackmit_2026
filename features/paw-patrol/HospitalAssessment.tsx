@@ -154,10 +154,6 @@ function AssessmentSession({
           </button>
         </div>
       </header>
-      <div className={styles.contextNote}>
-        Officer context is selected separately from the ambulance incident. No patient-to-incident
-        link received.
-      </div>
       <div className={styles.layout}>
         <div className={styles.bodyColumn}>
           <AnatomyViewer

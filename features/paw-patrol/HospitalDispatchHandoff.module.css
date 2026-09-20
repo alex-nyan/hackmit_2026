@@ -24,6 +24,7 @@
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
+  margin-bottom: 14px;
 }
 .eyebrow,
 .connection,
@@ -56,11 +57,6 @@
 }
 .connection[data-fresh="false"] {
   border: 1px solid color-mix(in srgb, #b8792c 55%, var(--handoff-line));
-}
-.disclaimer {
-  margin: 8px 0 18px;
-  color: var(--handoff-muted);
-  font-size: 11px;
 }
 .selection {
   display: grid;
@@ -187,35 +183,24 @@
   grid-template-columns: minmax(0, 1fr) 17px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  margin-top: 10px;
+  margin: 10px 0 16px;
 }
 .route > div {
   min-width: 0;
 }
-.route span,
 .route strong,
 .route code {
   display: block;
-}
-.route span {
-  color: var(--handoff-muted);
-  font-size: 10px;
 }
 .route strong {
   margin: 3px 0;
   font-size: 12px;
 }
-.route code,
-.routeNote code {
+.route code {
   font:
     10px/1.5 ui-monospace,
     monospace;
   overflow-wrap: anywhere;
-}
-.routeNote {
-  margin: 10px 0 16px;
-  color: var(--handoff-muted);
-  font-size: 10px;
 }
 .timestamps {
   margin: 7px 0 0;
