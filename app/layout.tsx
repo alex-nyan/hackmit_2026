@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { BroadcastDock } from "@/features/live-video/BroadcastDock";
+import { WorkspaceNavigationProvider } from "@/features/paw-patrol/WorkspaceLink";
+import { parseWorkspace } from "@/features/paw-patrol/workspace";
+import { readRoster } from "@/features/access/roster";
 import "./globals.css";
 import "./operations.css";
 
@@ -25,7 +28,13 @@ export default function RootLayout({
     // hydrates; that mismatch is not the app's to reconcile.
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        {children}
+        <WorkspaceNavigationProvider
+          dedicatedWorkspace={parseWorkspace(process.env.PAW_PATROL_WORKSPACE)}
+          officerSignIn={readRoster(process.env).length > 0}
+          localDevelopment={process.env.NODE_ENV === "development"}
+        >
+          {children}
+        </WorkspaceNavigationProvider>
         <BroadcastDock />
       </body>
     </html>

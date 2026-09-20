@@ -20,32 +20,31 @@ export function previewBpm(personId: string, second: number) {
 export function HospitalHeartMonitor({
   personId,
   connection,
+  previewTime = 0,
 }: {
   personId: string;
   connection: HeartRateConnection;
+  previewTime?: number;
 }) {
-  const [clock, setClock] = useState({ tick: 0, now: null as number | null });
-  useEffect(() => {
-    const started = Date.now();
-    const interval = setInterval(
-      () =>
-        setClock({
-          tick: Math.floor((Date.now() - started) / 1000),
-          now: Date.now(),
-        }),
-      1000,
-    );
-    return () => clearInterval(interval);
-  }, []);
-
   const preview = connection.mode === "demo";
-  const end = preview
-    ? clock.tick * 1000
-    : (clock.now ?? connection.history.at(-1)?.receivedAt ?? 0);
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    if (preview) return;
+    const update = () => setNow(Date.now());
+    const first = requestAnimationFrame(update);
+    const interval = setInterval(update, 1000);
+    return () => {
+      cancelAnimationFrame(first);
+      clearInterval(interval);
+    };
+  }, [preview]);
+
+  const second = Math.floor(previewTime);
+  const end = preview ? second * 1000 : (now ?? connection.history.at(-1)?.receivedAt ?? 0);
   const samples: HeartRateSample[] = preview
     ? Array.from({ length: 61 }, (_, index) => ({
-        bpm: previewBpm(personId, clock.tick - 60 + index),
-        receivedAt: (clock.tick - 60 + index) * 1000,
+        bpm: previewBpm(personId, second - 60 + index),
+        receivedAt: (second - 60 + index) * 1000,
       }))
     : connection.history.filter(
         (sample) => sample.receivedAt >= end - WINDOW_MS && sample.receivedAt <= end,
@@ -63,7 +62,7 @@ export function HospitalHeartMonitor({
     else last.push(sample);
   }
   const current = preview
-    ? previewBpm(personId, clock.tick)
+    ? previewBpm(personId, second)
     : connection.status === "receiving"
       ? connection.bpm
       : null;

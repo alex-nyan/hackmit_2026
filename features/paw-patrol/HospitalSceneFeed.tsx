@@ -191,33 +191,36 @@ function SceneMedia({
   }
   return (
     <figure className={styles.frame}>
-      <div
-        hidden={!live && failed}
-        onLoadCapture={(event) => recordFrame(event, "loaded")}
-        onErrorCapture={(event) => recordFrame(event, "failed")}
-      >
-        <LiveTile
-          sourceId={sourceId}
-          onLiveChange={setLive}
-          onStateChange={setStreamState}
-          fallbackSrc={
-            frame
-              ? `/api/streams/${encodeURIComponent(sourceId)}/frame?live=${Date.parse(frame.at)}`
-              : undefined
-          }
-          alt={
-            live
-              ? `Live scene camera from ${sourceId}`
-              : `Published scene still from ${sourceId} at ${timestamp ?? "unknown time"} UTC`
-          }
-        />
-      </div>
-      {!live && frame && (!loaded || failed) && (
-        <div className={styles.noFootage}>
-          <VideoOff size={28} />
-          <span>{failed ? "Frame unavailable" : "Loading frame"}</span>
+      <div className={styles.mediaStage}>
+        <div
+          className={styles.mediaContent}
+          hidden={!live && failed}
+          onLoadCapture={(event) => recordFrame(event, "loaded")}
+          onErrorCapture={(event) => recordFrame(event, "failed")}
+        >
+          <LiveTile
+            sourceId={sourceId}
+            onLiveChange={setLive}
+            onStateChange={setStreamState}
+            fallbackSrc={
+              frame
+                ? `/api/streams/${encodeURIComponent(sourceId)}/frame?live=${Date.parse(frame.at)}`
+                : undefined
+            }
+            alt={
+              live
+                ? `Live scene camera from ${sourceId}`
+                : `Published scene still from ${sourceId} at ${timestamp ?? "unknown time"} UTC`
+            }
+          />
         </div>
-      )}
+        {!live && frame && (!loaded || failed) && (
+          <div className={styles.noFootage}>
+            <VideoOff size={28} />
+            <span>{failed ? "Frame unavailable" : "Loading frame"}</span>
+          </div>
+        )}
+      </div>
       <figcaption data-current={live || (fresh && loaded && !failed)}>
         <strong>
           {live

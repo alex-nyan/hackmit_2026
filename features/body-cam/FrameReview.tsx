@@ -22,10 +22,13 @@ function clockOf(atMs: number): string {
  */
 export function FrameReview({ sourceId, onClose }: { sourceId: string; onClose: () => void }) {
   const { frames, status } = useFrameHistory(sourceId);
-  const [index, setIndex] = useState<number | null>(null);
+  const [selectedAt, setSelectedAt] = useState<number | null>(null);
 
-  // Follow the newest frame until the reviewer takes hold of the scrubber.
-  const position = index ?? Math.max(frames.length - 1, 0);
+  // Keep the selected moment when older frames leave the rolling history.
+  // Follow the newest frame only until the reviewer takes hold of the scrubber.
+  const position =
+    selectedAt === null ? Math.max(frames.length - 1, 0) : frames.indexOf(selectedAt);
+  const expired = selectedAt !== null && position === -1;
   const at = frames[position];
 
   return (
@@ -33,12 +36,24 @@ export function FrameReview({ sourceId, onClose }: { sourceId: string; onClose: 
       <div className={styles.reviewHead}>
         <strong>{sourceId}</strong>
         <span className={styles.reviewClock}>
-          {at ? clockOf(at) : status === "loading" ? "Loading…" : "No footage"}
+          {at
+            ? clockOf(at)
+            : expired
+              ? "Selected frame unavailable"
+              : status === "loading"
+                ? "Loading…"
+                : "No footage"}
         </span>
         <button type="button" className={styles.reviewClose} onClick={onClose}>
           Close
         </button>
       </div>
+
+      {status === "unavailable" && (
+        <p className={styles.connecting} role="status">
+          History updates unavailable{at ? " · showing previously received footage" : ""}
+        </p>
+      )}
 
       {at ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -49,20 +64,22 @@ export function FrameReview({ sourceId, onClose }: { sourceId: string; onClose: 
         />
       ) : (
         <p className={styles.empty}>
-          {status === "unavailable"
-            ? "That officer's history could not be read."
-            : "Nothing recorded for this officer yet."}
+          {expired
+            ? "The selected frame expired or was removed. Return to live to view the latest available footage."
+            : status === "unavailable"
+              ? "That officer's history could not be read."
+              : "Nothing recorded for this officer yet."}
         </p>
       )}
 
-      {frames.length > 1 && (
+      {frames.length > 1 && !expired && (
         <input
           className={styles.reviewScrub}
           type="range"
           min={0}
           max={frames.length - 1}
           value={position}
-          onChange={(event) => setIndex(Number(event.target.value))}
+          onChange={(event) => setSelectedAt(frames[Number(event.target.value)] ?? null)}
           aria-label={`Scrub ${sourceId} footage`}
         />
       )}
@@ -72,8 +89,8 @@ export function FrameReview({ sourceId, onClose }: { sourceId: string; onClose: 
           {frames.length} frame{frames.length === 1 ? "" : "s"}
           {frames.length > 0 && ` · ${clockOf(frames[0])} to ${clockOf(frames[frames.length - 1])}`}
         </span>
-        {index !== null && (
-          <button type="button" className={styles.reviewClose} onClick={() => setIndex(null)}>
+        {selectedAt !== null && (
+          <button type="button" className={styles.reviewClose} onClick={() => setSelectedAt(null)}>
             Back to live
           </button>
         )}

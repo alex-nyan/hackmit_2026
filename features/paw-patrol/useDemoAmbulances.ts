@@ -15,10 +15,14 @@ interface Props {
 type AmbulanceState = {
   missions: DemoAmbulanceMission[];
   logs: DemoHotspotLog[];
-  message: string;
+  feedback: {
+    message: string;
+    hotspotId: string | null;
+    missionId: string | null;
+  } | null;
 };
 
-const INITIAL: AmbulanceState = { missions: [], logs: [], message: "" };
+const INITIAL: AmbulanceState = { missions: [], logs: [], feedback: null };
 
 /** Entirely local simulation. Scene entry always requires an explicit operator action. */
 export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props) {
@@ -51,7 +55,7 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
       );
       let changed = false;
       const logs = [...previous.logs];
-      let message = previous.message;
+      let feedback = previous.feedback;
       const missions = previous.missions.map((mission): DemoAmbulanceMission => {
         if (mission.status === "cancelled") return mission;
         if (reset || !liveIds.has(mission.hotspotId)) {
@@ -66,9 +70,13 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
                 : `${mission.stationName}: its selected hotspot was resolved or removed. The simulated mission was cancelled and no further engagement is permitted.`,
             ),
           );
-          message = reset
-            ? "Demo reset cancelled ambulance missions."
-            : "Hotspot resolved. Its demo ambulance mission was cancelled.";
+          feedback = {
+            message: reset
+              ? "Demo reset cancelled ambulance missions."
+              : "Hotspot resolved. Its demo ambulance mission was cancelled.",
+            hotspotId: mission.hotspotId,
+            missionId: mission.id,
+          };
           return {
             ...mission,
             status: "cancelled",
@@ -90,13 +98,17 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
               `${mission.stationName}'s simulated ambulance reached its road staging point. It is holding for an explicit operator engagement decision. Arrival does not imply AI clearance or a safe scene.`,
             ),
           );
-          message = "Demo ambulance staged nearby. Explicit operator engagement is required.";
+          feedback = {
+            message: "Demo ambulance staged nearby. Explicit operator engagement is required.",
+            hotspotId: mission.hotspotId,
+            missionId: mission.id,
+          };
           return { ...mission, status: "staged", updatedAt: new Date().toISOString() };
         }
         return mission;
       });
       previousTime.current = now;
-      return changed ? { missions, logs, message } : previous;
+      return changed ? { missions, logs, feedback } : previous;
     },
     [hotspots, makeLog],
   );
@@ -110,18 +122,25 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
       if (!hotspot) {
         publish({
           ...previous,
-          message: "Select an active hotspot before requesting a demo ambulance.",
+          feedback: {
+            message: "Select an active hotspot before requesting a demo ambulance.",
+            hotspotId,
+            missionId: null,
+          },
         });
         return false;
       }
-      if (
-        previous.missions.some(
-          (mission) => mission.hotspotId === hotspotId && mission.status !== "cancelled",
-        )
-      ) {
+      const existingMission = previous.missions.find(
+        (mission) => mission.hotspotId === hotspotId && mission.status !== "cancelled",
+      );
+      if (existingMission) {
         publish({
           ...previous,
-          message: "This hotspot already has an active demo ambulance mission.",
+          feedback: {
+            message: "This hotspot already has an active demo ambulance mission.",
+            hotspotId,
+            missionId: existingMission.id,
+          },
         });
         return false;
       }
@@ -130,7 +149,10 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
         .map((mission) => mission.stationName);
       const { plan, reason } = planDemoAmbulance(hotspot.point, busy);
       if (!plan) {
-        publish({ ...previous, message: reason });
+        publish({
+          ...previous,
+          feedback: { message: reason, hotspotId, missionId: null },
+        });
         return false;
       }
       const at = new Date().toISOString();
@@ -155,7 +177,11 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
             `Operator requested a simulated ambulance from ${plan.stationName} for the explicitly selected hotspot. It follows supplied road geometry on an accelerated ${Math.round(plan.duration)}-second demo journey, not a real ETA. It will hold nearby until the operator engages medics. No real ambulance was dispatched.`,
           ),
         ],
-        message: `Demo ambulance responding from ${plan.stationName}. Accelerated journey; it will hold nearby.`,
+        feedback: {
+          message: `Demo ambulance responding from ${plan.stationName}. Accelerated journey; it will hold nearby.`,
+          hotspotId,
+          missionId: mission.id,
+        },
       });
       return true;
     },
@@ -170,7 +196,11 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
       if (!mission || mission.status !== "staged") {
         publish({
           ...previous,
-          message: "Only a staged demo ambulance at an active hotspot can be engaged.",
+          feedback: {
+            message: "Only a staged demo ambulance at an active hotspot can be engaged.",
+            hotspotId: mission?.hotspotId ?? null,
+            missionId,
+          },
         });
         return false;
       }
@@ -189,7 +219,11 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
             `The operator explicitly engaged the staged simulated team from ${mission.stationName} for this hotspot. This is a local demonstration, not AI scene clearance, a clinical assessment, or a real EMS command.`,
           ),
         ],
-        message: "Demo medics engaged by explicit operator action.",
+        feedback: {
+          message: "Demo medics engaged by explicit operator action.",
+          hotspotId: mission.hotspotId,
+          missionId,
+        },
       });
       return true;
     },
@@ -204,7 +238,12 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
       if (!mission || mission.status !== "engaged") {
         publish({
           ...previous,
-          message: "Only an engaged demo team at an active hotspot can receive this STOP command.",
+          feedback: {
+            message:
+              "Only an engaged demo team at an active hotspot can receive this STOP command.",
+            hotspotId: mission?.hotspotId ?? null,
+            missionId,
+          },
         });
         return false;
       }
@@ -223,7 +262,11 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
             `The operator revoked engagement for the simulated team from ${mission.stationName} at this hotspot. The team is holding at its demo staging point and needs a new explicit authorization before engagement. No real crew was contacted.`,
           ),
         ],
-        message: `STOP sent to the demo team for ${mission.hotspotId}. New authorization is required to engage.`,
+        feedback: {
+          message: `STOP sent to the demo team for ${mission.hotspotId}. New authorization is required to engage.`,
+          hotspotId: mission.hotspotId,
+          missionId,
+        },
       });
       return true;
     },
@@ -246,7 +289,8 @@ export function useDemoAmbulances({ hotspots, time, readClock, enabled }: Props)
     dispatchAmbulance,
     engageMedics,
     holdMedics,
-    message: state.message,
+    message: state.feedback?.message ?? "",
+    feedback: state.feedback,
     sampleAmbulance: sampleDemoAmbulance,
   };
 }

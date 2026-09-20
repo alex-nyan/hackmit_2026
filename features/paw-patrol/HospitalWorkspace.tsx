@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import type { HeartRateConnection } from "../heart-rate/useHeartRate";
+import { bodySourceIds } from "../anatomy/bodyEvidence";
 import { PEOPLE, type Person } from "./scenario";
 import { byNewest, type IncidentEvent } from "./incidents";
 import { BusIndicator, SharedTimeline } from "./Provenance";
@@ -61,6 +62,7 @@ export function HospitalWorkspace({
   events,
   busStatus,
   media,
+  time = 0,
   running,
   onPlay,
   onPause,
@@ -76,6 +78,7 @@ export function HospitalWorkspace({
   events: IncidentEvent[];
   busStatus: BusStatus;
   media?: OfficerMediaInput | null;
+  time?: number;
   running: boolean;
   onPlay: () => void;
   onPause: () => void;
@@ -97,8 +100,14 @@ export function HospitalWorkspace({
     : access.label === "Hold · Scene unsafe"
       ? "Reported unsafe"
       : "Unconfirmed";
+  const audioSources = bodySourceIds(person.id);
   const audio = events
-    .filter((event) => event.kind === "transcript" && event.personId === person.id)
+    .filter(
+      (event) =>
+        event.kind === "transcript" &&
+        event.personId !== null &&
+        audioSources.includes(event.personId),
+    )
     .sort(byNewest)[0];
   const connected = ["waiting", "receiving", "stale"].includes(heartRate.status);
   const busy = ["requesting", "connecting"].includes(heartRate.status);
@@ -162,6 +171,7 @@ export function HospitalWorkspace({
         person={person}
         onSelect={onSelect}
         heartRate={heartRate}
+        previewTime={time}
         session={session}
         events={events}
         busStatus={busStatus}
@@ -279,6 +289,9 @@ export function HospitalWorkspace({
             {audio ? (
               <>
                 <p>Machine transcript · unverified</p>
+                {audio.personId !== person.id && (
+                  <p>{audio.personId} · unit-slot link · wearer unverified</p>
+                )}
                 <p>{audio.detail}</p>
                 <time dateTime={audio.at}>
                   {new Date(audio.at).toLocaleTimeString()} · {audio.source}

@@ -26,7 +26,7 @@ export function useFrameHistory(sourceId: string) {
       try {
         const response = await fetch(`/api/streams/${encodeURIComponent(sourceId)}/history`, {
           cache: "no-store",
-          signal: inFlight.signal,
+          signal: AbortSignal.any([inFlight.signal, AbortSignal.timeout(10_000)]),
         });
         if (!response.ok) throw new Error(String(response.status));
         const body = (await response.json()) as { frames?: unknown };

@@ -272,6 +272,7 @@ export function OperationsMap(props: OperationsMapProps) {
         loading();
         const mapboxgl = await loadMapbox();
         if (disposed || !containerRef.current) return;
+        currentTheme = latestRef.current.theme;
         if (!mapboxgl.supported()) {
           fail(
             "WebGL is unavailable. Enable hardware acceleration or use another browser. The officer list remains available.",

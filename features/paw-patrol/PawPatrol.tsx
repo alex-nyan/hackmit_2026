@@ -76,7 +76,7 @@ import {
 const EMPTY_DEVICES: LiveDevice[] = [];
 
 const VIEW_NAMES: Record<View, string> = {
-  command: "Command",
+  command: "Command centre",
   officer: "Officer",
   hospital: "Hospital",
 };
@@ -395,12 +395,12 @@ export function PawPatrol({
     setView("officer");
   }
   function selectCommandOfficer(id: string) {
+    setSelectedId(id);
     const live = liveOfficer(id, liveDevices);
     if (live) {
       handleFocusDevice(live);
       return;
     }
-    setSelectedId(id);
     setFollowing(true);
     setRecenterKey((key) => key + 1);
   }
@@ -686,7 +686,7 @@ export function PawPatrol({
             <OfficerIncidentBriefing
               events={bus.events}
               busStatus={bus.status}
-              personId={person.id}
+              personId={officer?.id ?? person.id}
               demo={demo}
               onLocate={(id) => {
                 const unit = vehicleAt(id, readClock().time);
@@ -1007,6 +1007,7 @@ export function PawPatrol({
 
         {view === "hospital" && (
           <HospitalWorkspace
+            time={time}
             theme={theme}
             onToggleTheme={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
             person={person}

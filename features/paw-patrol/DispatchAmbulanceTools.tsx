@@ -22,9 +22,13 @@ export function DispatchAmbulanceTools({
 }) {
   const [open, setOpen] = useState(false);
   const [confirmEngagement, setConfirmEngagement] = useState(false);
-  const [feedbackTarget, setFeedbackTarget] = useState<string | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const incidentSelect = useRef<HTMLSelectElement>(null);
+  const keepHoldingButton = useRef<HTMLButtonElement>(null);
+  const missionAction = useRef<HTMLButtonElement>(null);
+  const pendingFocus = useRef<"confirmation" | "action" | null>(null);
   const active = hotspots.filter((item) => item.resolvedAt === null);
   const target = active.find((item) => item.id === selectedId);
   const mission = ambulance.missions.find(
@@ -38,7 +42,16 @@ export function DispatchAmbulanceTools({
     if (open && !dialog.current?.open) dialog.current?.showModal();
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !pendingFocus.current) return;
+    const next =
+      pendingFocus.current === "confirmation" ? keepHoldingButton.current : missionAction.current;
+    pendingFocus.current = null;
+    (next ?? incidentSelect.current ?? closeButton.current)?.focus();
+  });
+
   function close() {
+    pendingFocus.current = null;
     dialog.current?.close();
     setOpen(false);
     setConfirmEngagement(false);
@@ -54,7 +67,6 @@ export function DispatchAmbulanceTools({
         onClick={() => {
           if (!target && active.length === 1) onSelect(active[0].id);
           setConfirmEngagement(false);
-          setFeedbackTarget(null);
           setOpen(true);
         }}
       >
@@ -81,7 +93,7 @@ export function DispatchAmbulanceTools({
           <div className={styles.content}>
             <header>
               <span className={styles.eyebrow}>SIMULATED MEDICAL RESPONSE</span>
-              <button aria-label="Close ambulance controls" onClick={close}>
+              <button ref={closeButton} aria-label="Close ambulance controls" onClick={close}>
                 <X size={18} />
               </button>
             </header>
@@ -91,6 +103,7 @@ export function DispatchAmbulanceTools({
                 <label className={styles.selectLabel}>
                   Incident flag
                   <select
+                    ref={incidentSelect}
                     value={target?.id ?? ""}
                     onChange={(event) => {
                       onSelect(event.target.value);
@@ -149,13 +162,19 @@ export function DispatchAmbulanceTools({
                               to engage. Model observations cannot authorize entry.
                             </p>
                             <div className={styles.actions}>
-                              <button onClick={() => setConfirmEngagement(false)}>
+                              <button
+                                ref={keepHoldingButton}
+                                onClick={() => {
+                                  pendingFocus.current = "action";
+                                  setConfirmEngagement(false);
+                                }}
+                              >
                                 Keep holding
                               </button>
                               <button
                                 className={styles.primary}
                                 onClick={() => {
-                                  setFeedbackTarget(mission.hotspotId);
+                                  pendingFocus.current = "action";
                                   ambulance.engageMedics(mission.id);
                                   setConfirmEngagement(false);
                                 }}
@@ -166,8 +185,12 @@ export function DispatchAmbulanceTools({
                           </div>
                         ) : (
                           <button
+                            ref={missionAction}
                             className={styles.primary}
-                            onClick={() => setConfirmEngagement(true)}
+                            onClick={() => {
+                              pendingFocus.current = "confirmation";
+                              setConfirmEngagement(true);
+                            }}
                           >
                             Authorize medic engagement <ArrowRight size={15} />
                           </button>
@@ -181,9 +204,10 @@ export function DispatchAmbulanceTools({
                           receives this demo handoff; no real crew is contacted.
                         </p>
                         <button
+                          ref={missionAction}
                           className={styles.primary}
                           onClick={() => {
-                            setFeedbackTarget(mission.hotspotId);
+                            pendingFocus.current = "action";
                             ambulance.holdMedics(mission.id);
                             setConfirmEngagement(false);
                           }}
@@ -209,7 +233,6 @@ export function DispatchAmbulanceTools({
                       disabled={!target}
                       onClick={() => {
                         if (target) {
-                          setFeedbackTarget(target.id);
                           ambulance.dispatchAmbulance(target.id);
                         }
                       }}
@@ -223,7 +246,11 @@ export function DispatchAmbulanceTools({
               <p>Place a hotspot flag on the map first.</p>
             )}
             <p role="status" className={styles.message}>
-              {feedbackTarget === target?.id ? ambulance.message : ""}
+              {target &&
+              ambulance.feedback?.hotspotId === target.id &&
+              ambulance.feedback.missionId === (mission?.id ?? null)
+                ? ambulance.feedback.message
+                : ""}
             </p>
             <footer>Demo only · not a real dispatch or scene clearance.</footer>
           </div>

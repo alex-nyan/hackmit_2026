@@ -33,6 +33,7 @@ import { PEOPLE, personStatus, sampleHeartRate, stamp, type Person, type View } 
 import { vehicleAt } from "./vehicles/vehicleMotion";
 import type { Workspace } from "./workspace";
 import { MapFullscreenButton } from "./MapFullscreenButton";
+import { WorkspaceNav, WORKSPACE_NAV_LABELS } from "./WorkspaceNav";
 import styles from "./OfficerDashboard.module.css";
 
 export interface OfficerDashboardProps {
@@ -55,68 +56,6 @@ export interface OfficerDashboardProps {
   trackingPanel: ReactNode;
   phoneConnected: boolean;
   incidentPanel: (demo: boolean) => ReactNode;
-}
-
-function WorkspaceSwitcher({ onViewChange }: Pick<OfficerDashboardProps, "onViewChange">) {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
-  const id = useId();
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false);
-    };
-    const escape = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        button.current?.focus();
-      }
-    };
-    document.addEventListener("pointerdown", closeOutside);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOutside);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [open]);
-  return (
-    <div className={styles.switcher} ref={root}>
-      <button
-        className={styles.glassControl}
-        ref={button}
-        type="button"
-        aria-expanded={open}
-        aria-controls={id}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Shield size={14} aria-hidden="true" /> Officer <ChevronDown size={14} aria-hidden="true" />
-      </button>
-      {open && (
-        <nav id={id} className={styles.workspaceChoices} aria-label="Switch workspace">
-          {(
-            [
-              ["command", "Command centre"],
-              ["officer", "Officer"],
-              ["hospital", "Medic"],
-            ] as const
-          ).map(([view, label]) => (
-            <button
-              type="button"
-              key={view}
-              aria-current={view === "officer" ? "page" : undefined}
-              onClick={() => {
-                setOpen(false);
-                onViewChange(view);
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-      )}
-    </div>
-  );
 }
 
 function OfficerAvatar({ person }: { person: Person }) {
@@ -254,14 +193,12 @@ export function OfficerDashboard({
           </span>
           <strong>Paw Patrol</strong>
         </Link>
-        {workspace ? (
-          <span className={styles.pinned}>
-            <Shield size={13} aria-hidden="true" />
-            Officer
-          </span>
-        ) : (
-          <WorkspaceSwitcher onViewChange={onViewChange} />
-        )}
+        <WorkspaceNav
+          view="officer"
+          labels={WORKSPACE_NAV_LABELS}
+          pinnedLabel={workspace ? WORKSPACE_NAV_LABELS.officer : null}
+          onSelect={onViewChange}
+        />
         {officer ? (
           <form action="/api/sign-in" method="post" className={styles.account}>
             <span>

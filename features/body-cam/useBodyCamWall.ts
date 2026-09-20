@@ -34,7 +34,7 @@ export function useBodyCamWall() {
       try {
         const response = await fetch(ENDPOINT, {
           cache: "no-store",
-          signal: inFlight.signal,
+          signal: AbortSignal.any([inFlight.signal, AbortSignal.timeout(10_000)]),
         });
         if (!response.ok) throw new Error(String(response.status));
         const body = (await response.json()) as { frames?: unknown };

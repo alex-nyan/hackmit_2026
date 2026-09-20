@@ -85,12 +85,13 @@ export function CapturePanel({
   const { watchers } = useLivePublisher(sourceId, stream);
   const liveTrack = useLiveTrack(true);
   const position = useDevicePosition(sourceId, displayName ?? sourceId);
+  const { start: startPosition, stop: stopPosition } = position;
   const [locationMode, setLocationMode] = useState<"this-device" | "paired-phone">("this-device");
   useEffect(() => {
-    const release = () => position.stop();
+    const release = () => stopPosition();
     window.addEventListener("pagehide", release);
     return () => window.removeEventListener("pagehide", release);
-  }, [position.stop]);
+  }, [stopPosition]);
   const audio = useAudioTranscription(
     sourceId,
     (result) => {
@@ -127,6 +128,7 @@ export function CapturePanel({
       },
     },
   );
+  const { start: startAudio } = audio;
   const running = state.state === "running";
   const busy = discovering || running || state.state === "requesting-camera";
   const listening =
@@ -229,14 +231,14 @@ export function CapturePanel({
     try {
       const chosen = await resolveDevices({ microphone: true });
       if (audioAttempt.current !== attempt) return;
-      await audio.start(chosen.microphoneId);
+      await startAudio(chosen.microphoneId);
     } finally {
       if (audioAttempt.current === attempt) {
         audioAttempt.current = null;
         setAudioDiscovering(false);
       }
     }
-  }, [resolveDevices, audio.start]);
+  }, [resolveDevices, startAudio]);
 
   const startCamera = useCallback(async () => {
     if (startAttempt.current) return;
@@ -249,7 +251,7 @@ export function CapturePanel({
       if (startAttempt.current !== attempt) return;
       const opened = await start(chosen.cameraId);
       if (!opened || startAttempt.current !== attempt) return;
-      if (locationMode === "this-device") position.start();
+      if (locationMode === "this-device") startPosition();
       // Let Continuity finish opening video before acquiring its microphone.
       void startListening();
     } finally {
@@ -258,7 +260,7 @@ export function CapturePanel({
         setDiscovering(false);
       }
     }
-  }, [resolveDevices, start, startListening, locationMode, position.start]);
+  }, [resolveDevices, start, startListening, locationMode, startPosition]);
 
   useEffect(() => {
     if (!autoStart || startedAutomatically.current) return;
@@ -537,7 +539,6 @@ function PhoneLocationPairing({
     url.searchParams.set("name", displayName);
     const next = url.toString();
     let cancelled = false;
-    setLink(next);
 
     void QRCode.toString(next, {
       type: "svg",
@@ -546,10 +547,16 @@ function PhoneLocationPairing({
       color: { dark: "#0d1216ff", light: "#ffffffff" },
     })
       .then((svg) => {
-        if (!cancelled) setQrSvg(svg);
+        if (!cancelled) {
+          setLink(next);
+          setQrSvg(svg);
+        }
       })
       .catch(() => {
-        if (!cancelled) setQrSvg(null);
+        if (!cancelled) {
+          setLink(next);
+          setQrSvg(null);
+        }
       });
 
     return () => {

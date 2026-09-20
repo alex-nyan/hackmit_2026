@@ -43,6 +43,7 @@ interface Props {
   person: Person;
   onSelect: (id: string) => void;
   heartRate: HeartRateConnection;
+  previewTime?: number;
   session: number;
   events: IncidentEvent[];
   busStatus: BusStatus;
@@ -59,6 +60,7 @@ function AssessmentSession({
   person,
   onSelect,
   heartRate,
+  previewTime,
   events,
   busStatus,
   media,
@@ -177,7 +179,11 @@ function AssessmentSession({
           <div className={styles.telemetry}>
             <HospitalSceneFeed personId={person.id} media={media} />
             <div className={`${styles.vitals} ${hospitalStyles.assessmentVitals}`}>
-              <HospitalHeartMonitor personId={person.id} connection={heartRate} />
+              <HospitalHeartMonitor
+                personId={person.id}
+                connection={heartRate}
+                previewTime={previewTime}
+              />
               <p>
                 <Activity size={13} />
                 {heartRate.mode === "demo" ? "Simulated vitals" : "Received sensor values"} · not an

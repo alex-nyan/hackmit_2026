@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
   Activity,
   ChevronDown,
-  HeartPulse,
   Moon,
   Pause,
   Play,
@@ -36,6 +35,7 @@ import { InferencePreview } from "./InferencePreview";
 import { DispatchAmbulanceTools } from "./DispatchAmbulanceTools";
 import type { useDemoAmbulances } from "./useDemoAmbulances";
 import { MapFullscreenButton } from "./MapFullscreenButton";
+import { WorkspaceNav, WORKSPACE_NAV_LABELS } from "./WorkspaceNav";
 import styles from "./DispatchDashboard.module.css";
 
 interface Props {
@@ -176,80 +176,6 @@ function OfficerAvatar({ id, initials }: { id: string; initials: string }) {
         />
       )}
     </span>
-  );
-}
-
-function WorkspaceSwitcher({ onViewChange }: { onViewChange: (view: View) => void }) {
-  const [open, setOpen] = useState(false);
-  const container = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const choicesId = useId();
-
-  useEffect(() => {
-    if (!open) return;
-    function closeOutside(event: PointerEvent) {
-      if (event.target instanceof Node && !container.current?.contains(event.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("pointerdown", closeOutside);
-    return () => document.removeEventListener("pointerdown", closeOutside);
-  }, [open]);
-
-  return (
-    <div
-      ref={container}
-      className={styles.switcher}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && open) {
-          event.preventDefault();
-          setOpen(false);
-          trigger.current?.focus();
-        }
-      }}
-    >
-      <button
-        ref={trigger}
-        type="button"
-        className={styles.switcherTrigger}
-        aria-expanded={open}
-        aria-controls={choicesId}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Radio size={14} aria-hidden="true" />
-        Command centre
-        <ChevronDown size={14} aria-hidden="true" />
-      </button>
-      {open && (
-        <div id={choicesId} className={styles.workspaceChoices}>
-          <span className={styles.switcherLabel}>Switch workspace</span>
-          {(
-            [
-              ["command", "Command centre", Radio],
-              ["officer", "Officer", Shield],
-              ["hospital", "Medic", HeartPulse],
-            ] as const
-          ).map(([view, label, Icon]) => (
-            <button
-              key={view}
-              type="button"
-              aria-current={view === "command" ? "page" : undefined}
-              onClick={() => {
-                setOpen(false);
-                onViewChange(view);
-              }}
-            >
-              <Icon size={16} aria-hidden="true" />
-              <span>{label}</span>
-              {view === "command" && <span className={styles.currentWorkspace}>Current</span>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -412,15 +338,12 @@ export function DispatchDashboard({
           <span className={styles.divider}>/</span>
           <span>Command desk</span>
         </Link>
-        <nav aria-label="Workspace" className={styles.navigation}>
-          {workspace ? (
-            <span aria-current="page">
-              <Radio size={14} aria-hidden="true" /> Command centre
-            </span>
-          ) : (
-            <WorkspaceSwitcher onViewChange={onViewChange} />
-          )}
-        </nav>
+        <WorkspaceNav
+          view="command"
+          labels={WORKSPACE_NAV_LABELS}
+          pinnedLabel={workspace ? WORKSPACE_NAV_LABELS.command : null}
+          onSelect={onViewChange}
+        />
         <Link href="/sign-in" className={styles.accountLink}>
           Officer sign-in
         </Link>
