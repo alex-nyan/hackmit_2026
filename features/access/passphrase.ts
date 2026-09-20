@@ -17,7 +17,14 @@ export const COOKIE_NAME = "paw-patrol-access";
 export const COOKIE_MAX_AGE_SECONDS = 12 * 60 * 60;
 
 /** Paths that must stay reachable, or the gate would lock out its own form. */
-const ALWAYS_OPEN = ["/unlock", "/api/unlock", "/sign-in", "/api/sign-in"];
+const ALWAYS_OPEN = [
+  "/unlock",
+  "/api/unlock",
+  "/sign-in",
+  "/api/sign-in",
+  "/control",
+  "/api/instances",
+];
 
 export function isOpenPath(pathname: string): boolean {
   return ALWAYS_OPEN.some((open) => pathname === open || pathname.startsWith(`${open}/`));

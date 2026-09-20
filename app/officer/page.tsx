@@ -1,3 +1,4 @@
+import { SharedWorkspace } from "@/features/officer-instance/SharedWorkspace";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -20,6 +21,8 @@ export const metadata: Metadata = {
 export default async function OfficerWorkspace() {
   // Read at request time: a server dedicated to another role serves nothing here.
   await connection();
+  if (process.env.PAW_PATROL_BROADCAST_ENABLED !== "false")
+    return <SharedWorkspace role="officer" />;
   if (pinnedElsewhere("officer", process.env.PAW_PATROL_WORKSPACE)) notFound();
   return <PawPatrol workspace="officer" />;
 }

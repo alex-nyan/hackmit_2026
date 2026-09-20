@@ -22,7 +22,7 @@ export function HospitalHeartMonitor({
   connection,
 }: {
   personId: string;
-  connection: HeartRateConnection;
+  connection: Pick<HeartRateConnection, "mode" | "status" | "history" | "bpm">;
 }) {
   const [clock, setClock] = useState({ tick: 0, now: null as number | null });
   useEffect(() => {

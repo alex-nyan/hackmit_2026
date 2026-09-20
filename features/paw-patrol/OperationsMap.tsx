@@ -40,6 +40,7 @@ export interface OperationsMapProps {
   /** Bumped to fly to a tracked unit, so repeat clicks still move the camera. */
   fixRequest: { longitude: number; latitude: number; nonce: number } | null;
   onBuildingSelect: (building: BuildingFacts | null) => void;
+  onLiveDeviceSelect?: (id: string) => void;
 }
 /** The pulsing ground light under a unit. Green for officers, red for reports. */
 type BeaconMarker = { marker: Marker; element: HTMLDivElement };
@@ -420,6 +421,15 @@ export function OperationsMap(props: OperationsMapProps) {
         // race the way separate layer and map handlers would. A patrol vehicle
         // always wins the pixel it shares with the building behind it.
         const click = (event: MapMouseEvent) => {
+          const live = latestRef.current.liveDevices.find((device) => {
+            if (!device.fix) return false;
+            const point = map.project([device.fix.longitude, device.fix.latitude]);
+            return Math.hypot(point.x - event.point.x, point.y - event.point.y) < 18;
+          });
+          if (live && latestRef.current.onLiveDeviceSelect) {
+            latestRef.current.onLiveDeviceSelect(live.id);
+            return;
+          }
           const id = nearestUnit(event);
           if (id) {
             latestRef.current.onSelect(id);
