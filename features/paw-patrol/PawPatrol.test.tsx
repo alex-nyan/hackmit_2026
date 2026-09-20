@@ -50,13 +50,13 @@ describe("workspace entry points", () => {
     const nav = within(ui.getByRole("navigation", { name: "Workspace" }));
     expect(nav.getAllByRole("button")).toHaveLength(3);
     fireEvent.click(nav.getByRole("button", { name: "Officer" }));
-    expect(ui.getByRole("heading", { level: 1 }).textContent).toBe("Never out there alone.");
+    expect(ui.getByRole("heading", { level: 1 }).textContent).toBe("Officer workspace");
     fireEvent.click(nav.getByRole("button", { name: "Hospital" }));
     expect(ui.getByRole("heading", { level: 1 }).textContent).toBe("Ready before arrival.");
   });
 
   it.each([
-    ["officer", "Officer", "Never out there alone."],
+    ["officer", "Officer", "Officer workspace"],
     ["hospital", "Hospital", "Ready before arrival."],
   ] as const)(
     "opens the fixed %s workspace without role switching controls",
@@ -75,6 +75,24 @@ describe("workspace entry points", () => {
     },
   );
 
+  it("keeps officer selection and map controls while removing the overview panels", () => {
+    const ui = render(<PawPatrol workspace="officer" />);
+    expect(ui.queryByText("Body viewer")).toBeNull();
+    expect(ui.queryByRole("heading", { name: "Heart rate" })).toBeNull();
+    expect(ui.queryByText("INCIDENT RESPONSE UNITS")).toBeNull();
+    expect(ui.queryByText(/Synthetic people and signals/)).toBeNull();
+    fireEvent.change(ui.getByLabelText("Selected person"), { target: { value: "P-03" } });
+    expect(ui.getByTestId("map-selection").textContent).toBe("P-03");
+    fireEvent.click(ui.getByRole("button", { name: "Follow P-03" }));
+    expect(ui.getByRole("button", { name: "Stop following" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    fireEvent.click(ui.getByRole("button", { name: "Camera" }));
+    expect(ui.getByRole("heading", { name: "Camera & audio" })).toBeTruthy();
+    fireEvent.click(ui.getByRole("button", { name: "Close camera" }));
+    expect(ui.queryByRole("heading", { name: "Camera & audio" })).toBeNull();
+  });
+
   it("keeps unit selection in dispatch without changing the workspace", () => {
     const ui = render(<PawPatrol workspace="dispatch" />);
     const nav = ui.getByRole("navigation", { name: "Workspace" });
@@ -85,7 +103,7 @@ describe("workspace entry points", () => {
     fireEvent.click(ui.getByRole("button", { name: new RegExp(`${PEOPLE[1].name}.*P-02`) }));
     expect(ui.getByTestId("map-selection").textContent).toBe("P-02");
     expect(ui.getByRole("heading", { name: "On the ground" })).toBeTruthy();
-    expect(ui.queryByRole("heading", { name: "Never out there alone." })).toBeNull();
+    expect(ui.queryByRole("heading", { name: "Officer workspace" })).toBeNull();
   });
 });
 
@@ -103,14 +121,14 @@ describe("existing workspace integrations", () => {
 
   it("publishes officer camera and audio reports with the selected identity and provenance", () => {
     const ui = render(<PawPatrol workspace="officer" />);
-    expect(ui.getByRole("heading", { name: "Body camera · live" })).toBeTruthy();
+    fireEvent.click(ui.getByRole("button", { name: "Camera" }));
+    expect(ui.getByRole("heading", { name: "Camera & audio" })).toBeTruthy();
     expect(ui.getByTestId("capture-source").textContent).toBe("officer-P-01");
     expect(bus.publish).not.toHaveBeenCalled();
 
     fireEvent.change(ui.getByRole("combobox", { name: /^Selected person$/ }), {
       target: { value: "P-02" },
     });
-    fireEvent.click(ui.getByRole("button", { name: /Next stage/ }));
     expect(ui.getByTestId("capture-source").textContent).toBe("officer-P-02");
 
     const capture = vi.mocked(CapturePanel).mock.calls.at(-1)![0];
@@ -125,7 +143,7 @@ describe("existing workspace integrations", () => {
         kind: "hazard",
         origin: "model",
         personId: "P-02",
-        scenarioAt: 15,
+        scenarioAt: 0,
         title: "Possible weapon · unverified · P-02",
         source: "Officer body camera",
         provenance: { provider: "ultralytics", model: "yolo26n", confidence: 0.75 },
@@ -138,7 +156,7 @@ describe("existing workspace integrations", () => {
         kind: "transcript",
         origin: "model",
         personId: "P-02",
-        scenarioAt: 15,
+        scenarioAt: 0,
         detail: expect.stringContaining("model hypothesis"),
         provenance: { provider: "faster_whisper", model: "whisper", confidence: 0.98 },
         requiresHumanReview: true,
@@ -146,7 +164,7 @@ describe("existing workspace integrations", () => {
     );
   });
 
-  it.each(["dispatch", "officer", "hospital"] as const)(
+  it.each(["dispatch", "hospital"] as const)(
     "retains shared incident provenance in the %s workspace",
     (workspace) => {
       bus.events = [
@@ -178,7 +196,7 @@ describe("existing workspace integrations", () => {
   );
 
   it("keeps manual assistance publication and shared-log reset working", () => {
-    const ui = render(<PawPatrol workspace="officer" />);
+    const ui = render(<PawPatrol workspace="dispatch" />);
     fireEvent.click(ui.getByRole("button", { name: "Demo panic · P-01" }));
 
     expect(bus.publish).toHaveBeenCalledWith(

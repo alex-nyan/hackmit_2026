@@ -1,9 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { clampTime, DURATION, nextTime } from "./scenario";
+import { clampTime, nextTime } from "./scenario";
 import {
   isPersonId,
-  sceneAt,
   type SceneReport,
   type SceneStatus,
   type PanicReport,
@@ -30,19 +29,12 @@ export const initialDemo: DemoState = {
   audit: [],
 };
 function advance(state: DemoState, target: number): DemoState {
-  // A clock jump may not bypass staging. Default playback contains a distinct,
-  // explicitly scripted command clearance at 00:56; manual reports override it.
-  const blocked =
-    state.time < 60 && target >= 60 && sceneAt(target, state.sceneOverride).status !== "cleared";
-  const time = blocked ? Math.max(state.time, 59) : clampTime(target);
-  return { ...state, time, running: state.running && !blocked && time < DURATION };
+  return { ...state, time: clampTime(target) };
 }
 export function demoReducer(state: DemoState, action: DemoAction): DemoState {
   switch (action.type) {
     case "play":
-      return state.time === DURATION
-        ? { ...initialDemo, running: true }
-        : { ...state, running: true };
+      return { ...state, running: true };
     case "pause":
       return { ...state, running: false };
     case "reset":
@@ -56,8 +48,6 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
       return advance(state, state.time + action.delta);
     }
     case "scene": {
-      // Once transport has departed, preserve that historical clearance.
-      if (state.time >= 60 || (action.status === "cleared" && state.time < 15)) return state;
       const sceneOverride: SceneReport = {
         status: action.status,
         at: state.time,
@@ -82,11 +72,7 @@ export function demoReducer(state: DemoState, action: DemoAction): DemoState {
       };
     }
     case "panic": {
-      if (
-        !isPersonId(action.personId) ||
-        state.time >= 60 ||
-        state.panics.some((p) => p.personId === action.personId)
-      )
+      if (!isPersonId(action.personId) || state.panics.some((p) => p.personId === action.personId))
         return state;
       // An assistance request is not a timeline seek. Preserve the current
       // positions rather than jumping every unit to the scripted threat stage.

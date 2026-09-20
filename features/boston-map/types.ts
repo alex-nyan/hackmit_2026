@@ -5,8 +5,8 @@ export type MapStatus = "loading" | "ready" | "error" | "missing-token";
 export const MAP_FOCUS = {
   all: {
     label: "All Boston",
-    center: [-71.092, 42.3615] as [number, number],
-    zoom: 12.7,
+    center: [-71.077, 42.3505] as [number, number],
+    zoom: 13.1,
   },
   mit: {
     label: "MIT",

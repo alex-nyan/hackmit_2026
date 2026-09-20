@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useHeartRate } from "../heart-rate/useHeartRate";
 import { PawPatrol } from "./PawPatrol";
+import { MistHandoff } from "./ConsultPanels";
+import { sceneAt } from "./consult";
 import { PEOPLE, sampleHeartRate } from "./scenario";
 import { useIncidentBus } from "./useIncidentBus";
 
@@ -74,13 +76,23 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+function renderWorkspace(workspace: "dispatch" | "officer" | "hospital") {
+  const ui = render(<PawPatrol workspace={workspace} />);
+  if (workspace === "officer") {
+    expect(ui.queryByLabelText("Selected person heart rate")).toBeNull();
+    expect(ui.queryByRole("button", { name: /connect heart rate/i })).toBeNull();
+    fireEvent.click(ui.getByRole("button", { name: "Devices" }));
+  }
+  return ui;
+}
+
 describe("dashboard heart-rate integration", () => {
   it.each(["dispatch", "officer", "hospital"] as const)(
     "offers an explicit local connection in the %s workspace",
     (workspace) => {
       const feed = heartRate();
       mockUseHeartRate.mockReturnValue(feed);
-      const ui = render(<PawPatrol workspace={workspace} />);
+      const ui = renderWorkspace(workspace);
 
       expect(feed.connect).not.toHaveBeenCalled();
       fireEvent.click(ui.getByRole("button", { name: /connect heart rate/i }));
@@ -100,7 +112,7 @@ describe("dashboard heart-rate integration", () => {
     "replaces the %s selected-person reading with the received BPM without publishing it",
     (workspace) => {
       mockUseHeartRate.mockReturnValue(receiving());
-      const ui = render(<PawPatrol workspace={workspace} />);
+      const ui = renderWorkspace(workspace);
       const reading = within(ui.getByLabelText("Selected person heart rate"));
 
       expect(reading.getByText("123")).toBeTruthy();
@@ -119,11 +131,11 @@ describe("dashboard heart-rate integration", () => {
     "shows received history instead of an invented trend in %s",
     (workspace) => {
       mockUseHeartRate.mockReturnValue(receiving());
-      const ui = render(<PawPatrol workspace={workspace} />);
+      const ui = renderWorkspace(workspace);
 
       expect(ui.getByRole("img", { name: "Received heart rate trend" })).toBeTruthy();
       expect(ui.queryByRole("img", { name: "Synthetic heart rate trend" })).toBeNull();
-      fireEvent.click(ui.getByRole("button", { name: /Next stage/ }));
+      fireEvent.click(ui.getByRole("button", { name: "Run demo" }));
       expect(within(ui.getByLabelText("Selected person heart rate")).getByText("123")).toBeTruthy();
       expect(bus.publish).not.toHaveBeenCalled();
     },
@@ -146,7 +158,7 @@ describe("dashboard heart-rate integration", () => {
         (status) => {
           // Retain the old number deliberately: current readings are gated by status.
           mockUseHeartRate.mockReturnValue({ ...receiving(), status });
-          const ui = render(<PawPatrol workspace={workspace} />);
+          const ui = renderWorkspace(workspace);
           const reading = within(ui.getByLabelText("Selected person heart rate"));
 
           expect(reading.getByText("--")).toBeTruthy();
@@ -162,7 +174,7 @@ describe("dashboard heart-rate integration", () => {
   it.each(["officer", "hospital"] as const)(
     "retains the clearly named synthetic chart only in %s demo mode",
     (workspace) => {
-      const ui = render(<PawPatrol workspace={workspace} />);
+      const ui = renderWorkspace(workspace);
       expect(ui.getByRole("img", { name: "Synthetic heart rate trend" })).toBeTruthy();
       expect(ui.queryByRole("img", { name: "Received heart rate trend" })).toBeNull();
     },
@@ -171,7 +183,7 @@ describe("dashboard heart-rate integration", () => {
   it.each(["officer", "hospital"] as const)(
     "binds the connection to the %s selected identity and resets its session",
     (workspace) => {
-      const ui = render(<PawPatrol workspace={workspace} />);
+      const ui = renderWorkspace(workspace);
       fireEvent.change(ui.getByRole("combobox", { name: /^Selected person$/ }), {
         target: { value: "P-02" },
       });
@@ -199,6 +211,7 @@ describe("dashboard heart-rate integration", () => {
     const navigation = within(ui.getByRole("navigation", { name: "Workspace" }));
     for (const name of ["Officer", "Hospital", "Command"]) {
       fireEvent.click(navigation.getByRole("button", { name }));
+      if (name === "Officer") fireEvent.click(ui.getByRole("button", { name: "Devices" }));
       expect(mockUseHeartRate).toHaveBeenLastCalledWith("P-01", 0);
       expect(within(ui.getByLabelText("Selected person heart rate")).getByText("123")).toBeTruthy();
     }
@@ -206,7 +219,7 @@ describe("dashboard heart-rate integration", () => {
 
   it("does not attach local device data to a shared assistance request", () => {
     mockUseHeartRate.mockReturnValue(receiving());
-    const ui = render(<PawPatrol workspace="officer" />);
+    const ui = render(<PawPatrol workspace="dispatch" />);
     fireEvent.click(ui.getByRole("button", { name: "Demo panic · P-01" }));
 
     expect(bus.publish).toHaveBeenCalledTimes(1);
@@ -228,9 +241,17 @@ describe("dashboard heart-rate integration", () => {
     try {
       mockUseHeartRate.mockReturnValue(receiving());
       const ui = render(<PawPatrol workspace="hospital" />);
-      for (let stage = 0; stage < 3; stage += 1) {
-        fireEvent.click(ui.getByRole("button", { name: /Next stage/ }));
-      }
+      expect(ui.queryByRole("region", { name: "MIST clinical handoff" })).toBeNull();
+      // Exercise copying explicitly: continuous patrol no longer opens a scripted handoff.
+      render(
+        <MistHandoff
+          person={PEOPLE[0]}
+          time={45}
+          scene={sceneAt(45, null)}
+          saved={undefined}
+          onSave={vi.fn()}
+        />,
+      );
       const handoff = within(ui.getByRole("region", { name: "MIST clinical handoff" }));
       expect(handoff.getByText(/SIMULATED MIST/)).toBeTruthy();
       expect(handoff.getByText(`${sampleHeartRate("P-01", 45)} bpm · synthetic`)).toBeTruthy();

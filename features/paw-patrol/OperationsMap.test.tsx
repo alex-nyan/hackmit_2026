@@ -269,9 +269,14 @@ describe("patrol map integration", () => {
     expect(frameData.find((vehicle) => vehicle.id === "P-01")?.selected).toBe(false);
     expect(map.getSource("paw-scenario-route")?.setData).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        features: [
-          expect.objectContaining({ properties: expect.objectContaining({ unit: "P-02" }) }),
-        ],
+        features: expect.arrayContaining([
+          expect.objectContaining({
+            properties: expect.objectContaining({ unit: "P-02", selected: true }),
+          }),
+          expect.objectContaining({
+            properties: expect.objectContaining({ unit: "P-11", selected: false }),
+          }),
+        ]),
       }),
     );
   });
@@ -327,6 +332,11 @@ describe("patrol map integration", () => {
         value.options.element.textContent?.includes(person.id),
       );
       expect(marker?.point).toEqual(vehicle?.point);
+      const heading = mocked.markers.filter(
+        (value) => value.options.element.getAttribute("aria-hidden") === "true",
+      )[PEOPLE.indexOf(person)];
+      expect(heading.point).toEqual(vehicle?.point);
+      expect(heading.setRotation).toHaveBeenLastCalledWith(vehicleAt(person.id, time).heading);
     }
   });
 
@@ -337,6 +347,8 @@ describe("patrol map integration", () => {
     act(() => map.emit("style.load"));
     expect(mocked.maps).toHaveLength(1);
     expect(map.layers.has("paw-patrol-vehicles")).toBe(true);
+    expect(map.layers.has("paw-route-arrow-line")).toBe(true);
+    expect(map.getSource("paw-route-arrows")).toBeDefined();
     expect(mocked.layers[0].dispose).toHaveBeenCalledOnce();
     const count = mocked.layers.length;
     act(() => map.emit("style.load"));

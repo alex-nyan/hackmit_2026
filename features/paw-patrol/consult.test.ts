@@ -1,33 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { bloodPressure, emptyMist, mistText, sceneAt, validateMist } from "./consult";
 import { demoReducer, initialDemo } from "./useScenario";
-import { INCIDENT, PEOPLE, positionAt, personStatus } from "./scenario";
+import { PEOPLE, positionAt, personStatus } from "./scenario";
 
 describe("consult workflow safety", () => {
-  it.each(["unsafe", "unknown"] as const)("holds EMS for %s even on oversized jumps", (status) => {
-    let state = demoReducer({ ...initialDemo, time: 45, running: true }, { type: "scene", status });
-    state = demoReducer(state, { type: "tick", delta: 100 });
-    expect(state.time).toBe(59);
-    expect(state.running).toBe(false);
-    expect(positionAt(PEOPLE[0], state.time)).toEqual(INCIDENT);
-    expect(demoReducer(state, { type: "next" }).time).toBe(59);
-    state = demoReducer(state, { type: "scene", status: "cleared" });
-    expect(demoReducer(state, { type: "next" }).time).toBe(60);
-  });
-  it("does not rewind or accept pre-incident clearance", () => {
-    expect(demoReducer(initialDemo, { type: "scene", status: "cleared" })).toEqual(initialDemo);
-    const state = demoReducer(
-      { ...initialDemo, time: 59.75, running: true },
-      { type: "scene", status: "unsafe" },
-    );
-    expect(demoReducer(state, { type: "tick", delta: 1 }).time).toBe(59.75);
-  });
-  it("uses a distinct scripted clearance in automatic playback", () => {
-    expect(sceneAt(55, null).status).toBe("unsafe");
-    expect(sceneAt(56, null)).toMatchObject({ status: "cleared", at: 56 });
-    expect(demoReducer({ ...initialDemo, running: true }, { type: "tick", delta: 100 }).time).toBe(
-      90,
-    );
+  it("records only manual scene reports and never redirects patrol vehicles", () => {
+    for (const time of [0, 15, 56, 90, 3600]) {
+      expect(sceneAt(time, null)).toMatchObject({ status: "unknown", source: "Not reported" });
+      const state = demoReducer(
+        { ...initialDemo, time, running: true },
+        { type: "scene", status: "unsafe" },
+      );
+      expect(state.sceneOverride).toMatchObject({ status: "unsafe", at: time });
+      expect(demoReducer(state, { type: "tick", delta: 100 }).time).toBe(time + 100);
+    }
   });
   it("keeps panic person-specific, idempotent and distinct from injury", () => {
     const state = demoReducer(initialDemo, { type: "panic", personId: "P-02" });
@@ -35,13 +21,14 @@ describe("consult workflow safety", () => {
     expect(state.panics).toHaveLength(1);
     expect(demoReducer(state, { type: "panic", personId: "P-02" })).toEqual(state);
     expect(demoReducer(state, { type: "panic", personId: "INVALID" })).toEqual(state);
-    expect(personStatus("P-02", 45)).toBe("At scene");
+    expect(personStatus("P-02", 45)).toBe("On patrol");
     const acknowledged = demoReducer(state, { type: "acknowledge", personId: "P-02" });
     expect(acknowledged.panics[0].acknowledgedAt).toBe(0);
     expect(acknowledged.sceneOverride?.status).toBe("unsafe");
     expect(demoReducer(acknowledged, { type: "reset" })).toEqual(initialDemo);
     expect(demoReducer({ ...acknowledged, time: 90 }, { type: "play" })).toEqual({
-      ...initialDemo,
+      ...acknowledged,
+      time: 90,
       running: true,
     });
   });
@@ -63,11 +50,6 @@ describe("consult workflow safety", () => {
       expect(PEOPLE.map((person) => positionAt(person, state.time))).toEqual(before);
     },
   );
-  it("retains historical scene clearance once transport begins", () => {
-    const state = { ...initialDemo, time: 60 };
-    expect(demoReducer(state, { type: "scene", status: "unsafe" })).toEqual(state);
-    expect(demoReducer(state, { type: "panic", personId: "P-01" })).toEqual(state);
-  });
   it("never invents BP, pulse, or consciousness", () => {
     const record = emptyMist(45);
     expect(bloodPressure(record)).toBe("Not measured");

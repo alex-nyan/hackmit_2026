@@ -30,7 +30,8 @@ dashboard. Other app features retain their existing data flows.
    and Bluetooth enabled on both the iPhone and laptop.
 4. Select the fictional officer profile that will display your test reading.
    This association is made by you; it does not verify the wearer's identity.
-5. In the heart-rate panel, click **Connect Heart Rate**. In Chrome's chooser,
+5. In the officer workspace, open **Devices & HeartCast** to reveal the heart-rate
+   panel; the default view keeps the map unobstructed. Click **Connect Heart Rate**. In Chrome's chooser,
    select your HeartCast device and confirm. This requests only the standard
    Bluetooth Heart Rate service, not unrelated Bluetooth devices.
 6. The number remains `--` until a usable reading arrives. Once received, the

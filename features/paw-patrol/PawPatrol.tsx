@@ -10,7 +10,6 @@ import {
   Play,
   Pause,
   RotateCcw,
-  SkipForward,
   ArrowUpRight,
   MapPin,
   Camera,
@@ -35,8 +34,8 @@ import type { BuildingFacts } from "../boston-map/buildingSelection";
 import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-track";
 import { OperationsMap } from "./OperationsMap";
+import officerStyles from "./OfficerWorkspace.module.css";
 import {
-  DURATION,
   EVENTS,
   PEOPLE,
   PHASES,
@@ -57,13 +56,7 @@ import { useIncidentBus } from "./useIncidentBus";
 import { hazardIncident, transcriptIncident } from "./hazardSignal";
 import { draftMist, hasDraft, type MistDraft } from "./draftMist";
 import type { IncidentDraft } from "./incidents";
-import {
-  BusIndicator,
-  MistDraftCard,
-  NotConcluded,
-  PreArrival,
-  SharedTimeline,
-} from "./Provenance";
+import { BusIndicator, MistDraftCard, NotConcluded, SharedTimeline } from "./Provenance";
 import type { TriageResult } from "../camera-triage/types";
 import type { TranscriptionResult } from "../camera-triage/audio";
 import { HeartRatePanel } from "../heart-rate/HeartRatePanel";
@@ -189,7 +182,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
     if (!fixedView) setSelectedView(nextView);
   }
   const [selectedId, setSelectedId] = useState<string>("P-01");
-  const [focus, setFocus] = useState<MapFocus>("mit");
+  const [focus, setFocus] = useState<MapFocus>("all");
   const [theme, setTheme] = useState<MapTheme>("light");
   const [recenterKey, setRecenterKey] = useState(0);
   const [following, setFollowing] = useState(false);
@@ -222,7 +215,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
   const vehicle = vehicleAt(person.id, time);
   const phase = phaseAt(time),
     medical = phase >= 3,
-    complete = time === DURATION;
+    complete = false;
   const selectedCase = medical && person.id === "P-01";
   const scene = sceneAt(time, sceneOverride);
 
@@ -312,15 +305,12 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
   const modelDraft = draftMist(bus.events, person.id);
   const draftAvailable = hasDraft(modelDraft) && !draftDismissed && !records[person.id];
 
-  const events = [
-    ...EVENTS.filter((e) => e.at <= time && !(sceneOverride && e.at === 56)),
-    ...audit,
-  ].sort((a, b) => a.at - b.at);
+  const events = [...EVENTS, ...audit].sort((a, b) => a.at - b.at);
   function reset() {
     dispatch({ type: "reset" });
     setSelectedId("P-01");
     setFollowing(false);
-    setFocus("mit");
+    setFocus("all");
     setRecenterKey((k) => k + 1);
     setEvidence(null);
     setRecords({});
@@ -447,44 +437,45 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
           ))}
         </div>
       </div>
-      <div className="vehicle-telemetry" aria-label="Selected unit simulated position">
-        <span>
-          <strong>{person.id}</strong>{" "}
-          {time >= 60 && person.id === "P-01" ? "Transport proxy" : personStatus(person.id, time)}
-        </span>
-        <span>
-          {vehicle.routeId ? `${Math.round(vehicle.speedMps * 3.6)} km/h` : "Route unavailable"}
-        </span>
-        {vehicle.routeId && (
-          <span className="vehicle-coordinates">
-            {vehicle.point[1].toFixed(5)}, {vehicle.point[0].toFixed(5)}
-          </span>
-        )}
-      </div>
-      <div className="map-legend">
-        <span>
-          <i className="legend-officer" />
-          Simulated patrol
-        </span>
-        <span>
-          <i className="legend-route" />
-          Cached street routes · not navigation
-        </span>
-      </div>
+      {view !== "officer" && (
+        <>
+          <div className="vehicle-telemetry" aria-label="Selected unit simulated position">
+            <span>
+              <strong>{person.id}</strong> {personStatus(person.id, time)}
+            </span>
+            <span>
+              {vehicle.routeId ? `${Math.round(vehicle.speedMps * 3.6)} km/h` : "Route unavailable"}
+            </span>
+            {vehicle.routeId && (
+              <span className="vehicle-coordinates">
+                {vehicle.point[1].toFixed(5)}, {vehicle.point[0].toFixed(5)}
+              </span>
+            )}
+          </div>
+          <div className="map-legend">
+            <span>
+              <i className="legend-officer" />
+              Simulated patrol
+            </span>
+            <span>
+              <i className="legend-route" />
+              Cached street routes · not navigation
+            </span>
+          </div>
+        </>
+      )}
     </section>
   );
 
   return (
-    <div className="paw-app">
+    <div className={`paw-app ${view === "officer" ? officerStyles.officer : ""}`}>
       <a className="skip-link" href="#workspace">
         Skip to workspace
       </a>
       <header className="topbar">
         <Link className="wordmark" href="/" aria-label="Paw Patrol home">
           <Shield />
-          <span>
-            Paw Patrol<small>CONNECTED RESPONSE</small>
-          </span>
+          <span>Paw Patrol{view !== "officer" && <small>CONNECTED RESPONSE</small>}</span>
         </Link>
         <nav aria-label="Workspace">
           {workspace ? (
@@ -514,6 +505,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
         </nav>
         <button
           className="hardware-toggle"
+          aria-label={view === "officer" ? "Devices" : "Devices offline"}
           onClick={() => setHardware(!hardware)}
           aria-expanded={hardware}
         >
@@ -524,72 +516,66 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
         </button>
       </header>
       <main id="workspace">
-        <div className="page-heading">
-          <div>
-            <p className="eyebrow">
-              {view === "command"
-                ? "BOSTON & CAMBRIDGE · OPERATIONS"
-                : view === "officer"
-                  ? "OFFICER WORKSPACE · DESKTOP"
-                  : "RECEIVING DESK · SIMULATED HOSPITAL"}
-            </p>
-            <h1>
-              {view === "command"
-                ? PHASES[phase].title
-                : view === "officer"
-                  ? "Never out there alone."
-                  : "Ready before arrival."}
-            </h1>
-          </div>
-          <div className="demo-buttons">
-            <button
-              className="primary"
-              onClick={() => (running ? dispatch({ type: "pause" }) : play())}
-            >
-              {running ? <Pause size={16} /> : <Play size={16} />}{" "}
-              {running
-                ? "Pause demo"
-                : complete
-                  ? "Replay demo"
-                  : time > 0
-                    ? "Resume demo"
-                    : "Run demo"}
-              <ArrowUpRight size={16} />
-            </button>
-            <button
-              className="outline-button"
-              onClick={reset}
-              title="Reset demo"
-              aria-label="Reset demo"
-            >
-              <RotateCcw size={17} />
-            </button>
-          </div>
-        </div>
-        <div className="demo-notice">
-          <span className="tag">SIMULATION</span>
-          <span>
-            Demo people, scenes & dispatch. Optional Bluetooth heart rate stays in this tab.
-          </span>
-          <span className="auto-label">
-            {complete
-              ? "Demo complete"
-              : running
-                ? "Automatic sequence running"
-                : time > 0
-                  ? "Paused · press Resume to continue"
-                  : "90-second automatic scenario"}
-          </span>
-        </div>
-        <BusIndicator status={bus.status} count={bus.events.length} />
-        <SceneCoordination
-          time={time}
-          scene={scene}
-          person={person}
-          panics={panics}
-          command={view === "command"}
-          dispatch={sharedDispatch}
-        />
+        {view !== "officer" && (
+          <>
+            <div className="page-heading">
+              <div>
+                <p className="eyebrow">
+                  {view === "command"
+                    ? "BOSTON & CAMBRIDGE · OPERATIONS"
+                    : "RECEIVING DESK · SIMULATED HOSPITAL"}
+                </p>
+                <h1>{view === "command" ? PHASES[phase].title : "Ready before arrival."}</h1>
+              </div>
+              <div className="demo-buttons">
+                <button
+                  className="primary"
+                  onClick={() => (running ? dispatch({ type: "pause" }) : play())}
+                >
+                  {running ? <Pause size={16} /> : <Play size={16} />}{" "}
+                  {running
+                    ? "Pause demo"
+                    : complete
+                      ? "Replay demo"
+                      : time > 0
+                        ? "Resume demo"
+                        : "Run demo"}
+                  <ArrowUpRight size={16} />
+                </button>
+                <button
+                  className="outline-button"
+                  onClick={reset}
+                  title="Reset demo"
+                  aria-label="Reset demo"
+                >
+                  <RotateCcw size={17} />
+                </button>
+              </div>
+            </div>
+            <div className="demo-notice">
+              <span className="tag">SIMULATION</span>
+              <span>15 simulated patrol vehicles.</span>
+              <span className="auto-label">
+                {complete
+                  ? "Demo complete"
+                  : running
+                    ? "Patrol running"
+                    : time > 0
+                      ? "Paused · press Resume to continue"
+                      : "15 units · continuous patrol"}
+              </span>
+            </div>
+            <BusIndicator status={bus.status} count={bus.events.length} />
+            <SceneCoordination
+              time={time}
+              scene={scene}
+              person={person}
+              panics={panics}
+              command={view === "command"}
+              dispatch={sharedDispatch}
+            />
+          </>
+        )}
         {hardware && (
           <section className="hardware-panel panel">
             <div className="panel-heading">
@@ -602,6 +588,21 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
                 <X size={18} />
               </button>
             </div>
+            {view === "officer" && (
+              <>
+                <HeartRateReadout connection={heartRate} time={time} personId={person.id} />
+                <HeartChart
+                  time={time}
+                  id={person.id}
+                  deviceSamples={heartRate.mode === "device" ? heartRate.history : undefined}
+                />
+                <HeartRatePanel
+                  connection={heartRate}
+                  personId={person.id}
+                  personName={person.name}
+                />
+              </>
+            )}
             <div className="hardware-grid">
               {[
                 {
@@ -645,7 +646,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
           </section>
         )}
 
-        {view !== "command" && (
+        {view === "hospital" && (
           <div className="person-bar">
             <label htmlFor="person">
               Selected person <ChevronDown size={14} />
@@ -667,7 +668,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
             <aside className="panel units-panel">
               <div className="panel-heading">
                 <h2>On the ground</h2>
-                <span>04</span>
+                <span>{PEOPLE.length}</span>
               </div>
               <p className="muted">Demo patrol units</p>
               {PEOPLE.map((p) => (
@@ -737,12 +738,14 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               </div>
               <dl className="details">
                 <div>
-                  <dt>Location</dt>
-                  <dd>Kendall Square</dd>
+                  <dt>Patrol area</dt>
+                  <dd>{person.area}</dd>
                 </div>
                 <div>
-                  <dt>Primary unit</dt>
-                  <dd>P-01 · Alex Morgan</dd>
+                  <dt>Selected unit</dt>
+                  <dd>
+                    {person.id} · {person.name}
+                  </dd>
                 </div>
                 <div>
                   <dt>Backup</dt>
@@ -750,13 +753,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
                 </div>
                 <div>
                   <dt>Medical</dt>
-                  <dd>
-                    {time >= 52
-                      ? "EMS-01 · simulated"
-                      : medical
-                        ? "Coordinating in demo"
-                        : "No injury reported"}
-                  </dd>
+                  <dd>No injury reported</dd>
                 </div>
               </dl>
               <div className="evidence-buttons">
@@ -792,101 +789,68 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
 
         {view === "officer" && (
           <>
-            <div className="officer-summary">
-              <section className="panel assignment">
-                <p className="eyebrow">{person.id} · ASSIGNMENT</p>
-                <h2>{person.area} patrol</h2>
-                <p className="prose">
-                  {person.id === "P-01"
-                    ? phase === 0
-                      ? "Stay connected to your team. Your surroundings and status, in one place."
-                      : PHASES[phase].detail
-                    : personStatus(person.id, time) === "On patrol"
-                      ? "Continue the assigned patrol. The sample unit is available to the command desk."
-                      : "Responding to the staged incident near Kendall Square. Assignment is simulated."}
-                </p>
-              </section>
-              <section className="panel vital-card">
-                <div className="panel-heading">
-                  <h3>Heart rate</h3>
-                  <HeartPulse size={20} />
-                </div>
-                <HeartRateReadout connection={heartRate} time={time} personId={person.id} />
-                <HeartChart
-                  time={time}
-                  id={person.id}
-                  deviceSamples={heartRate.mode === "device" ? heartRate.history : undefined}
-                />
-                <HeartRatePanel
-                  connection={heartRate}
-                  personId={person.id}
-                  personName={person.name}
-                />
-              </section>
-              <section className="panel support-card">
-                <p className="eyebrow">INCIDENT RESPONSE UNITS</p>
-                <h3>{phase >= 2 ? "Support for P-01." : "Available for response."}</h3>
-                <div className="support-avatars">
-                  <span className="avatar sage">JL</span>
-                  <span className="avatar sky">SR</span>
-                  <span>
-                    P-02 & P-03
-                    <br />
-                    <small>
-                      {phase >= 3
-                        ? "At staged scene"
-                        : phase >= 2
-                          ? "On illustrative response paths"
-                          : "Available in demo"}
-                    </small>
-                  </span>
-                </div>
-              </section>
+            <h1 className="sr-only">Officer workspace</h1>
+            {map}
+            <div className={officerStyles.unitPicker}>
+              <Shield size={18} aria-hidden="true" />
+              <label className="sr-only" htmlFor="officer-person">
+                Selected person
+              </label>
+              <select
+                id="officer-person"
+                value={selectedId}
+                onChange={(e) => setSelectedId(e.target.value)}
+              >
+                {PEOPLE.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.id} · {p.name}
+                  </option>
+                ))}
+              </select>
+              <span>{personStatus(person.id, time)}</span>
             </div>
-            <div className="officer-grid">
-              {map}
-              <AnatomyViewer
-                personId={person.id}
-                personName={person.name}
-                annotation={annotation}
-              />
+            <div className={officerStyles.tools}>
+              <button
+                aria-expanded={evidence === "camera"}
+                aria-controls="officer-camera"
+                onClick={() => setEvidence(evidence === "camera" ? null : "camera")}
+              >
+                <Camera size={17} /> Camera
+              </button>
+              <button onClick={() => (running ? dispatch({ type: "pause" }) : play())}>
+                {running ? <Pause size={17} /> : <Play size={17} />}
+                {running
+                  ? "Pause demo"
+                  : complete
+                    ? "Replay demo"
+                    : time > 0
+                      ? "Resume demo"
+                      : "Run demo"}
+              </button>
+              <button aria-label="Reset demo" title="Reset demo" onClick={reset}>
+                <RotateCcw size={17} />
+              </button>
             </div>
-            <section className="panel evidence-panel">
+            <section
+              id="officer-camera"
+              className={officerStyles.camera}
+              hidden={evidence !== "camera"}
+            >
               <div className="panel-heading">
-                <h2>Body camera · live</h2>
-                <span className="tag">REAL CAPTURE</span>
+                <h2>Camera & audio</h2>
+                <button
+                  className="icon-control"
+                  aria-label="Close camera"
+                  onClick={() => setEvidence(null)}
+                >
+                  <X size={18} />
+                </button>
               </div>
-              <div className="evidence-content">
-                <Camera size={34} />
-                <div>
-                  <h3>This camera opens the incident</h3>
-                  <p>
-                    Frames from this device go to the triage service. A reported weapon or person
-                    down publishes to the shared log, so Command and the receiving desk see it
-                    without a radio call. The service has no &quot;safe&quot; result to return and
-                    every output needs a person to review it.
-                  </p>
-                </div>
-              </div>
-              <div className="evidence-capture">
-                <CapturePanel
-                  sourceId={`officer-${person.id}`}
-                  onResult={onHazard}
-                  onTranscript={onTranscript}
-                />
-              </div>
-            </section>
-            <section className="panel device-strip">
-              <Smartphone size={20} />
-              <strong>iPhone 16 Pro Max</strong>
-              <span>Video, audio & GPS not connected</span>
-              <Watch size={20} />
-              <strong>Apple Watch SE</strong>
-              <span>
-                {heartRate.mode === "device"
-                  ? `HeartCast local test · ${heartRate.status}`
-                  : "Heart-rate feed not connected"}
-              </span>
+              <CapturePanel
+                sourceId={`officer-${person.id}`}
+                onResult={onHazard}
+                onTranscript={onTranscript}
+              />
             </section>
           </>
         )}
@@ -912,24 +876,6 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               </p>
               {selectedCase ? (
                 <>
-                  <PreArrival
-                    time={time}
-                    duration={DURATION}
-                    arrived={complete}
-                    landed={[
-                      { label: "Scene status reported", present: scene.status !== "unknown" },
-                      {
-                        label: "Mechanism drafted from scene camera",
-                        present: Boolean(modelDraft.mechanism),
-                      },
-                      { label: "Scene audio reviewed", present: Boolean(modelDraft.symptoms) },
-                      { label: "Heart-rate series available", present: true },
-                      {
-                        label: "Clinician-entered handoff saved",
-                        present: Boolean(records[person.id]),
-                      },
-                    ]}
-                  />
                   <dl className="details">
                     <div>
                       <dt>Demo case</dt>
@@ -967,10 +913,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               ) : (
                 <div className="empty-handoff">
                   <HeartPulse size={48} />
-                  <p>
-                    When the demo reaches its explicit injury event, the handoff for Alex Morgan
-                    appears here automatically.
-                  </p>
+                  <p>No incoming transfer. Patrol playback does not generate medical events.</p>
                   <button className="secondary" onClick={() => setSelectedId("P-01")}>
                     Select primary officer
                   </button>
@@ -1001,9 +944,9 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               </p>
               <h3 className="section-label">Handoff contents</h3>
               {[
-                "Scenario event timeline",
+                "Operator reports",
                 "Synthetic heart-rate series in demo MIST only",
-                "Scripted transport status",
+                "Recorded transport status",
               ].map((s) => (
                 <div className="check-row" key={s}>
                   <Check size={16} />
@@ -1068,15 +1011,9 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
             <div className="evidence-content">
               {evidence === "camera" ? <Camera size={34} /> : <Mic size={34} />}
               <div>
-                <h3>The {evidence === "camera" ? "weapon" : "concern"} signal is scripted</h3>
-                <p>
-                  That event came from the demo timeline, not from a sensor. Capture below is
-                  separate and real: this device&apos;s{" "}
-                  {evidence === "camera" ? "camera" : "microphone"} feeds the triage service, and
-                  what comes back is a model reading for a person to check.
-                </p>
+                <h3>{evidence === "camera" ? "Camera capture" : "Audio capture"}</h3>
+                <p>Start capture to review readings from this device.</p>
               </div>
-              <span className="tag">DEMO SIGNAL ONLY</span>
             </div>
             <div className="evidence-capture">
               <CapturePanel sourceId={`dispatch-${evidence}`} />
@@ -1084,66 +1021,52 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
           </section>
         )}
 
-        <section className="scenario-strip" aria-label="Demo playback">
-          <div className="scenario-caption">
-            <span className="eyebrow">THE RESPONSE CHAIN</span>
-            <span className="clock">
-              {stamp(time)} <small>/ 01:30</small>
-            </span>
-            <button
-              className="next-button"
-              disabled={complete}
-              onClick={() => dispatch({ type: "next" })}
-            >
-              Next stage <SkipForward size={15} />
-            </button>
-          </div>
-          <ol className="phases">
-            {PHASES.map((p, i) => (
-              <li key={p.label} className={phase === i ? "current" : phase > i ? "done" : ""}>
-                <span>{phase > i ? <Check size={14} /> : String(i + 1).padStart(2, "0")}</span>
-                <strong>{p.label}</strong>
-                <small>{stamp(p.at)}</small>
-              </li>
-            ))}
-          </ol>
-          <div className="progress-track">
-            <div style={{ width: `${(time / DURATION) * 100}%` }} />
-          </div>
-        </section>
-        <section className="activity-panel panel">
-          <div className="panel-heading">
-            <h2>Shared incident log</h2>
-            <span className="tag">ALL WORKSPACES</span>
-          </div>
-          <SharedTimeline events={bus.events} />
-        </section>
-        <section className="activity-panel panel">
-          <div className="panel-heading">
-            <h2>Event timeline</h2>
-            <span className="tag">SCRIPTED EVENTS</span>
-          </div>
-          <div className="activity-list">
-            {[...events].reverse().map((e) => (
-              <article key={"id" in e ? String(e.id) : `${e.at}-${e.title}`}>
-                <time>{stamp(e.at)}</time>
-                <div>
-                  <strong>{e.title}</strong>
-                  <p>{e.detail}</p>
-                </div>
-                <span>{e.source}</span>
-              </article>
-            ))}
-          </div>
-        </section>
+        {view !== "officer" && (
+          <>
+            <section className="scenario-strip" aria-label="Demo playback">
+              <div className="scenario-caption">
+                <span className="eyebrow">15 UNITS · CONTINUOUS PATROL</span>
+                <span className="clock">{stamp(time)}</span>
+              </div>
+            </section>
+            <section className="activity-panel panel">
+              <div className="panel-heading">
+                <h2>Shared incident log</h2>
+                <span className="tag">ALL WORKSPACES</span>
+              </div>
+              <SharedTimeline events={bus.events} />
+            </section>
+            <section className="activity-panel panel">
+              <div className="panel-heading">
+                <h2>Event timeline</h2>
+                <span className="tag">OPERATOR ACTIONS</span>
+              </div>
+              <div className="activity-list">
+                {events.length === 0 && <p>No operator actions recorded.</p>}
+                {[...events].reverse().map((e) => (
+                  <article key={"id" in e ? String(e.id) : `${e.at}-${e.title}`}>
+                    <time>{stamp(e.at)}</time>
+                    <div>
+                      <strong>{e.title}</strong>
+                      <p>{e.detail}</p>
+                    </div>
+                    <span>{e.source}</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
         <p className="sr-only" role="status">
           {PHASES[phase].label}: {PHASES[phase].detail}
         </p>
       </main>
-      <footer>
-        <span>PAW PATROL · HACKMIT 2026</span>
-        <span>Frontend demo · No external dispatch or clinical decisions</span>
-      </footer>
+      {view !== "officer" && (
+        <footer>
+          <span>PAW PATROL · HACKMIT 2026</span>
+          <span>Frontend demo · No external dispatch or clinical decisions</span>
+        </footer>
+      )}
     </div>
   );
 }

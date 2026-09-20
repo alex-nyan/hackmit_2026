@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEMO_DESTINATION,
-  DEMO_INCIDENT,
+  PATROL_UNITS,
   VEHICLE_ROUTES,
   bearingDegrees,
   distanceMeters,
@@ -128,81 +127,60 @@ describe("distance-based road sampling", () => {
   });
 });
 
-describe("shared patrol simulation", () => {
-  it("loads seven deterministic road routes for the four real roster entries", () => {
-    expect(VEHICLE_ROUTES).toHaveLength(7);
-    expect(new Set(VEHICLE_ROUTES.map((route) => route.unitId))).toEqual(
-      new Set(["P-01", "P-02", "P-03", "P-04"]),
-    );
-    expect(vehicleRoute("P-99", 10)).toBeNull();
-    expect(vehicleAt("P-99", 10)).toMatchObject({
-      speedMps: 0,
-      emergency: false,
-      routeId: "",
-      roadName: "Route unavailable",
-    });
-  });
-
-  it("holds before departure, between legs and after completion without looping or teleporting", () => {
-    expect(vehicleAt("P-01", 15).point).toEqual(DEMO_INCIDENT);
-    expect(vehicleAt("P-01", 59.99).point).toEqual(DEMO_INCIDENT);
-    expect(vehicleAt("P-01", 60).point).toEqual(DEMO_INCIDENT);
-    expect(vehicleAt("P-01", 90).point).toEqual(DEMO_DESTINATION);
-    expect(vehicleAt("P-01", 900)).toEqual(vehicleAt("P-01", 90));
-    expect(vehicleAt("P-01", NaN)).toEqual(vehicleAt("P-01", 0));
-    expect(vehicleAt("P-01", -20)).toEqual(vehicleAt("P-01", 0));
-    for (const id of ["P-02", "P-03"]) {
-      expect(distanceMeters(vehicleAt(id, 29.999).point, vehicleAt(id, 30).point)).toBeLessThan(
-        0.001,
-      );
-      expect(vehicleAt(id, 45).point).toEqual(vehicleAt(id, 89).point);
-      expect(vehicleAt(id, 45).speedMps).toBe(0);
+describe("continuous Boston patrol", () => {
+  it("has fifteen patrol units on closed road loops", () => {
+    expect(VEHICLE_ROUTES).toHaveLength(15);
+    expect(new Set(VEHICLE_ROUTES.map((r) => r.unitId)).size).toBe(15);
+    for (const route of VEHICLE_ROUTES) {
+      expect(route.kind).toBe("patrol");
+      expect(route.coordinates.length).toBeGreaterThan(100);
+      expect(route.coordinates.at(-1)).toEqual(route.coordinates[0]);
     }
+    expect(vehicleRoute("P-99", 10)).toBeNull();
+    expect(vehicleAt("P-99", 10)).toMatchObject({ speedMps: 0, routeId: "", emergency: false });
   });
-
-  it("has distinct unit positions and plausible speeds across the whole demo", () => {
-    for (let time = 0; time <= 90; time += 0.25) {
-      const samples = ["P-01", "P-02", "P-03", "P-04"].map((id) => vehicleAt(id, time));
-      expect(new Set(samples.map(({ point }) => point.join(","))).size).toBe(4);
+  it("keeps all cars moving at plausible speeds without emergency lights after the former ending", () => {
+    for (const time of [0, 15, 30, 45, 60, 75, 90, 600, 3600, 86400]) {
+      const samples = PATROL_UNITS.map(({ id }) => vehicleAt(id, time));
+      expect(new Set(samples.map(({ point }) => point.join(","))).size).toBe(15);
       for (const sample of samples) {
-        expect(sample.speedMps).toBeGreaterThanOrEqual(0);
-        expect(sample.speedMps).toBeLessThan(16);
+        expect(sample.speedMps).toBeGreaterThan(0);
+        expect(sample.speedMps).toBeLessThan(12);
+        expect(sample.emergency).toBe(false);
         expect(sample.heading).toBeGreaterThanOrEqual(0);
         expect(sample.heading).toBeLessThan(360);
         expect(sample.point.every(Number.isFinite)).toBe(true);
       }
+      for (const { id } of PATROL_UNITS)
+        expect(vehicleAt(id, time + 1).point).not.toEqual(vehicleAt(id, time).point);
     }
   });
-
-  it("has bounded continuous positions at every route junction and incident boundary", () => {
-    for (const id of ["P-01", "P-02", "P-03", "P-04"]) {
-      let previous = vehicleAt(id, 0).point;
-      for (let frame = 1; frame <= 900; frame++) {
-        const point = vehicleAt(id, frame / 10).point;
-        expect(distanceMeters(previous, point)).toBeLessThan(1.6);
-        previous = point;
+  it("crosses lap boundaries without teleporting or snapping its heading", () => {
+    for (const unit of PATROL_UNITS) {
+      const lap = unit.geometry.lengthMeters / unit.speedMps;
+      const seam = (unit.geometry.lengthMeters - unit.offsetMeters) / unit.speedMps;
+      for (const time of [seam, seam + lap, seam + lap * 10]) {
+        const before = vehicleAt(unit.id, time - 0.01);
+        const after = vehicleAt(unit.id, time + 0.01);
+        expect(distanceMeters(before.point, after.point)).toBeLessThan(0.25);
+        const turn = Math.abs(((after.heading - before.heading + 540) % 360) - 180);
+        expect(turn).toBeLessThan(10);
       }
+      expect(
+        distanceMeters(vehicleAt(unit.id, 0).point, vehicleAt(unit.id, lap).point),
+      ).toBeLessThan(0.001);
     }
   });
-
-  it("enables lights only during explicit incident response, not normal patrol or completion", () => {
-    expect(vehicleAt("P-01", 14.99).emergency).toBe(false);
-    expect(vehicleAt("P-01", 15).emergency).toBe(true);
-    expect(vehicleAt("P-02", 29.99).emergency).toBe(false);
-    expect(vehicleAt("P-02", 30).emergency).toBe(true);
-    expect(vehicleAt("P-03", 45).emergency).toBe(true);
-    for (const id of ["P-01", "P-02", "P-03", "P-04"])
-      expect(vehicleAt(id, 90).emergency).toBe(false);
-    for (const time of [0, 15, 30, 60, 89]) expect(vehicleAt("P-04", time).emergency).toBe(false);
-  });
-
-  it("is pure: pause, repeated sampling and reset cannot mutate shared route coordinates", () => {
+  it("is deterministic and never mutates cached geometry", () => {
     const original = JSON.stringify(VEHICLE_ROUTES);
-    const paused = vehicleAt("P-02", 35);
-    expect(vehicleAt("P-02", 35)).toEqual(paused);
-    paused.point[0] = 0;
-    expect(vehicleAt("P-02", 35).point[0]).not.toBe(0);
-    expect(vehicleAt("P-02", 0).point).toEqual(vehicleRoute("P-02", 0)?.coordinates[0]);
+    for (const { id } of PATROL_UNITS) {
+      const a = vehicleAt(id, 500);
+      expect(vehicleAt(id, 500)).toEqual(a);
+      a.point[0] = 0;
+      expect(vehicleAt(id, 500).point[0]).not.toBe(0);
+      expect(vehicleAt(id, NaN)).toEqual(vehicleAt(id, 0));
+      expect(vehicleAt(id, -1)).toEqual(vehicleAt(id, 0));
+    }
     expect(JSON.stringify(VEHICLE_ROUTES)).toBe(original);
   });
 });
