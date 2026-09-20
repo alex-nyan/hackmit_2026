@@ -43,6 +43,7 @@ you connected. Keep viewing links within the team.
   or another permitted network if necessary.
 - Video but no sound: verify the selected microphone and moving meter on the
   publisher, then the player's unmute/play control and receiving Mac's output.
+  The publisher can default to **No Audio**; explicitly select the microphone.
 - Frozen video: check the publishing preview first. If that is frozen too,
   reconnect Continuity Camera before debugging the network. Use a lower camera
   resolution/frame rate in VDO.Ninja's source settings if capture/encoding struggles.
@@ -54,11 +55,12 @@ on the actual devices for camera contention and extra CPU/network load.
 
 ## Verification boundary
 
-The dashboard controls and embedded hosted player were exercised locally using
-VDO.Ninja's generated test media. The embedded statistics showed VP8 video and
-Opus audio (about 31 kbps, nonzero audio level), with a working TURN relay route
-and zero reported packet loss in the observed sample. Disconnect removed the
-iframe. Typecheck and targeted ESLint passed; the test suite was skipped under
+The dashboard controls and embedded hosted player were exercised locally and on
+the deployed PR preview using VDO.Ninja's generated test media. The embedded
+statistics showed VP8 video and Opus audio (about 31–32 kbps, nonzero audio level),
+with a working TURN relay route and zero reported packet loss in the observed
+sample. Reconnect and page reload recovered playback; disconnect and closing
+the panel removed the iframe. Typecheck and targeted ESLint passed; the test suite was skipped under
 the repository's hackathon rule. This is not a measurement of Continuity Camera
 or the link between two physical Macs. Before the demo, run both Macs for at least
 five minutes with motion and speech, reload the viewer, and verify reconnection
