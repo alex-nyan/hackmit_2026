@@ -28,7 +28,12 @@ describe("live operator gateway", () => {
     expect(session).not.toContain(token);
     expect(openSession(session, 2_000)).toBe(token);
     expect(openSession(session, 30_000_000)).toBeNull();
-    expect(openSession(`x${session.slice(1)}`, 2_000)).toBeNull();
+    // The first character has to actually change. A sealed session is
+    // base64url, so "x" is one of the sixty-four it can already start with,
+    // and one run in sixty-four would otherwise tamper it into itself and
+    // then be surprised that it opens.
+    const tampered = `${session.startsWith("x") ? "y" : "x"}${session.slice(1)}`;
+    expect(openSession(tampered, 2_000)).toBeNull();
   });
   it("rejects cross-origin sign in before contacting the service", async () => {
     configure();
