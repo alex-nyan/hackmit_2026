@@ -34,6 +34,7 @@ import type { BuildingFacts } from "../boston-map/buildingSelection";
 import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-track";
 import { OperationsMap } from "./OperationsMap";
+import { WorkspaceMapShell } from "./WorkspaceMapShell";
 import officerStyles from "./OfficerWorkspace.module.css";
 import {
   EVENTS,
@@ -166,7 +167,14 @@ function HeartRateReadout({
   );
 }
 
-export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }) {
+export function PawPatrol({
+  workspace = null,
+  presentation = "map",
+}: {
+  workspace?: Workspace | null;
+  /** Retain existing detail workflows for later UI work and regression coverage. */
+  presentation?: "map" | "detailed";
+}) {
   const { time, running, readClock, dispatch, sceneOverride, panics, audit } = useScenario();
   // The only state shared across workspaces. Everything else stays local.
   const bus = useIncidentBus();
@@ -437,7 +445,7 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
           ))}
         </div>
       </div>
-      {view !== "officer" && (
+      {view !== "officer" && presentation === "detailed" && (
         <>
           <div className="vehicle-telemetry" aria-label="Selected unit simulated position">
             <span>
@@ -457,15 +465,28 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
               <i className="legend-officer" />
               Simulated patrol
             </span>
-            <span>
-              <i className="legend-route" />
-              Cached street routes · not navigation
-            </span>
           </div>
         </>
       )}
     </section>
   );
+
+  // Keep the shared state/subscription above mounted, but do not mount legacy
+  // panels (especially capture) in the new Dispatch/Medic presentation.
+  // Officer capture callbacks and all backend/live-mode paths remain unchanged.
+  if (view !== "officer" && presentation === "map") {
+    return (
+      <WorkspaceMapShell
+        workspace={workspace}
+        view={view}
+        onViewChange={setView}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        status={personStatus(person.id, time)}
+        map={map}
+      />
+    );
+  }
 
   return (
     <div className={`paw-app ${view === "officer" ? officerStyles.officer : ""}`}>
