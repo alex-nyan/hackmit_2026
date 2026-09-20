@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Paw Patrol · Officer sign-in" };
 export const dynamic = "force-dynamic";
 
 const PROBLEMS: Record<string, string> = {
-  rejected: "That passcode was not accepted. Please try again.",
+  rejected: "Choose an available officer profile.",
   "no-roster": "No officer accounts are configured yet.",
 };
 
@@ -42,13 +42,12 @@ export default async function SignIn({
           <p>
             Your connection to dispatch, field observations and the teams responding alongside you.
           </p>
-          <small>OFFICER WORKSPACE · ASSIGNED ACCESS</small>
+          <small>OFFICER WORKSPACE</small>
         </div>
         <section className={styles.card} aria-labelledby="sign-in-title">
           <div className={styles.intro}>
-            <span className={styles.eyebrow}>Officer access</span>
-            <h1 id="sign-in-title">Sign in to your workspace</h1>
-            <p>Choose your officer profile and enter your assigned passcode.</p>
+            <span className={styles.eyebrow}>Officer workspace</span>
+            <h1 id="sign-in-title">Choose your profile</h1>
           </div>
           <form className={styles.form} method="post" action="/api/sign-in">
             <div className={styles.field}>
@@ -59,6 +58,8 @@ export default async function SignIn({
                 defaultValue={officer || roster[0]?.id || ""}
                 required
                 disabled={!hasOfficers}
+                aria-invalid={problem === "rejected" || undefined}
+                aria-describedby={problem && hasOfficers ? "sign-in-error" : undefined}
               >
                 {!hasOfficers && <option value="">No officer accounts available</option>}
                 {roster.map((entry) => (
@@ -68,20 +69,6 @@ export default async function SignIn({
                 ))}
               </select>
             </div>
-            <div className={styles.field}>
-              <label htmlFor="passcode">Passcode</label>
-              <input
-                id="passcode"
-                type="password"
-                name="passcode"
-                autoComplete="current-password"
-                placeholder="Enter your passcode"
-                required
-                disabled={!hasOfficers}
-                aria-invalid={problem === "rejected" || undefined}
-                aria-describedby={problem && hasOfficers ? "sign-in-error" : undefined}
-              />
-            </div>
             {problem && hasOfficers && (
               <p className={styles.error} id="sign-in-error" role="alert">
                 {PROBLEMS[problem] ?? "Sign-in failed. Please try again."}
@@ -90,14 +77,13 @@ export default async function SignIn({
             {!hasOfficers && (
               <div className={styles.notice} role="status">
                 <strong>Officer accounts aren’t set up yet</strong>
-                <p>Ask your administrator to add your name, badge and passcode to the roster.</p>
+                <p>Add an officer to the roster to continue.</p>
               </div>
             )}
             <button className={styles.submit} type="submit" disabled={!hasOfficers}>
-              Sign in <ArrowRight size={17} aria-hidden="true" />
+              Continue <ArrowRight size={17} aria-hidden="true" />
             </button>
           </form>
-          <p className={styles.help}>Need a passcode? Contact your team administrator.</p>
         </section>
       </main>
     </div>

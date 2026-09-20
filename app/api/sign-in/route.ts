@@ -1,8 +1,15 @@
-import { matches } from "@/features/access/passphrase";
+import type { NextRequest } from "next/server";
+import { COOKIE_NAME, digest, matches, requiredPassphrase } from "@/features/access/passphrase";
 import { findOfficer, readRoster } from "@/features/access/roster";
-import { clearedSessionCookie, issueSession, sessionCookie } from "@/features/access/session";
+import {
+  clearedSessionCookie,
+  issueSession,
+  OFFICER_COOKIE,
+  readSession,
+  sessionCookie,
+} from "@/features/access/session";
 
-/** Exchanges an officer's passcode for the cookie that carries their identity. */
+/** Records a configured demo profile selection without an officer password. */
 export const dynamic = "force-dynamic";
 
 function backToForm(request: Request, officerId: string, problem: string): Response {
@@ -12,7 +19,7 @@ function backToForm(request: Request, officerId: string, problem: string): Respo
   return Response.redirect(retry, 303);
 }
 
-export async function POST(request: Request): Promise<Response> {
+export async function POST(request: NextRequest): Promise<Response> {
   const form = await request.formData();
 
   // Signing out is the same door, walked the other way.
@@ -30,13 +37,27 @@ export async function POST(request: Request): Promise<Response> {
   if (roster.length === 0) return backToForm(request, "", "no-roster");
 
   const officerId = String(form.get("officer") ?? "");
-  const passcode = String(form.get("passcode") ?? "");
   const officer = findOfficer(roster, officerId);
+  if (!officer) return backToForm(request, officerId, "rejected");
 
-  // Compared even when the officer is unknown, so a wrong name and a wrong
-  // passcode take the same time and reveal the same thing.
-  const accepted = matches(passcode, officer?.passcode ?? ` ${passcode}`);
-  if (!officer || !accepted) return backToForm(request, officerId, "rejected");
+  // The sign-in route is publicly reachable, but its signed officer cookie is
+  // trusted by the shared app gate. Name selection must not bypass that gate.
+  const sharedPassphrase = requiredPassphrase(process.env);
+  if (sharedPassphrase) {
+    const sharedCookie = request.cookies.get(COOKIE_NAME)?.value ?? "";
+    const sharedAccess = sharedCookie && matches(sharedCookie, await digest(sharedPassphrase));
+    const existingId = sharedAccess
+      ? null
+      : await readSession(request.cookies.get(OFFICER_COOKIE)?.value, rosterRaw);
+    const existingOfficer = existingId ? findOfficer(roster, existingId) : null;
+    if (!sharedAccess && !existingOfficer) {
+      const returnTo = new URL("/sign-in", request.url);
+      returnTo.searchParams.set("officer", officer.id);
+      const unlock = new URL("/unlock", request.url);
+      unlock.searchParams.set("next", `${returnTo.pathname}${returnTo.search}`);
+      return Response.redirect(unlock, 303);
+    }
+  }
 
   const response = new Response(null, {
     status: 303,
