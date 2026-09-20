@@ -2,14 +2,18 @@
 
 import { useState } from "react";
 
+import { describeTranscript } from "./audio";
 import styles from "./CameraTriageView.module.css";
+import { useAudioTranscription } from "./useAudioTranscription";
 import { useCameraTriage } from "./useCameraTriage";
 
 export function CameraTriageView() {
   const [sourceId, setSourceId] = useState("unit-01");
   const { state, videoRef, start, stop } = useCameraTriage({ sourceId });
+  const audio = useAudioTranscription(sourceId);
   const running = state.state === "running";
   const active = running || state.state === "requesting-camera";
+  const listening = audio.state.state === "recording";
 
   return (
     <main className={styles.root}>
@@ -36,6 +40,41 @@ export function CameraTriageView() {
             {active ? "Stop" : "Start"}
           </button>
         </div>
+
+        <div className={styles.row}>
+          <button
+            type="button"
+            className={styles.secondary}
+            data-on={listening ? "true" : undefined}
+            onClick={() => (listening ? audio.stop() : void audio.start())}
+          >
+            {listening ? "Stop listening" : "Also transcribe audio"}
+          </button>
+        </div>
+
+        {audio.state.state === "unsupported" && (
+          <p className={styles.error}>{audio.state.reason}</p>
+        )}
+
+        {audio.state.state === "recording" && (
+          <div className={styles.result}>
+            <span className={styles.heard}>Heard</span>
+            {audio.state.lastError ? (
+              <p className={styles.error}>{audio.state.lastError}</p>
+            ) : audio.state.lastResult ? (
+              <>
+                <p className={styles.summary}>{describeTranscript(audio.state.lastResult)}</p>
+                {/* A transcript is what a model guessed, not what was said. */}
+                <p className={styles.caveat}>
+                  Machine transcript, not a record of speech. It can mishear, and silence is
+                  indistinguishable from speech it failed to recognise.
+                </p>
+              </>
+            ) : (
+              <p className={styles.notice}>Listening…</p>
+            )}
+          </div>
+        )}
 
         {state.state === "requesting-camera" && (
           <p className={styles.notice}>Waiting for camera permission…</p>

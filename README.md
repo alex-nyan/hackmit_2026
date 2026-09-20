@@ -155,6 +155,30 @@ The first run downloads mkcert and installs a local certificate authority, which
 enable full trust under Settings → General → About → Certificate Trust Settings;
 without that second step Safari still refuses the camera.
 
+### Audio transcription
+
+The page can also record ten-second audio clips and send them to
+`/v1/transcribe`. It is **off by default on the service**; enable it and install
+the optional dependency:
+
+```bash
+cd services/triage
+uv sync --extra whisper
+TRIAGE_TRANSCRIPTION_ENABLED=true uv run uvicorn triage.app:create_app --factory
+```
+
+`TRIAGE_WHISPER_MODEL` defaults to `base` on CPU with `int8`. The service starts
+and serves triage normally without the dependency, reporting transcription as
+unavailable rather than failing.
+
+Safari records AAC in an MP4 container and cannot record WebM, so the page picks
+`audio/mp4` first; a WebM-first list records nothing at all on an iPhone.
+
+A transcript is a model hypothesis, not a record of speech. Empty text means
+nothing was recognised, which is **not** the same as nothing having been said —
+the payload carries `transcript_semantics` and `requires_human_review` so a
+caller cannot quietly treat it as evidence.
+
 ### What it does and does not do
 
 Frames go out one at a time. The service admits a single frame concurrently and
@@ -166,9 +190,9 @@ or `insufficient_evidence`, and `requires_human_review` is always true. Treat th
 output as a prompt for a person, and the confidence values as uncalibrated model
 scores rather than probabilities.
 
-**iOS suspends camera capture when the tab is backgrounded or the screen locks.**
-A browser page cannot keep recording from a pocket; it needs to stay in the
-foreground.
+**iOS suspends camera and microphone capture when the tab is backgrounded or the
+screen locks.** A browser page cannot keep recording from a pocket; it needs to
+stay in the foreground. Only a native app can do otherwise.
 
 ## What is included
 
@@ -181,8 +205,8 @@ foreground.
 - Responsive layout, loading feedback, missing-token and failed-load states.
 - Optional live fleet tracking from a Traccar server: every unit on one map,
   opt-in and server-authenticated.
-- Optional camera hazard triage at `/capture`, proxied so the service token
-  stays on the server.
+- Optional camera hazard triage and audio transcription at `/capture`, proxied so
+  the service token stays on the server.
 - Isolated map feature modules, TypeScript, tests, and CI checks.
 
 There are intentionally **no energy overlays, mock metrics, heatmap circles,

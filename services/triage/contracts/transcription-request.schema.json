@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "audio_base64": {
+      "maxLength": 11200000,
+      "minLength": 1,
+      "title": "Audio Base64",
+      "type": "string"
+    },
+    "captured_at": {
+      "format": "date-time",
+      "title": "Captured At",
+      "type": "string"
+    },
+    "incident_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Incident Id"
+    },
+    "language": {
+      "anyOf": [
+        {
+          "maxLength": 8,
+          "minLength": 2,
+          "pattern": "^[a-z-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Language"
+    },
+    "media_type": {
+      "enum": [
+        "audio/mp4",
+        "audio/aac",
+        "audio/mpeg",
+        "audio/wav",
+        "audio/webm",
+        "audio/ogg"
+      ],
+      "title": "Media Type",
+      "type": "string"
+    },
+    "source_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Source Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "audio_base64",
+    "media_type",
+    "source_id",
+    "captured_at"
+  ],
+  "title": "TranscriptionRequest",
+  "type": "object"
+}

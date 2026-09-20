@@ -7,6 +7,8 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 Score = Annotated[float, Field(ge=0, le=1, allow_inf_nan=False, strict=True)]
 Text = Annotated[str, Field(min_length=1, max_length=1000)]
+TranscriptText = Annotated[str, Field(max_length=20_000)]
+Seconds = Annotated[float, Field(ge=0, le=86_400, allow_inf_nan=False)]
 
 
 class Contract(BaseModel):
@@ -68,7 +70,7 @@ class VisionAssessment(Contract):
 
 
 class ModelProvenance(Contract):
-    provider: Literal["ollama", "openai_compatible", "ultralytics"]
+    provider: Literal["ollama", "openai_compatible", "ultralytics", "faster_whisper"]
     model: str = Field(min_length=1, max_length=256)
     revision: str | None = Field(default=None, max_length=256)
 
@@ -92,3 +94,65 @@ class TriageResult(Contract):
     timings_ms: dict[str, float]
     policy_version: Literal["human-review-v1"] = "human-review-v1"
     prompt_version: Literal["visual-hazards-v1"] = "visual-hazards-v1"
+
+
+class TranscriptionRequest(Contract):
+    audio_base64: str = Field(min_length=1, max_length=11_200_000)
+    media_type: Literal[
+        "audio/mp4",
+        "audio/aac",
+        "audio/mpeg",
+        "audio/wav",
+        "audio/webm",
+        "audio/ogg",
+    ]
+    source_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
+    captured_at: AwareDatetime
+    incident_id: str | None = Field(default=None, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
+    # An ISO-639-1 hint. Omitted means the model decides, which it can get wrong.
+    language: str | None = Field(default=None, min_length=2, max_length=8, pattern=r"^[a-z-]+$")
+
+
+class TranscriptSegment(Contract):
+    start_seconds: Seconds
+    end_seconds: Seconds
+    text: Text
+    """Whisper's own estimate that this span is not speech. Uncalibrated."""
+    no_speech_probability: Score | None = None
+
+    @model_validator(mode="after")
+    def ordered(self):
+        if self.end_seconds < self.start_seconds:
+            raise ValueError("segment must not end before it starts")
+        return self
+
+
+class TranscriptionResult(Contract):
+    """
+    A transcript is a model hypothesis about what was said, not a record of it.
+    Empty text means no speech was recognised, which is not the same as silence,
+    and a confident-looking transcript can still be wrong. Both are stated in the
+    payload so a caller cannot quietly treat this as evidence.
+    """
+
+    schema_version: Literal["1.0"] = "1.0"
+    request_id: str
+    source_id: str
+    incident_id: str | None
+    captured_at: datetime
+    processed_at: datetime
+    audio_sha256: str
+    text: TranscriptText
+    speech_detected: bool
+    language: str | None
+    language_probability: Score | None
+    duration_seconds: Seconds
+    segments: list[TranscriptSegment] = Field(max_length=500)
+    models: list[ModelProvenance]
+    warnings: list[str]
+    timings_ms: dict[str, float]
+    requires_human_review: Literal[True] = True
+    confidence_semantics: Literal["uncalibrated_model_scores"] = "uncalibrated_model_scores"
+    transcript_semantics: Literal["machine_hypothesis_not_verbatim_record"] = (
+        "machine_hypothesis_not_verbatim_record"
+    )
