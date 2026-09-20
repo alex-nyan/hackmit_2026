@@ -232,7 +232,7 @@ async function mount(overrides: Partial<OperationsMapProps> = {}) {
   const current = props(overrides);
   const view = render(<OperationsMap {...current} />);
   await waitFor(() => expect(mocked.maps).toHaveLength(1));
-  await waitFor(() => expect(mocked.markers).toHaveLength(PEOPLE.length * 2));
+  await waitFor(() => expect(mocked.markers).toHaveLength(PEOPLE.length * 3));
   await waitFor(() => expect(mocked.maps[0].getLayer(BUILDING_LAYER_ID)).toBeDefined());
   await waitFor(() => expect(view.queryByRole("status")).toBeNull());
   expectNoPatrolRoutes(mocked.maps[0]);
@@ -256,7 +256,10 @@ function expectNoPatrolRoutes(map: TestMap) {
 
 function carMarkers() {
   return mocked.markers.filter(
-    (marker) => marker.options.element.getAttribute("aria-hidden") === "true",
+    (marker) =>
+      marker.options.element.getAttribute("aria-hidden") === "true" &&
+      // The ground beacon is aria-hidden too; only the car is wanted here.
+      !marker.options.element.dataset.kind,
   );
 }
 
@@ -291,7 +294,7 @@ function expectNeutralUnitMarkers() {
 
 function device(name: string, ageSeconds: number): LiveDevice {
   return {
-    id: 7,
+    id: "7",
     name,
     online: true,
     fix: {
@@ -305,6 +308,10 @@ function device(name: string, ageSeconds: number): LiveDevice {
       freshness: ageSeconds < 90 ? "live" : "stale",
     },
   };
+}
+
+function markerFor(element: Element) {
+  return mocked.markers.find((marker) => marker.options.element === element)!;
 }
 
 function frame(milliseconds = 40) {
@@ -465,7 +472,7 @@ describe("patrol map integration", () => {
     const count = map.addLayer.mock.calls.length;
     act(() => map.emit("style.load"));
     expect(map.addLayer).toHaveBeenCalledTimes(count);
-    expect(mocked.markers).toHaveLength(PEOPLE.length * 2);
+    expect(mocked.markers).toHaveLength(PEOPLE.length * 3);
     expectNoPatrolRoutes(map);
   });
 
@@ -653,6 +660,24 @@ describe("patrol map integration", () => {
     expect(onSelect).toHaveBeenLastCalledWith("P-04");
     expect(onBuildingSelect).not.toHaveBeenCalled();
     expect(map.queryRenderedFeatures).not.toHaveBeenCalled();
+  });
+
+  it("beams a green beacon from under every officer", async () => {
+    let time = 0;
+    const readClock = () => ({ ...initialDemo, time, running: true });
+    const { container } = await mount({ running: true, readClock });
+    const beacons = (kind: string) => [
+      ...container.querySelectorAll<HTMLElement>(`[data-kind="${kind}"]`),
+    ];
+    expect(beacons("officer")).toHaveLength(PEOPLE.length);
+
+    time = 30;
+    frame();
+    PEOPLE.forEach((person, index) => {
+      const green = beacons("officer")[index];
+      expect(green.hidden).toBe(false);
+      expect(markerFor(green).point).toEqual(vehicleAt(person.id, time).point);
+    });
   });
 
   it("publishes tracked units to the live layer and refreshes them on each poll", async () => {

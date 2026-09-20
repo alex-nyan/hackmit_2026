@@ -26,6 +26,16 @@ const names = [
   "Charlie Kim",
   "Finley Ross",
 ];
+/**
+ * Where the scripted incident stood.
+ *
+ * The 90-second script that used to hang off this is gone, and nothing draws
+ * the point any more. It stays because `suspects.ts` is authored relative to
+ * it and its tests check that the reported track starts here — the report is
+ * retained, unrendered, until there is a signal to attach it to again.
+ */
+export const INCIDENT: Point = [-71.090794, 42.362764];
+
 export const PEOPLE = PATROL_UNITS.map((unit, index) => ({
   id: unit.id,
   name: names[index],

@@ -78,8 +78,9 @@ export function LiveTrackPanel({ state, onFocusDevice }: LiveTrackPanelProps) {
       <aside className="live-card" role="status">
         <span className="panel-label">Tracking not configured</span>
         <p>
-          Set <code>TRACCAR_URL</code>, <code>TRACCAR_EMAIL</code> and <code>TRACCAR_PASSWORD</code>{" "}
-          in <code>.env</code>, then restart the server.
+          This deployment has nowhere to put a position. Set <code>BLOB_READ_WRITE_TOKEN</code> so
+          phones can publish from <code>/capture</code>, or configure <code>TRACCAR_URL</code>,{" "}
+          <code>TRACCAR_EMAIL</code> and <code>TRACCAR_PASSWORD</code> for a tracking server.
         </p>
       </aside>
     );
@@ -99,8 +100,8 @@ export function LiveTrackPanel({ state, onFocusDevice }: LiveTrackPanelProps) {
       <aside className="live-card" role="status">
         <span className="panel-label">No units</span>
         <p>
-          No devices are visible to this account. Add one in Traccar, or check{" "}
-          <code>TRACCAR_DEVICE_IDS</code>.
+          Nobody is publishing a position. Open <code>/capture</code> on a phone, name the unit and
+          share its location — it appears here within a few seconds.
         </p>
       </aside>
     );

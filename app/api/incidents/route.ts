@@ -1,119 +1,34 @@
-import { parseIncidentDraft, type IncidentEvent } from "@/features/paw-patrol/incidents";
+import { appendIncident, clearIncidents, readIncidents } from "@/features/paw-patrol/incidentStore";
+import { parseIncidentDraft } from "@/features/paw-patrol/incidents";
 
 /**
  * The one piece of state the three workspaces share.
  *
- * This is deliberately in-memory and single-process: it makes Dispatch, Officer
- * and Hospital a single incident instead of three independent simulations, and
- * it is not a database. Run one server (leave `PAW_PATROL_WORKSPACE` unset and
- * open the workspaces as separate windows). Three `next dev` processes on three
- * ports each get their own heap, and each would see only its own events.
- *
- * Nothing here is durable. A restart is a new incident, which is the correct
- * behaviour for a demonstration and the wrong behaviour for a real one.
+ * Polled by sequence rather than streamed. An event stream is the better
+ * shape for a log, but it holds a server instance open for every workspace
+ * watching, and on a platform that answers each request from whichever
+ * instance is free the subscriber and the publisher are rarely the same one.
+ * A cursor gives the same guarantee — a workspace never misses an event —
+ * without either problem.
  */
 
 export const dynamic = "force-dynamic";
 
-const MAX_RETAINED = 200;
-const HEARTBEAT_MS = 15_000;
 const MAX_BODY_BYTES = 16_384;
 
-interface Subscriber {
-  enqueue: (chunk: string) => void;
-  close: () => void;
-}
-
-const log: IncidentEvent[] = [];
-const subscribers = new Set<Subscriber>();
-let seq = 0;
-
-function frame(event: IncidentEvent): string {
-  return `id: ${event.seq}\nevent: incident\ndata: ${JSON.stringify(event)}\n\n`;
-}
-
-function broadcast(event: IncidentEvent): void {
-  for (const subscriber of subscribers) {
-    try {
-      subscriber.enqueue(frame(event));
-    } catch {
-      // A closed stream is removed by its own abort handler; a failed write
-      // here must not stop delivery to the remaining workspaces.
-      subscribers.delete(subscriber);
-    }
-  }
-}
-
-/** Replay is by sequence, so a reconnecting workspace never misses an event. */
-function backlogAfter(lastSeq: number): IncidentEvent[] {
-  return log.filter((event) => event.seq > lastSeq);
-}
-
-function parseLastEventId(value: string | null): number {
+function parseSince(value: string | null): number {
   if (!value) return 0;
   const parsed = Number.parseInt(value, 10);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  const fromHeader = parseLastEventId(request.headers.get("last-event-id"));
-  const fromQuery = parseLastEventId(url.searchParams.get("since"));
-  const since = Math.max(fromHeader, fromQuery);
-
-  const encoder = new TextEncoder();
-  let heartbeat: ReturnType<typeof setInterval> | undefined;
-  let subscriber: Subscriber | undefined;
-
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      let open = true;
-      const send = (chunk: string) => {
-        if (!open) return;
-        controller.enqueue(encoder.encode(chunk));
-      };
-
-      subscriber = {
-        enqueue: send,
-        close: () => {
-          if (!open) return;
-          open = false;
-          try {
-            controller.close();
-          } catch {
-            // Already closed by the runtime when the client went away.
-          }
-        },
-      };
-
-      // Retry hint first, then everything the subscriber has not already seen.
-      send(`retry: 2000\n\n`);
-      for (const event of backlogAfter(since)) send(frame(event));
-
-      subscribers.add(subscriber);
-      heartbeat = setInterval(() => send(`: keepalive\n\n`), HEARTBEAT_MS);
-
-      request.signal.addEventListener("abort", () => {
-        if (heartbeat) clearInterval(heartbeat);
-        if (subscriber) subscribers.delete(subscriber);
-        subscriber?.close();
-      });
-    },
-    cancel() {
-      if (heartbeat) clearInterval(heartbeat);
-      if (subscriber) subscribers.delete(subscriber);
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-store, no-transform",
-      Connection: "keep-alive",
-      // Proxies that buffer would defeat the point of streaming these.
-      "X-Accel-Buffering": "no",
-    },
-  });
+  const since = parseSince(new URL(request.url).searchParams.get("since"));
+  const events = await readIncidents(since);
+  return Response.json(
+    { events, seq: events.at(-1)?.seq ?? since },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -143,26 +58,12 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // The client proposes an id; the server owns ordering and the wall clock so a
-  // workspace cannot backdate an event or claim a position in the timeline.
-  const event: IncidentEvent = { ...draft, seq: ++seq, at: new Date().toISOString() };
-
-  log.push(event);
-  if (log.length > MAX_RETAINED) log.splice(0, log.length - MAX_RETAINED);
-  broadcast(event);
-
+  const event = await appendIncident(draft);
   return Response.json(event, { status: 201, headers: { "Cache-Control": "no-store" } });
 }
 
-/** Demo reset. Clears the shared log and tells every workspace to do the same. */
+/** Demo reset. Clears the shared log for every workspace. */
 export async function DELETE(): Promise<Response> {
-  log.length = 0;
-  for (const subscriber of subscribers) {
-    try {
-      subscriber.enqueue(`event: reset\ndata: {}\n\n`);
-    } catch {
-      subscribers.delete(subscriber);
-    }
-  }
+  await clearIncidents();
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }

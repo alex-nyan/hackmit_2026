@@ -1,0 +1,478 @@
+.hospital {
+  --ink: #233247;
+  --muted: #526176;
+  --focus: #326bb4;
+  --line: rgb(50 69 96 / 15%);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: #e5ebef;
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+.hospital h1,
+.hospital h2,
+.hospital h3,
+.hospital :global(.wordmark) {
+  font-family: Arial, Helvetica, sans-serif;
+}
+.hospital :global(main) {
+  order: 0;
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  margin: 0;
+}
+.hospital :global(.topbar) {
+  order: 1;
+  min-height: 60px;
+  margin: 0 24px 24px;
+  padding: 8px 0;
+  background: transparent;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+}
+.hospital :global(.wordmark) {
+  font-size: 15px;
+  font-weight: 600;
+  gap: 8px;
+}
+.hospital :global(.wordmark) > svg {
+  width: 21px;
+  height: 24px;
+}
+.hospital :global(.nav-item) {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.hospital :global(.nav-item.active) {
+  background: rgb(55 97 155 / 9%);
+  color: var(--ink);
+}
+
+.viewport {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  min-height: 400px;
+  isolation: isolate;
+  overflow: hidden;
+  background: #dce3e9;
+}
+.viewport::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: inset 0 0 34px 5px rgb(192 49 67 / 22%);
+  border: 2px solid rgb(192 49 67 / 33%);
+}
+.viewport[data-cleared="true"]::after {
+  box-shadow: inset 0 0 34px 5px rgb(35 153 95 / 25%);
+  border-color: rgb(35 153 95 / 40%);
+}
+.videoStage {
+  position: absolute;
+  inset: 0;
+  background: #dce3e9;
+}
+.video,
+.videoHidden {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.videoHidden {
+  opacity: 0;
+}
+.videoEmpty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+  color: #586778;
+}
+.videoEmpty p {
+  font-size: 14px;
+}
+.videoEmpty button {
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 0;
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  color: var(--ink);
+}
+.panelHeading {
+  position: absolute;
+  z-index: 2;
+  bottom: 28px;
+  right: 24px;
+}
+.panelHeading h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.feedStatus {
+  display: none;
+}
+.feedStatus[data-live="true"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 0;
+}
+.feedStatus i {
+  width: 6px;
+  height: 6px;
+  background: #2b8058;
+  border-radius: 50%;
+}
+.identity,
+.heart,
+.access {
+  position: absolute;
+  z-index: 3;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+/* The overlay has no surface; only glyph shadows maintain contrast over footage. */
+.viewport:has(.feedStatus[data-live="true"]) {
+  --ink: #fff;
+  --muted: #edf2f8;
+}
+.viewport:has(.feedStatus[data-live="true"]) .identity,
+.viewport:has(.feedStatus[data-live="true"]) .heart,
+.viewport:has(.feedStatus[data-live="true"]) .access,
+.viewport:has(.feedStatus[data-live="true"]) .feedStatus {
+  text-shadow:
+    0 1px 3px rgb(0 0 0 / 90%),
+    0 0 2px rgb(0 0 0 / 80%);
+}
+.viewport:has(.feedStatus[data-live="true"]) .trendLine {
+  stroke: #8cbcff;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 75%));
+}
+.viewport:has(.feedStatus[data-live="true"]) .trendPoint {
+  fill: #8cbcff;
+}
+.viewport:has(.feedStatus[data-live="true"]) .gridLine {
+  stroke: rgb(255 255 255 / 32%);
+}
+.viewport:has(.feedStatus[data-live="true"]) .access {
+  color: #ffd0d8;
+}
+.viewport[data-cleared="true"]:has(.feedStatus[data-live="true"]) .access {
+  color: #a8efc8;
+}
+.identity {
+  top: 24px;
+  left: 24px;
+}
+.identity strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.identity > span {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.connectionRow select {
+  min-height: 44px;
+  padding: 8px;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.heart {
+  top: 24px;
+  right: 24px;
+  width: 320px;
+  padding: 0;
+}
+.monitorHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.monitorHeading h2 {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.monitorHeading > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.reading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 7px 0 8px;
+}
+.reading strong {
+  font:
+    500 48px/1.1 Arial,
+    sans-serif;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.reading span {
+  color: var(--muted);
+  font-size: 15px;
+}
+.trend {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.trend text {
+  font:
+    10px Arial,
+    sans-serif;
+  fill: var(--muted);
+}
+.gridLine {
+  stroke: rgb(57 77 104 / 19%);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.trendLine {
+  stroke: #326ed0;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  fill: none;
+}
+.trendPoint {
+  fill: #326ed0;
+}
+.chartTimes {
+  display: flex;
+  justify-content: space-between;
+  padding-right: 28px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.noReadings {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.access {
+  bottom: 24px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  font-size: 12px;
+  color: #843644;
+}
+.viewport[data-cleared="true"] .access {
+  color: #246142;
+}
+.scrollHint {
+  position: absolute;
+  z-index: 3;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: #526176;
+  border-radius: 50%;
+}
+.scrollHint:hover {
+  background: rgb(255 255 255 / 35%);
+}
+.utilities {
+  max-width: 1200px;
+  padding: 32px 24px 12px;
+  margin: 0 auto;
+  scroll-margin-top: 16px;
+}
+.connections {
+  background: none;
+  border-top: 1px solid var(--line);
+}
+.connections > summary,
+.activity > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+  min-height: 60px;
+  padding: 16px 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.connections > summary::-webkit-details-marker,
+.activity > summary::-webkit-details-marker {
+  display: none;
+}
+.connections > summary > span {
+  flex: 1;
+}
+.connections[open] > summary > svg:last-child,
+.activity[open] > summary > svg {
+  transform: rotate(180deg);
+}
+.connectionBody {
+  padding: 0 20px;
+}
+.connectionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding: 20px 0;
+}
+.connectionRow h2 {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.connectionRow p {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  min-height: 42px;
+  background: #e6ecf4;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.connectionMessage {
+  flex-basis: 100%;
+}
+.activity {
+  margin-top: 8px;
+  color: var(--muted);
+}
+.activity > summary {
+  justify-content: flex-end;
+  padding: 12px 4px;
+  font-size: 12px;
+  font-weight: 400;
+  min-height: 44px;
+}
+.activity h2 {
+  font-size: 16px;
+  margin: 20px 0 10px;
+}
+.transcript {
+  padding-bottom: 16px;
+  font-size: 13px;
+}
+.transcript p {
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.transcript time {
+  font-size: 12px;
+}
+.hospital button:hover:not(:disabled),
+.connections > summary:hover {
+  background: #dde6f0;
+  color: var(--ink);
+}
+
+@media (max-width: 600px) {
+  .identity {
+    top: 16px;
+    left: 16px;
+  }
+  .identity strong {
+    font-size: 14px;
+  }
+  .heart {
+    top: 80px;
+    right: 16px;
+    width: 256px;
+    padding: 0;
+  }
+  .reading strong {
+    font-size: 38px;
+  }
+  .videoEmpty {
+    padding-top: 130px;
+  }
+  .access {
+    left: 16px;
+    bottom: 66px;
+    font-size: 11px;
+  }
+  .panelHeading {
+    bottom: 20px;
+    right: 16px;
+  }
+  .scrollHint {
+    left: 36px;
+    bottom: 14px;
+  }
+  .utilities {
+    padding: 24px 16px 8px;
+  }
+  .hospital :global(.topbar) {
+    margin: 0 16px 16px;
+    flex-wrap: wrap;
+  }
+  .hospital :global(.topbar nav) {
+    width: auto;
+    order: initial;
+  }
+}
+@media (max-height: 500px) and (min-width: 601px) {
+  .heart {
+    top: 16px;
+    right: 16px;
+    width: 270px;
+    padding: 0;
+  }
+  .identity {
+    top: 16px;
+    left: 16px;
+  }
+}

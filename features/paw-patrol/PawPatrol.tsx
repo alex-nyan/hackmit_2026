@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   Shield,
@@ -21,24 +20,24 @@ import {
   LocateFixed,
   Sun,
   Moon,
-  Check,
   ArrowRight,
-  Ambulance,
   WifiOff,
-  Info,
-  ChevronDown,
 } from "lucide-react";
 import { type MapFocus, type MapTheme, MAP_FOCUS } from "../boston-map/types";
 import { BuildingPanel } from "../boston-map/BuildingPanel";
 import type { BuildingFacts } from "../boston-map/buildingSelection";
 import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-track";
+import { JoinCard, type JoinLink } from "@/features/join";
 import { OperationsMap } from "./OperationsMap";
 import { WorkspaceMapShell } from "./WorkspaceMapShell";
 import { OfficerOverview } from "./OfficerOverview";
 import { GlassEffect } from "@/components/ui/liquid-glass";
 import glassStyles from "./OfficerGlass.module.css";
 import officerStyles from "./OfficerWorkspace.module.css";
+import hospitalStyles from "./HospitalWorkspace.module.css";
+import { HospitalWorkspace } from "./HospitalWorkspace";
+import type { OfficerMediaInput } from "./OfficerFeed";
 import {
   EVENTS,
   PEOPLE,
@@ -53,14 +52,13 @@ import {
 import { useScenario, type DemoAction } from "./useScenario";
 import { vehicleAt } from "./vehicles/vehicleMotion";
 import { useDemoTools } from "./useDemoTools";
-import { sceneAt, emsStatus, type MistRecord } from "./consult";
-import { SceneCoordination, TacticalBrief, MistHandoff, emptyTactical } from "./ConsultPanels";
+import { sceneAt } from "./consult";
+import { SceneCoordination, TacticalBrief, emptyTactical } from "./ConsultPanels";
 import { WORKSPACE_LABELS, WORKSPACE_VIEWS, type Workspace } from "./workspace";
 import { useIncidentBus } from "./useIncidentBus";
 import { hazardIncident, transcriptIncident } from "./hazardSignal";
-import { draftMist, hasDraft, type MistDraft } from "./draftMist";
 import type { IncidentDraft } from "./incidents";
-import { BusIndicator, MistDraftCard, NotConcluded, SharedTimeline } from "./Provenance";
+import { BusIndicator, SharedTimeline } from "./Provenance";
 import type { TriageResult } from "../camera-triage/types";
 import type { TranscriptionResult } from "../camera-triage/audio";
 import { HeartRatePanel } from "../heart-rate/HeartRatePanel";
@@ -70,14 +68,6 @@ import {
   type HeartRateSample,
 } from "../heart-rate/useHeartRate";
 
-const AnatomyViewer = dynamic(() => import("../anatomy/AnatomyViewer"), {
-  ssr: false,
-  loading: () => (
-    <div className="model-pending" role="status">
-      Preparing anatomy viewer…
-    </div>
-  ),
-});
 /** Stable identity so a poll that finds nothing does not rerun the map effect. */
 const EMPTY_DEVICES: LiveDevice[] = [];
 
@@ -172,18 +162,20 @@ function HeartRateReadout({
 
 export function PawPatrol({
   workspace = null,
+  officerMedia,
   presentation = "map",
+  join = null,
 }: {
   workspace?: Workspace | null;
-  /** Retain existing detail workflows for later UI work and regression coverage. */
+  officerMedia?: OfficerMediaInput | null;
+  /** Dispatch defaults to the map; retain its detailed workflows for regression coverage. */
   presentation?: "map" | "detailed";
+  /** Resolved on the server from the request's own origin. */
+  join?: JoinLink | null;
 }) {
   const { time, running, readClock, dispatch, sceneOverride, panics, audit } = useScenario();
   // The only state shared across workspaces. Everything else stays local.
   const bus = useIncidentBus();
-  const [draftDismissed, setDraftDismissed] = useState(false);
-  const [appliedDraft, setAppliedDraft] = useState<MistDraft | null>(null);
-  const [records, setRecords] = useState<Record<string, MistRecord>>({});
   const [session, setSession] = useState(0);
   const [tactical, setTactical] = useState(emptyTactical);
   const fixedView = workspace ? WORKSPACE_VIEWS[workspace] : undefined;
@@ -199,8 +191,12 @@ export function PawPatrol({
   const [following, setFollowing] = useState(false);
   const [hardware, setHardware] = useState(false);
   const [evidence, setEvidence] = useState<"camera" | "audio" | null>(null);
-  // Both are opt-in: no camera, microphone or tracking request until asked.
-  const [tracking, setTracking] = useState(false);
+  // The camera and microphone stay opt-in. Tracking does not: it was opt-in
+  // when it meant reaching out to a Traccar server holding credentials
+  // somewhere else, and the positions now come from this deployment's own
+  // store — with a join code on screen inviting people to publish into it.
+  // Left off, a phone could scan, join and publish and still appear nowhere.
+  const [tracking, setTracking] = useState(true);
   const liveTrack = useLiveTrack(tracking);
   const liveDevices = liveTrack.state === "tracking" ? liveTrack.devices : EMPTY_DEVICES;
   const [building, setBuilding] = useState<BuildingFacts | null>(null);
@@ -224,10 +220,8 @@ export function PawPatrol({
   // Local-only: never pass device readings to the incident bus or MIST records.
   const heartRate = useHeartRate(person.id, session);
   const vehicle = vehicleAt(person.id, time);
-  const phase = phaseAt(time),
-    medical = phase >= 3,
-    complete = false;
-  const selectedCase = medical && person.id === "P-01";
+  const phase = phaseAt(time);
+  const complete = false;
   const scene = sceneAt(time, sceneOverride);
 
   const { publish } = bus;
@@ -313,9 +307,6 @@ export function PawPatrol({
     [captureContext, publish],
   );
 
-  const modelDraft = draftMist(bus.events, person.id);
-  const draftAvailable = hasDraft(modelDraft) && !draftDismissed && !records[person.id];
-
   const events = [...EVENTS, ...audit].sort((a, b) => a.at - b.at);
   function reset() {
     dispatch({ type: "reset" });
@@ -324,17 +315,13 @@ export function PawPatrol({
     setFocus("all");
     setRecenterKey((k) => k + 1);
     setEvidence(null);
-    setRecords({});
     setTactical(emptyTactical);
     setSession((s) => s + 1);
-    setDraftDismissed(false);
-    setAppliedDraft(null);
     // Clears the shared log in every workspace, not only this one.
     void bus.clear();
   }
   function play() {
     if (complete) {
-      setRecords({});
       setTactical(emptyTactical);
       setSession((s) => s + 1);
     }
@@ -356,13 +343,6 @@ export function PawPatrol({
     setSelectedId(p.id);
     setView("officer");
   }
-  const annotation = selectedCase
-    ? {
-        label: "Staged injury report",
-        detail: "The demo script reports an injury. Site, severity and diagnosis are not provided.",
-      }
-    : null;
-
   const map = (
     <section className="map-panel" aria-label="Operations map">
       <div className={`map-heading ${view === "officer" ? glassStyles.bubble : ""}`}>
@@ -434,6 +414,7 @@ export function PawPatrol({
         {view !== "officer" && (
           <div className="map-overlay">
             <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+            {view === "command" && <JoinCard join={join} />}
             <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
           </div>
         )}
@@ -456,7 +437,7 @@ export function PawPatrol({
           ))}
         </div>
       </div>
-      {view !== "officer" && presentation === "detailed" && (
+      {view === "command" && presentation === "detailed" && (
         <>
           <div className="vehicle-telemetry" aria-label="Selected unit simulated position">
             <span>
@@ -483,9 +464,10 @@ export function PawPatrol({
   );
 
   // Keep the shared state/subscription above mounted, but do not mount legacy
-  // panels (especially capture) in the new Dispatch/Medic presentation.
+  // panels (especially capture) in the new Dispatch presentation.
+  // Hospital keeps its dedicated camera and heart-rate overlay.
   // Officer capture callbacks and all backend/live-mode paths remain unchanged.
-  if (view !== "officer" && presentation === "map") {
+  if (view === "command" && presentation === "map") {
     return (
       <WorkspaceMapShell
         workspace={workspace}
@@ -501,7 +483,7 @@ export function PawPatrol({
 
   return (
     <div
-      className={`paw-app ${view === "officer" ? `${officerStyles.officer} ${glassStyles.workspace}` : ""}`}
+      className={`paw-app ${view === "officer" ? `${officerStyles.officer} ${glassStyles.workspace}` : view === "hospital" ? hospitalStyles.hospital : ""}`}
       data-officer-glass={view === "officer" ? "true" : undefined}
       data-officer-theme={view === "officer" ? theme : undefined}
     >
@@ -512,7 +494,7 @@ export function PawPatrol({
         {view === "officer" && <GlassEffect />}
         <Link className="wordmark" href="/" aria-label="Paw Patrol home">
           <Shield />
-          <span>Paw Patrol{view !== "officer" && <small>CONNECTED RESPONSE</small>}</span>
+          <span>Paw Patrol{view === "command" && <small>CONNECTED RESPONSE</small>}</span>
         </Link>
         <nav aria-label="Workspace">
           {workspace ? (
@@ -540,29 +522,27 @@ export function PawPatrol({
             ))
           )}
         </nav>
-        <button
-          className="hardware-toggle"
-          aria-label={view === "officer" ? "Devices" : "Devices offline"}
-          onClick={() => setHardware(!hardware)}
-          aria-expanded={hardware}
-        >
-          <Watch size={16} />
-          <span>
-            {heartRate.status === "receiving" ? "Heart rate live" : "Devices & HeartCast"}
-          </span>
-        </button>
+        {view !== "hospital" && (
+          <button
+            className="hardware-toggle"
+            aria-label={view === "officer" ? "Devices" : "Devices offline"}
+            onClick={() => setHardware(!hardware)}
+            aria-expanded={hardware}
+          >
+            <Watch size={16} />
+            <span>
+              {heartRate.status === "receiving" ? "Heart rate live" : "Devices & HeartCast"}
+            </span>
+          </button>
+        )}
       </header>
       <main id="workspace">
-        {view !== "officer" && (
+        {view === "command" && (
           <>
             <div className="page-heading">
               <div>
-                <p className="eyebrow">
-                  {view === "command"
-                    ? "BOSTON & CAMBRIDGE · OPERATIONS"
-                    : "RECEIVING DESK · SIMULATED HOSPITAL"}
-                </p>
-                <h1>{view === "command" ? PHASES[phase].title : "Ready before arrival."}</h1>
+                <p className="eyebrow">BOSTON &amp; CAMBRIDGE · OPERATIONS</p>
+                <h1>{PHASES[phase].title}</h1>
               </div>
               <div className="demo-buttons">
                 <button
@@ -613,7 +593,7 @@ export function PawPatrol({
             />
           </>
         )}
-        {hardware && (
+        {hardware && view !== "hospital" && (
           <section
             className={`hardware-panel panel ${view === "officer" ? glassStyles.bubble : ""}`}
           >
@@ -684,23 +664,6 @@ export function PawPatrol({
               events, tactical messages or real dispatch requests.
             </p>
           </section>
-        )}
-
-        {view === "hospital" && (
-          <div className="person-bar">
-            <label htmlFor="person">
-              Selected person <ChevronDown size={14} />
-            </label>
-            <select id="person" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
-              {PEOPLE.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} · {p.id}
-                </option>
-              ))}
-            </select>
-            <span className="tag paper">{personStatus(person.id, time)}</span>
-            <span className="person-note">Fictional demo identity</span>
-          </div>
         )}
 
         {view === "command" && (
@@ -915,143 +878,18 @@ export function PawPatrol({
         )}
 
         {view === "hospital" && (
-          <div className="hospital-grid">
-            <section className="panel handoff-panel">
-              <div className="panel-heading">
-                <span className={`tag ${selectedCase ? "sky" : "sage"}`}>
-                  {selectedCase
-                    ? complete
-                      ? "HANDOFF COMPLETE"
-                      : "SIMULATED INCOMING"
-                    : "STANDBY"}
-                </span>
-                <Ambulance size={25} />
-              </div>
-              <h2>{selectedCase ? person.name : "Awaiting a handoff."}</h2>
-              <p className="prose">
-                {selectedCase
-                  ? "A single view of the staged incident and sample observations. No clinical assessment has been performed."
-                  : `No injury or incoming transfer is reported for ${person.name} in the current scenario.`}
-              </p>
-              {selectedCase ? (
-                <>
-                  <dl className="details">
-                    <div>
-                      <dt>Demo case</dt>
-                      <dd>DEMO-001 / P-01</dd>
-                    </div>
-                    <div>
-                      <dt>Transport</dt>
-                      <dd>{emsStatus(time, scene.status)}</dd>
-                    </div>
-                    <div>
-                      <dt>Destination</dt>
-                      <dd>Demo receiving point, Cambridge</dd>
-                    </div>
-                    <div>
-                      <dt>Injury site</dt>
-                      <dd>Not provided</dd>
-                    </div>
-                    <div>
-                      <dt>Diagnosis</dt>
-                      <dd>Not assessed</dd>
-                    </div>
-                    <div>
-                      <dt>History / allergies</dt>
-                      <dd>Not provided</dd>
-                    </div>
-                  </dl>
-                  <div className="handoff-note">
-                    <Info size={17} />
-                    <p>
-                      Unverified weapon report remains unconfirmed. Heart-rate changes do not
-                      establish an injury or a diagnosis.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <div className="empty-handoff">
-                  <HeartPulse size={48} />
-                  <p>No incoming transfer. Patrol playback does not generate medical events.</p>
-                  <button className="secondary" onClick={() => setSelectedId("P-01")}>
-                    Select primary officer
-                  </button>
-                </div>
-              )}
-            </section>
-            <AnatomyViewer personId={person.id} personName={person.name} annotation={annotation} />
-            <section className="panel observations">
-              <p className="eyebrow">
-                {heartRate.mode === "device" ? "LOCAL DEVICE TEST" : "SAMPLE OBSERVATIONS"}
-              </p>
-              <h2>Context, not conclusions.</h2>
-              <HeartRateReadout connection={heartRate} time={time} personId={person.id} />
-              <HeartChart
-                time={time}
-                id={person.id}
-                deviceSamples={heartRate.mode === "device" ? heartRate.history : undefined}
-              />
-              <HeartRatePanel
-                connection={heartRate}
-                personId={person.id}
-                personName={person.name}
-              />
-              <p className="small-note">
-                Bluetooth heart rate is a local connectivity test, not a clinical assessment. No
-                live blood pressure, oxygen saturation, ECG or diagnosis is available. Device
-                readings are excluded from the simulated MIST handoff and shared log.
-              </p>
-              <h3 className="section-label">Handoff contents</h3>
-              {[
-                "Operator reports",
-                "Synthetic heart-rate series in demo MIST only",
-                "Recorded transport status",
-              ].map((s) => (
-                <div className="check-row" key={s}>
-                  <Check size={16} />
-                  {s}
-                </div>
-              ))}
-              <div className="feed-unavailable">
-                <Camera size={23} />
-                <strong>No body-camera footage</strong>
-                <p>No recording was supplied. A detection result is not a visual confirmation.</p>
-              </div>
-              <p className="small-note">
-                All people and coordination are simulated. No hospital was contacted.
-              </p>
-            </section>
-          </div>
-        )}
-
-        {view === "hospital" && selectedCase && (
-          <>
-            {draftAvailable && (
-              <MistDraftCard
-                draft={modelDraft}
-                onApply={() => setAppliedDraft(modelDraft)}
-                onDismiss={() => setDraftDismissed(true)}
-              />
-            )}
-            <MistHandoff
-              // Remounting is what seeds the editable form from an applied
-              // draft; the form owns its state once a person is typing in it.
-              key={`${session}-${person.id}-${appliedDraft ? "drafted" : "blank"}`}
-              person={person}
-              time={time}
-              scene={scene}
-              saved={records[person.id]}
-              seed={appliedDraft}
-              onSave={(record) => setRecords((current) => ({ ...current, [person.id]: record }))}
-            />
-          </>
-        )}
-
-        {view === "hospital" && (
-          <NotConcluded
+          <HospitalWorkspace
+            person={person}
+            onSelect={setSelectedId}
+            heartRate={heartRate}
+            session={session}
             events={bus.events}
-            personId={person.id}
-            hasSavedRecord={Boolean(records[person.id])}
+            busStatus={bus.status}
+            media={officerMedia}
+            running={running}
+            onPlay={play}
+            onPause={() => dispatch({ type: "pause" })}
+            onReset={reset}
           />
         )}
 
@@ -1080,7 +918,7 @@ export function PawPatrol({
           </section>
         )}
 
-        {view !== "officer" && (
+        {view === "command" && (
           <>
             <section className="scenario-strip" aria-label="Demo playback">
               <div className="scenario-caption">
@@ -1120,7 +958,7 @@ export function PawPatrol({
           {PHASES[phase].label}: {PHASES[phase].detail}
         </p>
       </main>
-      {view !== "officer" && (
+      {view === "command" && (
         <footer>
           <span>PAW PATROL · HACKMIT 2026</span>
           <span>Frontend demo · No external dispatch or clinical decisions</span>

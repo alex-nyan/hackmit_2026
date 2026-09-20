@@ -29,3 +29,4 @@ certificates/
 
 # Local development CA copy, served only for on-device install.
 public/paw-patrol-rootCA.crt
+.vercel

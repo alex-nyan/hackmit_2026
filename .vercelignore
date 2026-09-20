@@ -1,0 +1,31 @@
+# Vercel does NOT honour .gitignore, so secrets must be excluded explicitly.
+# Without this the local .env ships with the bundle and Next reads it at
+# runtime, which both leaks the tokens and points the deployment at services
+# that only exist on a laptop.
+.env
+.env.*
+
+# Vercel installs dependencies and builds from source, so the local build
+# output and caches are dead weight — and Turbopack's cache alone carries
+# single files past the 100 MB upload limit.
+node_modules
+.next
+.next-*
+
+# The hazard triage service is a separate Python app with its own deployment;
+# its virtualenv, tests and model weights have no business in this bundle.
+#
+# Its JSON contracts do, though: shared/contracts imports the schemas at build
+# time, so excluding the whole directory fails the build with fifteen
+# unresolved modules. Re-including a path means not excluding its parents,
+# hence the directory-by-directory form rather than a bare `services`.
+services/*
+!services/triage
+services/triage/*
+!services/triage/contracts
+
+# Never upload local TLS material or notes.
+certificates
+docs
+.git
+.DS_Store

@@ -114,8 +114,15 @@ export function CaptureCheck() {
   const [running, setRunning] = useState(false);
   const [level, setLevel] = useState(0);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
-  const { devices, cameraId, microphoneId, setCameraId, setMicrophoneId, refreshDevices } =
-    useCaptureDevices();
+  const {
+    devices,
+    cameraId,
+    microphoneId,
+    setCameraId,
+    setMicrophoneId,
+    refreshDevices,
+    resolveDevices,
+  } = useCaptureDevices();
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const sessionRef = useRef<CheckSession | null>(null);
@@ -141,9 +148,12 @@ export function CaptureCheck() {
     };
     sessionRef.current = session;
     setRunning(true);
-    // Keep the selectors aligned with this acquisition when permission reveals labels.
-    setCameraId(cameraId);
-    setMicrophoneId(microphoneId);
+    // Device names only exist once permission has been granted, so ask for the
+    // list before choosing: this is what reports on the iPhone rather than on
+    // whichever camera the browser would have handed over by default.
+    const chosen = await resolveDevices({ microphone: true });
+    // Stop can land while that list is being asked for.
+    if (sessionRef.current !== session) return;
     setFindings(EMPTY);
     setPlaybackUrl(null);
     const fail = (error: string) => {
@@ -154,8 +164,8 @@ export function CaptureCheck() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: trackConstraint(cameraId),
-        audio: trackConstraint(microphoneId),
+        video: trackConstraint(chosen.cameraId),
+        audio: trackConstraint(chosen.microphoneId),
       });
       if (sessionRef.current !== session) {
         stream.getTracks().forEach((track) => track.stop());
@@ -165,8 +175,6 @@ export function CaptureCheck() {
       stream.getTracks().forEach((track) => {
         track.onended = () => fail("Camera or microphone capture ended. Test again to reconnect.");
       });
-      // Labels are only exposed after permission is granted, so list again now.
-      void refreshDevices();
 
       const [video] = stream.getVideoTracks();
       const [audio] = stream.getAudioTracks();
@@ -251,7 +259,7 @@ export function CaptureCheck() {
             : `Capture failed (${name || "unknown error"}).`,
       );
     }
-  }, [cameraId, microphoneId, refreshDevices, setCameraId, setMicrophoneId, stop]);
+  }, [resolveDevices, stop]);
 
   useEffect(() => {
     const onVisibilityChange = () => {

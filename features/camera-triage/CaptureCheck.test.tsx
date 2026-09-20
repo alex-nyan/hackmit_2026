@@ -164,7 +164,8 @@ describe("capture check session lifecycle", () => {
     getUserMedia.mockReturnValue(pending.promise);
     await mount();
     const button = screen.getByRole("button", { name: "Test camera and microphone" });
-    act(() => {
+    // The second click is refused before the device list is even asked for.
+    await act(async () => {
       fireEvent.click(button);
       fireEvent.click(button);
     });

@@ -75,15 +75,20 @@
 .officerMarker[data-selected="true"]::after {
   background: #263342;
 }
-.officerMarker[data-emergency="true"] {
-  border-color: #ae6c3e;
-}
+/* The chip repeats the beacon's hue so a unit reads as an officer at city
+   zoom, where the 3D car is not drawn. */
+.officerMarker[data-detail="false"]::before,
 .officerMarker[data-emergency="true"]::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #df8b5a;
+  background: #15803d;
+  box-shadow: 0 0 0 2px rgb(34 197 94 / 32%);
+}
+/* Urgency is a separate channel from role: it warms the edge, never the dot. */
+.officerMarker[data-emergency="true"] {
+  border-color: #ae6c3e;
 }
 .officerLabel {
   letter-spacing: 0.035em;
@@ -143,6 +148,113 @@
   .root[data-appearance="glass"][data-theme="dark"] .officerMarker:not([data-selected="true"]) {
     background: #172536;
   }
+}
+
+/* Live position beacons. Hue is the only thing carrying the reading, so it is
+   fixed per role and never reused for state: green is an officer, red is a
+   reported person of interest. Emergency and movement change the rhythm, not
+   the colour. */
+.beacon {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
+  --core: #15803d;
+  --glow: #22c55e;
+  --beat: 2.2s;
+}
+.beacon[data-kind="suspect"] {
+  --core: #b42318;
+  --glow: #ef4444;
+  --beat: 1.2s;
+}
+.beacon[data-emergency="true"],
+.beacon[data-moving="true"] {
+  --beat: 1s;
+}
+.beacon[hidden] {
+  display: none;
+}
+.beacon::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--core);
+  box-shadow:
+    0 0 0 2px rgb(252 247 237 / 90%),
+    0 0 10px 2px var(--glow);
+}
+.beacon[data-selected="true"]::after {
+  inset: 3px;
+  box-shadow:
+    0 0 0 2px #fcf7ed,
+    0 0 0 4px var(--glow),
+    0 0 14px 3px var(--glow);
+}
+.beaconRing {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--glow);
+  border-radius: 50%;
+  opacity: 0;
+  animation: beacon-beam var(--beat) linear infinite;
+}
+
+@keyframes beacon-beam {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(3.6);
+    opacity: 0;
+  }
+}
+
+/* A report, not a unit: no hover, no focus ring, nothing to click. */
+.suspectMarker {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid #7a1c14;
+  border-radius: 7px;
+  background: #b42318;
+  color: #fff4f2;
+  box-shadow: 0 3px 12px rgb(122 28 20 / 35%);
+  font:
+    700 10px/1.1 Arial,
+    sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.suspectMarker::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: calc(50% - 4px);
+  width: 8px;
+  height: 8px;
+  background: #b42318;
+  transform: rotate(45deg);
+}
+.suspectMarker[hidden] {
+  display: none;
+}
+.suspectId {
+  letter-spacing: 0.035em;
+}
+.suspectNote {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgb(255 244 242 / 22%);
+  font-size: 8px;
+  letter-spacing: 0.08em;
 }
 
 .incidentMarker {
@@ -307,6 +419,15 @@
 @media (prefers-reduced-motion: reduce) {
   .officerMarker {
     transition: none;
+  }
+  /* One steady ring instead of a pulse; the colour still reads. */
+  .beaconRing {
+    animation: none;
+    opacity: 0.55;
+    transform: scale(2);
+  }
+  .beaconRing + .beaconRing {
+    display: none;
   }
 }
 
