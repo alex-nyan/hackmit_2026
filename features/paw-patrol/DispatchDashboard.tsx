@@ -691,12 +691,6 @@ export function DispatchDashboard({
             </details>
           </BentoCell>
         </div>
-        <footer className={styles.footer}>
-          <span>
-            <Shield size={13} /> Paw Patrol / Dispatch
-          </span>
-          <span>Demo fleet • Received reports • Live GPS — kept distinct</span>
-        </footer>
       </main>
     </div>
   );

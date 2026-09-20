@@ -309,7 +309,7 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-template-rows: minmax(330px, calc(100dvh - 365px)) minmax(210px, auto);
+  grid-template-rows: minmax(330px, calc(100dvh - 341px)) minmax(210px, auto);
   gap: 8px;
 }
 .grid > section {
@@ -1030,19 +1030,6 @@
   background: #fff;
   padding: 12px;
 }
-.footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  color: var(--bento-muted);
-  font-size: 9px;
-}
-.footer > span:first-child {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
 
 @keyframes pulse {
   50% {
@@ -1065,7 +1052,7 @@
 }
 @media (max-width: 1100px) {
   .grid {
-    grid-template-rows: minmax(330px, calc(100dvh - 365px)) minmax(215px, auto) minmax(215px, auto);
+    grid-template-rows: minmax(330px, calc(100dvh - 341px)) minmax(215px, auto) minmax(215px, auto);
   }
   .readinessCell {
     grid-column: 1 / 7;
@@ -1162,9 +1149,6 @@
   }
   .rosterFilters label {
     flex-basis: 100%;
-  }
-  .footer {
-    flex-wrap: wrap;
   }
 }
 @media (max-width: 470px) {
