@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 
-# One long-running server, which is what the shared incident log and the body
-# camera wall require: both live in this process's memory, so a second instance
-# would be a second, invisible incident.
+# One long-running Next server. Deployed incident, camera, GPS and signaling
+# state use configured Blob storage; a single process does not replace it.
+# The Python/native pipeline is deployed separately.
 FROM node:22-slim AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable
