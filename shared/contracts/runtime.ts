@@ -30,6 +30,9 @@ type Schema = {
   exclusiveMinimum?: number;
   exclusiveMaximum?: number;
   "x-ordered-pairs"?: string[][];
+  "x-kind-value-models"?: Record<string, string>;
+  "x-kind-value-kinds"?: Record<string, string>;
+  "x-subject-kind"?: string;
 };
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -128,6 +131,21 @@ function visit(schema: Schema, value: unknown, root: Schema, path: string, depth
         else if (object(schema.additionalProperties))
           visit(schema.additionalProperties, item, root, `${path}.*`, depth + 1);
       }
+      if (schema["x-kind-value-models"]) {
+        const tag = value.kind;
+        const name = typeof tag === "string" ? schema["x-kind-value-models"][tag] : undefined;
+        const expected = name ? root.$defs?.[name] : undefined;
+        if (!expected) return fail();
+        visit(expected, value.value, root, `${path}.value`, depth + 1);
+        const nestedKind = schema["x-kind-value-kinds"]?.[String(tag)];
+        if (nestedKind && (!object(value.value) || value.value.kind !== nestedKind)) fail();
+      }
+      if (
+        schema["x-subject-kind"] &&
+        value.kind !== schema["x-subject-kind"] &&
+        value.subject_id !== null
+      )
+        fail();
       for (const [first, last, order] of schema["x-ordered-pairs"] ?? []) {
         const a = value[first];
         const b = value[last];

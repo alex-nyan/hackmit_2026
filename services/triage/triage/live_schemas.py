@@ -2,13 +2,14 @@
 
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, Field, SecretStr, model_validator
+from pydantic import AwareDatetime, ConfigDict, Field, SecretStr, model_validator
 
+from triage.live_media_schemas import ContextSummary, MediaResult
 from triage.schemas import Contract
 
 Identifier = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")]
 Counter = Annotated[int, Field(ge=0, le=9_007_199_254_740_991, strict=True)]
-Finite = Annotated[float, Field(allow_inf_nan=False)]
+Finite = Annotated[float, Field(allow_inf_nan=False, strict=True)]
 Role = Literal["source", "officer", "dispatch", "hospital"]
 
 
@@ -54,7 +55,7 @@ class SessionInfo(Contract):
 
 
 class HeartRateValue(Contract):
-    bpm: Annotated[float, Field(ge=1, le=400, allow_inf_nan=False)]
+    bpm: Annotated[float, Field(ge=1, le=400, allow_inf_nan=False, strict=True)]
     unit: Literal["bpm"] = "bpm"
     measurement_origin: Literal["watch_healthkit"] = "watch_healthkit"
     signal_quality: Literal["unknown"] = "unknown"
@@ -64,17 +65,25 @@ class HeartRateValue(Contract):
 
 
 class LocationValue(Contract):
-    latitude: Annotated[float, Field(ge=-90, le=90, allow_inf_nan=False)]
-    longitude: Annotated[float, Field(ge=-180, le=180, allow_inf_nan=False)]
-    horizontal_accuracy_m: Annotated[float, Field(ge=0, le=100_000, allow_inf_nan=False)]
-    speed_mps: Annotated[float, Field(ge=0, le=1000, allow_inf_nan=False)] | None = None
-    course_degrees: Annotated[float, Field(ge=0, lt=360, allow_inf_nan=False)] | None = None
+    latitude: Annotated[float, Field(ge=-90, le=90, allow_inf_nan=False, strict=True)]
+    longitude: Annotated[float, Field(ge=-180, le=180, allow_inf_nan=False, strict=True)]
+    horizontal_accuracy_m: Annotated[
+        float, Field(ge=0, le=100_000, allow_inf_nan=False, strict=True)
+    ]
+    speed_mps: Annotated[float, Field(ge=0, le=1000, allow_inf_nan=False, strict=True)] | None = (
+        None
+    )
+    course_degrees: (
+        Annotated[float, Field(ge=0, lt=360, allow_inf_nan=False, strict=True)] | None
+    ) = None
 
 
 class SourceHealthValue(Contract):
     availability: Literal["available", "interrupted", "unavailable"]
     reason: str | None = Field(default=None, max_length=200)
-    battery_fraction: Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)] | None = None
+    battery_fraction: (
+        Annotated[float, Field(ge=0, le=1, allow_inf_nan=False, strict=True)] | None
+    ) = None
 
 
 class SampleBase(Contract):
@@ -126,19 +135,55 @@ class TelemetryReceipt(Contract):
 
 
 class Observation(Contract):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "x-kind-value-models": {
+                "heart_rate": "HeartRateValue",
+                "location": "LocationValue",
+                "source_health": "SourceHealthValue",
+                "visual": "MediaResult",
+                "transcript": "MediaResult",
+                "context": "ContextSummary",
+            },
+            "x-kind-value-kinds": {"visual": "frame", "transcript": "audio"},
+            "x-subject-kind": "heart_rate",
+        }
+    )
     observation_id: Identifier
     source_id: Identifier
     subject_id: Identifier | None
-    kind: Literal["heart_rate", "location", "source_health"]
+    kind: Literal["heart_rate", "location", "source_health", "visual", "transcript", "context"]
     measured_at: AwareDatetime
     received_at: AwareDatetime
     boot_id: Identifier
     sequence: Counter
-    value: HeartRateValue | LocationValue | SourceHealthValue
-    provenance: Literal["device_reported"] = "device_reported"
+    value: HeartRateValue | LocationValue | SourceHealthValue | MediaResult | ContextSummary
+    provenance: Literal["device_reported", "machine_observed", "unverified_model_context"] = (
+        "device_reported"
+    )
     freshness: Literal["fresh", "stale", "historical"]
     age_seconds: Finite
     warnings: list[str]
+
+    @model_validator(mode="after")
+    def consistent_value(self):
+        expected = {
+            "heart_rate": HeartRateValue,
+            "location": LocationValue,
+            "source_health": SourceHealthValue,
+            "visual": MediaResult,
+            "transcript": MediaResult,
+            "context": ContextSummary,
+        }
+        if not isinstance(self.value, expected[self.kind]):
+            raise ValueError("observation kind must match its typed value")
+        if self.kind != "heart_rate" and self.subject_id is not None:
+            raise ValueError("only enrolled physiology carries a subject association")
+        if isinstance(self.value, MediaResult) and self.value.kind != (
+            "frame" if self.kind == "visual" else "audio"
+        ):
+            raise ValueError("media observation kind mismatch")
+        return self
 
 
 class SourceState(SourceEnrollment):
@@ -166,7 +211,7 @@ class AlertEvent(Contract):
     subject_id: Identifier | None
     observed_at: AwareDatetime
     created_at: AwareDatetime
-    evidence_refs: list[Identifier] = Field(default_factory=list)
+    evidence_refs: list[Identifier] = Field(default_factory=list, max_length=8)
     priority: Literal["urgent_review", "review"]
     evidence_status: Literal["human_reported", "machine_observed", "human_rejected"]
     attention: Literal["unacknowledged", "acknowledged"]

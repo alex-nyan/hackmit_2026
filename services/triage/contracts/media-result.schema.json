@@ -1,0 +1,477 @@
+{
+  "$defs": {
+    "BoundingBox": {
+      "additionalProperties": false,
+      "properties": {
+        "x1": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X1",
+          "type": "number"
+        },
+        "x2": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X2",
+          "type": "number"
+        },
+        "y1": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y1",
+          "type": "number"
+        },
+        "y2": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y2",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x1",
+        "y1",
+        "x2",
+        "y2"
+      ],
+      "title": "BoundingBox",
+      "type": "object",
+      "x-ordered-pairs": [
+        [
+          "x1",
+          "x2",
+          "lt"
+        ],
+        [
+          "y1",
+          "y2",
+          "lt"
+        ]
+      ]
+    },
+    "Detection": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "$ref": "#/$defs/BoundingBox"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "label": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "confidence",
+        "bbox"
+      ],
+      "title": "Detection",
+      "type": "object"
+    },
+    "ModelProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "enum": [
+            "ollama",
+            "openai_compatible",
+            "ultralytics",
+            "faster_whisper"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "revision"
+      ],
+      "title": "ModelProvenance",
+      "type": "object"
+    },
+    "TranscriptSegment": {
+      "additionalProperties": false,
+      "properties": {
+        "end_seconds": {
+          "maximum": 86400,
+          "minimum": 0,
+          "title": "End Seconds",
+          "type": "number"
+        },
+        "no_speech_probability": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "No Speech Probability"
+        },
+        "start_seconds": {
+          "maximum": 86400,
+          "minimum": 0,
+          "title": "Start Seconds",
+          "type": "number"
+        },
+        "text": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_seconds",
+        "end_seconds",
+        "text",
+        "no_speech_probability"
+      ],
+      "title": "TranscriptSegment",
+      "type": "object",
+      "x-ordered-pairs": [
+        [
+          "start_seconds",
+          "end_seconds",
+          "lte"
+        ]
+      ]
+    },
+    "TranscriptionResult": {
+      "additionalProperties": false,
+      "description": "A transcript is a model hypothesis about what was said, not a record of it.\nEmpty text means no speech was recognised, which is not the same as silence,\nand a confident-looking transcript can still be wrong. Both are stated in the\npayload so a caller cannot quietly treat this as evidence.",
+      "properties": {
+        "audio_sha256": {
+          "title": "Audio Sha256",
+          "type": "string"
+        },
+        "captured_at": {
+          "format": "date-time",
+          "title": "Captured At",
+          "type": "string"
+        },
+        "confidence_semantics": {
+          "const": "uncalibrated_model_scores",
+          "default": "uncalibrated_model_scores",
+          "title": "Confidence Semantics",
+          "type": "string"
+        },
+        "duration_seconds": {
+          "maximum": 86400,
+          "minimum": 0,
+          "title": "Duration Seconds",
+          "type": "number"
+        },
+        "incident_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Incident Id"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Language"
+        },
+        "language_probability": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Language Probability"
+        },
+        "models": {
+          "items": {
+            "$ref": "#/$defs/ModelProvenance"
+          },
+          "title": "Models",
+          "type": "array"
+        },
+        "processed_at": {
+          "format": "date-time",
+          "title": "Processed At",
+          "type": "string"
+        },
+        "request_id": {
+          "title": "Request Id",
+          "type": "string"
+        },
+        "requires_human_review": {
+          "const": true,
+          "default": true,
+          "title": "Requires Human Review",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "segments": {
+          "items": {
+            "$ref": "#/$defs/TranscriptSegment"
+          },
+          "maxItems": 500,
+          "title": "Segments",
+          "type": "array"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "speech_detected": {
+          "title": "Speech Detected",
+          "type": "boolean"
+        },
+        "text": {
+          "maxLength": 20000,
+          "title": "Text",
+          "type": "string"
+        },
+        "timings_ms": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Timings Ms",
+          "type": "object"
+        },
+        "transcript_semantics": {
+          "const": "machine_hypothesis_not_verbatim_record",
+          "default": "machine_hypothesis_not_verbatim_record",
+          "title": "Transcript Semantics",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "source_id",
+        "incident_id",
+        "captured_at",
+        "processed_at",
+        "audio_sha256",
+        "text",
+        "speech_detected",
+        "language",
+        "language_probability",
+        "duration_seconds",
+        "segments",
+        "models",
+        "warnings",
+        "timings_ms",
+        "requires_human_review",
+        "confidence_semantics",
+        "transcript_semantics"
+      ],
+      "title": "TranscriptionResult",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "boot_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Boot Id",
+      "type": "string"
+    },
+    "captured_at": {
+      "format": "date-time",
+      "title": "Captured At",
+      "type": "string"
+    },
+    "confidence_semantics": {
+      "const": "uncalibrated_model_scores",
+      "default": "uncalibrated_model_scores",
+      "title": "Confidence Semantics",
+      "type": "string"
+    },
+    "detections": {
+      "items": {
+        "$ref": "#/$defs/Detection"
+      },
+      "maxItems": 300,
+      "title": "Detections",
+      "type": "array"
+    },
+    "evidence_refs": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9_.:-]+$",
+        "type": "string"
+      },
+      "maxItems": 2,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "incident_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "frame",
+        "audio"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "media_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Media Id",
+      "type": "string"
+    },
+    "models": {
+      "items": {
+        "$ref": "#/$defs/ModelProvenance"
+      },
+      "maxItems": 3,
+      "title": "Models",
+      "type": "array"
+    },
+    "processed_at": {
+      "format": "date-time",
+      "title": "Processed At",
+      "type": "string"
+    },
+    "requires_human_review": {
+      "const": true,
+      "default": true,
+      "title": "Requires Human Review",
+      "type": "boolean"
+    },
+    "sequence": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "source_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "observed",
+        "unavailable"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "timings_ms": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "number"
+      },
+      "title": "Timings Ms",
+      "type": "object"
+    },
+    "transcript": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TranscriptionResult"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "media_id",
+    "incident_id",
+    "source_id",
+    "kind",
+    "boot_id",
+    "sequence",
+    "captured_at",
+    "processed_at",
+    "status",
+    "evidence_refs",
+    "detections",
+    "transcript",
+    "models",
+    "warnings",
+    "timings_ms",
+    "requires_human_review",
+    "confidence_semantics"
+  ],
+  "title": "MediaResult",
+  "type": "object"
+}

@@ -1,0 +1,173 @@
+{
+  "$defs": {
+    "AudioMediaRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "boot_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Boot Id",
+          "type": "string"
+        },
+        "captured_at": {
+          "format": "date-time",
+          "title": "Captured At",
+          "type": "string"
+        },
+        "data_base64": {
+          "maxLength": 1400000,
+          "minLength": 1,
+          "title": "Data Base64",
+          "type": "string"
+        },
+        "incident_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "audio",
+          "title": "Kind",
+          "type": "string"
+        },
+        "media_type": {
+          "enum": [
+            "audio/wav",
+            "audio/mp4",
+            "audio/aac",
+            "audio/mpeg",
+            "audio/webm",
+            "audio/ogg"
+          ],
+          "title": "Media Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "2.0",
+          "default": "2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "sequence": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "source_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Source Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "incident_id",
+        "source_id",
+        "boot_id",
+        "sequence",
+        "captured_at",
+        "data_base64",
+        "kind",
+        "media_type"
+      ],
+      "title": "AudioMediaRequest",
+      "type": "object"
+    },
+    "FrameMediaRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "boot_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Boot Id",
+          "type": "string"
+        },
+        "captured_at": {
+          "format": "date-time",
+          "title": "Captured At",
+          "type": "string"
+        },
+        "data_base64": {
+          "maxLength": 1400000,
+          "minLength": 1,
+          "title": "Data Base64",
+          "type": "string"
+        },
+        "incident_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "frame",
+          "title": "Kind",
+          "type": "string"
+        },
+        "media_type": {
+          "enum": [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+          ],
+          "title": "Media Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "2.0",
+          "default": "2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "sequence": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "source_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:-]+$",
+          "title": "Source Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "incident_id",
+        "source_id",
+        "boot_id",
+        "sequence",
+        "captured_at",
+        "data_base64",
+        "kind",
+        "media_type"
+      ],
+      "title": "FrameMediaRequest",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "discriminator": {
+    "mapping": {
+      "audio": "#/$defs/AudioMediaRequest",
+      "frame": "#/$defs/FrameMediaRequest"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/FrameMediaRequest"
+    },
+    {
+      "$ref": "#/$defs/AudioMediaRequest"
+    }
+  ]
+}

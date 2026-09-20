@@ -10,6 +10,7 @@ from pathlib import Path
 
 from pydantic import TypeAdapter
 
+from triage.live_media_schemas import ContextSummary, MediaReceipt, MediaRequest, MediaResult
 from triage.live_schemas import (
     CommandReceipt,
     IncidentCommand,
@@ -56,6 +57,9 @@ SUPPORTED_KEYS = {
     "exclusiveMinimum",
     "exclusiveMaximum",
     "x-ordered-pairs",
+    "x-kind-value-models",
+    "x-kind-value-kinds",
+    "x-subject-kind",
     "discriminator",
 }
 
@@ -78,6 +82,25 @@ def check_supported(schema):
 
 
 def ts_type(schema):
+    selector = schema.get("x-kind-value-models")
+    if selector:
+        common = {key: value for key, value in schema.items() if not key.startswith("x-")}
+        common["properties"] = {
+            key: value
+            for key, value in schema["properties"].items()
+            if key not in {"kind", "value", "subject_id"}
+        }
+        branches = []
+        for tag, model in selector.items():
+            nested = schema.get("x-kind-value-kinds", {}).get(tag)
+            value = model if nested is None else f"{model} & {{ kind: {json.dumps(nested)} }}"
+            subject = (
+                ts_type(schema["properties"]["subject_id"])
+                if tag == schema.get("x-subject-kind")
+                else "null"
+            )
+            branches.append(f"{{ kind: {json.dumps(tag)}; value: {value}; subject_id: {subject} }}")
+        return ts_type(common) + " & (\n  " + " |\n  ".join(branches) + "\n)"
     if "$ref" in schema:
         return schema["$ref"].rsplit("/", 1)[1]
     if "const" in schema:
@@ -138,12 +161,20 @@ def main():
             ("incident-event", IncidentEvent, "serialization"),
             ("command-receipt", CommandReceipt, "serialization"),
             ("incident-command", TypeAdapter(IncidentCommand), "validation"),
+            ("media-request", TypeAdapter(MediaRequest), "validation"),
+            ("media-receipt", MediaReceipt, "serialization"),
+            ("media-result", MediaResult, "serialization"),
+            ("context-summary", ContextSummary, "serialization"),
         ]
     )
     schemas = {}
     definitions = {}
     for filename, model, mode in contracts:
-        name = "IncidentCommand" if isinstance(model, TypeAdapter) else model.__name__
+        name = (
+            "".join(part.title() for part in filename.split("-"))
+            if isinstance(model, TypeAdapter)
+            else model.__name__
+        )
         content = (
             model.json_schema(mode=mode)
             if isinstance(model, TypeAdapter)
@@ -171,7 +202,9 @@ def main():
             if definition_name in definitions and definitions[definition_name] != definition:
                 raise ValueError(f"Conflicting schema definition: {definition_name}")
             definitions[definition_name] = definition
-        definitions[name] = type_schema
+        definitions[name] = {
+            key: value for key, value in type_schema.items() if key not in {"$schema", "$defs"}
+        }
         write_or_check(
             service / "contracts" / f"{filename}.schema.json",
             json.dumps(schema, indent=2, sort_keys=True) + "\n",

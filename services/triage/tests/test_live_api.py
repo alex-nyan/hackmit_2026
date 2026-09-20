@@ -197,3 +197,123 @@ def test_storage_failure_never_returns_durable_acknowledgment(tmp_path):
         assert store.snapshot("incident-a").revision == 0
     finally:
         store.close()
+
+
+async def test_media_admission_publishes_shared_observation_and_scoped_evidence(tmp_path):
+    import base64
+    from datetime import UTC, datetime
+
+    class Detector:
+        async def run(self, job):
+            return {
+                "detections": [],
+                "models": [{"provider": "ultralytics", "model": "test"}],
+                "image_base64": job["image_base64"],
+                "elapsed_ms": 1,
+            }
+
+        async def close(self):
+            pass
+
+    async with service(tmp_path, live_media_enabled=True) as (client, app):
+        app.state.live_api.media.detector = Detector()
+        body = {
+            "incident_id": "incident-a",
+            "source_id": "camera-a",
+            "kind": "frame",
+            "boot_id": "camera-boot",
+            "sequence": 1,
+            "captured_at": datetime.now(UTC).isoformat(),
+            "media_type": "image/jpeg",
+            "data_base64": base64.b64encode(b"evidence-test-content").decode(),
+        }
+        denied = await client.post("/v2/ingest/media", json=body, headers=headers())
+        assert denied.status_code == 403
+        accepted = await client.post("/v2/ingest/media", json=body, headers=headers(SOURCE_TOKEN))
+        assert accepted.status_code == 202
+        assert accepted.json()["processing_semantics"] == "admitted_not_processed"
+        for _ in range(20):
+            snapshot = await client.get("/v2/incidents/incident-a/state", headers=headers())
+            if snapshot.json()["observations"]:
+                break
+            await asyncio.sleep(0.01)
+        observation = snapshot.json()["observations"][0]
+        assert observation["kind"] == "visual"
+        assert observation["subject_id"] is None
+        reference = observation["value"]["evidence_refs"][0]
+        evidence = await client.get(f"/v2/evidence/{reference}", headers=headers())
+        assert evidence.content == b"evidence-test-content"
+        assert evidence.headers["cache-control"] == "no-store"
+        assert evidence.headers["x-content-type-options"] == "nosniff"
+        assert (
+            await client.get(f"/v2/evidence/{reference}", headers=headers(HOSPITAL_TOKEN))
+        ).status_code == 403
+        assert (
+            await client.get(f"/v2/evidence/{reference}", headers=headers(SOURCE_TOKEN))
+        ).status_code == 403
+        assert (await client.get("/v2/evidence/expired", headers=headers())).status_code == 404
+        repeated = await client.post("/v2/ingest/media", json=body, headers=headers(SOURCE_TOKEN))
+        assert repeated.json()["status"] == "duplicate"
+
+
+async def test_media_size_limit_and_disabled_path_fail_before_admission(tmp_path):
+    async with service(tmp_path) as (client, _):
+        disabled = await client.post("/v2/ingest/media", json={}, headers=headers(SOURCE_TOKEN))
+        assert disabled.status_code == 503
+        assert disabled.json()["error"]["code"] == "live_media_unavailable"
+    async with service(tmp_path, live_media_enabled=True, live_media_max_request_bytes=1024) as (
+        client,
+        _,
+    ):
+        oversized = await client.post(
+            "/v2/ingest/media",
+            content=b"x" * 1025,
+            headers={**headers(SOURCE_TOKEN), "Content-Type": "application/json"},
+        )
+        assert oversized.status_code == 413
+
+
+async def test_slow_media_uploads_are_bounded_and_assistance_has_reserved_admission(tmp_path):
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def slow_body():
+        started.set()
+        yield b"{"
+        await release.wait()
+        yield b"}"
+
+    async def forbidden_body():
+        raise AssertionError("Excess media must be rejected before reading bytes")
+        yield b""
+
+    async with service(tmp_path, live_media_enabled=True, live_media_ingress_limit=1) as (
+        client,
+        app,
+    ):
+        media_headers = {**headers(SOURCE_TOKEN), "Content-Type": "application/json"}
+        active = asyncio.create_task(
+            client.post("/v2/ingest/media", content=slow_body(), headers=media_headers)
+        )
+        await started.wait()
+        try:
+            rejected = await client.post(
+                "/v2/ingest/media", content=forbidden_body(), headers=media_headers
+            )
+            assert rejected.status_code == 429
+            assert rejected.json()["error"]["code"] == "media_ingress_busy"
+            assistance = await client.post(
+                "/v2/incidents/incident-a/commands",
+                json={"kind": "assistance", "note": "Help while camera upload is stalled"},
+                headers=headers(),
+            )
+            assert assistance.status_code == 200
+            telemetry_response = await client.post(
+                "/v2/ingest/telemetry",
+                json=telemetry().model_dump(mode="json"),
+                headers=headers(SOURCE_TOKEN),
+            )
+            assert telemetry_response.status_code == 200
+        finally:
+            release.set()
+        assert (await active).status_code == 422
+        assert app.state.live_api.ingress_active == {"media": 0, "telemetry": 0, "command": 0}

@@ -11,6 +11,10 @@ import IncidentSnapshotSchema from "../../services/triage/contracts/incident-sna
 import IncidentEventSchema from "../../services/triage/contracts/incident-event.schema.json";
 import CommandReceiptSchema from "../../services/triage/contracts/command-receipt.schema.json";
 import IncidentCommandSchema from "../../services/triage/contracts/incident-command.schema.json";
+import MediaRequestSchema from "../../services/triage/contracts/media-request.schema.json";
+import MediaReceiptSchema from "../../services/triage/contracts/media-receipt.schema.json";
+import MediaResultSchema from "../../services/triage/contracts/media-result.schema.json";
+import ContextSummarySchema from "../../services/triage/contracts/context-summary.schema.json";
 
 export type AlertCommandInput = {
   "kind": "acknowledge" | "reject" | "resolve";
@@ -53,6 +57,18 @@ export type Attribution = {
   "note": string | null;
 };
 
+export type AudioMediaRequestInput = {
+  "schema_version"?: "2.0";
+  "incident_id": string;
+  "source_id": string;
+  "boot_id": string;
+  "sequence": number;
+  "captured_at": string;
+  "data_base64": string;
+  "kind": "audio";
+  "media_type": "audio/wav" | "audio/mp4" | "audio/aac" | "audio/mpeg" | "audio/webm" | "audio/ogg";
+};
+
 export type BoundingBox = {
   "x1": number;
   "y1": number;
@@ -69,10 +85,36 @@ export type CommandReceipt = {
   "report_id": string | null;
 };
 
+export type ContextSummary = {
+  "context_id": string;
+  "incident_id": string;
+  "source_id": string;
+  "snapshot_revision": number;
+  "generated_at": string;
+  "evidence_refs": Array<string>;
+  "summary": string;
+  "limitations": Array<string>;
+  "model": ModelProvenance;
+  "requires_human_review": true;
+  "context_semantics": "unverified_visual_context_no_action_authority";
+};
+
 export type Detection = {
   "label": string;
   "confidence": number;
   "bbox": BoundingBox;
+};
+
+export type FrameMediaRequestInput = {
+  "schema_version"?: "2.0";
+  "incident_id": string;
+  "source_id": string;
+  "boot_id": string;
+  "sequence": number;
+  "captured_at": string;
+  "data_base64": string;
+  "kind": "frame";
+  "media_type": "image/jpeg" | "image/png" | "image/webp";
 };
 
 export type Hazard = {
@@ -160,6 +202,38 @@ export type LocationValueInput = {
   "course_degrees"?: number | null;
 };
 
+export type MediaReceipt = {
+  "schema_version": "2.0";
+  "media_id": string;
+  "incident_id": string;
+  "source_id": string;
+  "kind": "frame" | "audio";
+  "status": "accepted" | "replaced" | "duplicate";
+  "processing_semantics": "admitted_not_processed";
+};
+
+export type MediaRequest = FrameMediaRequestInput | AudioMediaRequestInput;
+
+export type MediaResult = {
+  "media_id": string;
+  "incident_id": string;
+  "source_id": string;
+  "kind": "frame" | "audio";
+  "boot_id": string;
+  "sequence": number;
+  "captured_at": string;
+  "processed_at": string;
+  "status": "observed" | "unavailable";
+  "evidence_refs": Array<string>;
+  "detections": Array<Detection>;
+  "transcript": TranscriptionResult | null;
+  "models": Array<ModelProvenance>;
+  "warnings": Array<string>;
+  "timings_ms": Record<string, number>;
+  "requires_human_review": true;
+  "confidence_semantics": "uncalibrated_model_scores";
+};
+
 export type ModelProvenance = {
   "provider": "ollama" | "openai_compatible" | "ultralytics" | "faster_whisper";
   "model": string;
@@ -169,18 +243,22 @@ export type ModelProvenance = {
 export type Observation = {
   "observation_id": string;
   "source_id": string;
-  "subject_id": string | null;
-  "kind": "heart_rate" | "location" | "source_health";
   "measured_at": string;
   "received_at": string;
   "boot_id": string;
   "sequence": number;
-  "value": HeartRateValue | LocationValue | SourceHealthValue;
-  "provenance": "device_reported";
+  "provenance": "device_reported" | "machine_observed" | "unverified_model_context";
   "freshness": "fresh" | "stale" | "historical";
   "age_seconds": number;
   "warnings": Array<string>;
-};
+} & (
+  { kind: "context"; value: ContextSummary; subject_id: null } |
+  { kind: "heart_rate"; value: HeartRateValue; subject_id: string | null } |
+  { kind: "location"; value: LocationValue; subject_id: null } |
+  { kind: "source_health"; value: SourceHealthValue; subject_id: null } |
+  { kind: "transcript"; value: MediaResult & { kind: "audio" }; subject_id: null } |
+  { kind: "visual"; value: MediaResult & { kind: "frame" }; subject_id: null }
+);
 
 export type RevokeSceneReportCommandInput = {
   "kind": "revoke_scene_report";
@@ -403,4 +481,24 @@ export function parseCommandReceipt(value: unknown): CommandReceipt {
 export function parseIncidentCommand(value: unknown): IncidentCommand {
   validateContract(IncidentCommandSchema, value);
   return value as IncidentCommand;
+}
+
+export function parseMediaRequest(value: unknown): MediaRequest {
+  validateContract(MediaRequestSchema, value);
+  return value as MediaRequest;
+}
+
+export function parseMediaReceipt(value: unknown): MediaReceipt {
+  validateContract(MediaReceiptSchema, value);
+  return value as MediaReceipt;
+}
+
+export function parseMediaResult(value: unknown): MediaResult {
+  validateContract(MediaResultSchema, value);
+  return value as MediaResult;
+}
+
+export function parseContextSummary(value: unknown): ContextSummary {
+  validateContract(ContextSummarySchema, value);
+  return value as ContextSummary;
 }

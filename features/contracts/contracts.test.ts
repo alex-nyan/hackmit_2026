@@ -112,3 +112,71 @@ describe("generated incident contracts", () => {
     );
   });
 });
+
+describe("observation kind and identity boundaries", () => {
+  const captured = "2026-09-20T01:00:00Z";
+  function snapshot() {
+    return {
+      schema_version: "2.0",
+      incident_id: "incident-1",
+      revision: 1,
+      generated_at: captured,
+      sources: [],
+      alerts: [],
+      scene_reports: [],
+      observations: [
+        {
+          observation_id: "media-1",
+          source_id: "camera-1",
+          subject_id: null,
+          kind: "visual",
+          measured_at: captured,
+          received_at: captured,
+          boot_id: "boot-1",
+          sequence: 1,
+          provenance: "machine_observed",
+          freshness: "fresh",
+          age_seconds: 0,
+          warnings: [],
+          value: {
+            media_id: "media-1",
+            incident_id: "incident-1",
+            source_id: "camera-1",
+            kind: "frame",
+            boot_id: "boot-1",
+            sequence: 1,
+            captured_at: captured,
+            processed_at: captured,
+            status: "unavailable",
+            evidence_refs: [],
+            detections: [],
+            transcript: null,
+            models: [],
+            warnings: ["detector_unavailable"],
+            timings_ms: { processing: 1 },
+            requires_human_review: true,
+            confidence_semantics: "uncalibrated_model_scores",
+          },
+        },
+      ],
+    };
+  }
+
+  it("accepts a typed machine observation with no inferred subject identity", () => {
+    const result = parseIncidentSnapshot(snapshot());
+    expect(result.observations[0].kind).toBe("visual");
+  });
+
+  it.each(["heart_rate", "transcript"])("rejects relabelling a frame result as %s", (kind) => {
+    const value = snapshot();
+    value.observations[0].kind = kind;
+    expect(() => parseIncidentSnapshot(value)).toThrow(ContractValidationError);
+  });
+
+  it("rejects associating an arbitrary person with machine visual evidence", () => {
+    const value = snapshot();
+    const observation: Record<string, unknown> = value.observations[0];
+    observation.subject_id = "person-1";
+    expect(() => parseIncidentSnapshot(value)).toThrow(ContractValidationError);
+  });
+});

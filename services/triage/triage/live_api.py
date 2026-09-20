@@ -3,29 +3,36 @@
 import asyncio
 import hmac
 import json
+import logging
 import re
 import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import TypeAdapter, ValidationError
 from starlette.requests import ClientDisconnect
 
 from triage.config import Settings
+from triage.live_media import LiveMedia
+from triage.live_media_schemas import MediaRequest
 from triage.live_schemas import IncidentCommand, SessionInfo, TelemetryRequest
 from triage.live_store import LiveError, LiveStore, require_incident
 
 KEY_PATTERN = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 command_adapter = TypeAdapter(IncidentCommand)
+media_adapter = TypeAdapter(MediaRequest)
+audit = logging.getLogger("triage.audit")
 
 
 class LiveAPI:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.store: LiveStore | None = None
+        self.media: LiveMedia | None = None
         self.router = APIRouter()
         self.sse_connections = 0
+        self.ingress_active = {"media": 0, "telemetry": 0, "command": 0}
         self._routes()
 
     @asynccontextmanager
@@ -33,11 +40,19 @@ class LiveAPI:
         if self.settings.live_enabled:
             self.store = LiveStore(self.settings)
         try:
+            if self.settings.live_media_enabled and self.store is not None:
+                self.media = LiveMedia(self.settings, self.store)
+                await self.media.start()
             yield
         finally:
-            if self.store is not None:
-                self.store.close()
-                self.store = None
+            try:
+                if self.media is not None:
+                    await self.media.close()
+                    self.media = None
+            finally:
+                if self.store is not None:
+                    self.store.close()
+                    self.store = None
 
     def authenticate(self, request: Request):
         if not self.settings.live_enabled:
@@ -57,7 +72,24 @@ class LiveAPI:
             raise LiveError(503, "live_store_unavailable")
         return self.store
 
-    async def body(self, request: Request) -> bytes:
+    async def body(
+        self,
+        request: Request,
+        limit: int | None = None,
+        *,
+        admission: str = "telemetry",
+    ) -> bytes:
+        slots = getattr(self.settings, f"live_{admission}_ingress_limit")
+        if self.ingress_active[admission] >= slots:
+            raise LiveError(429, f"{admission}_ingress_busy")
+        self.ingress_active[admission] += 1
+        try:
+            return await self._bounded_body(request, limit)
+        finally:
+            self.ingress_active[admission] -= 1
+
+    async def _bounded_body(self, request: Request, limit: int | None = None) -> bytes:
+        limit = limit or self.settings.live_max_request_bytes
         if request.headers.get("content-encoding", "identity").lower() != "identity":
             raise LiveError(415, "unsupported_content_encoding")
         content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
@@ -67,13 +99,13 @@ class LiveAPI:
         if length is not None:
             if not length.isascii() or not length.isdecimal():
                 raise LiveError(400, "invalid_content_length")
-            if len(length) > 12 or int(length) > self.settings.live_max_request_bytes:
+            if len(length) > 12 or int(length) > limit:
                 raise LiveError(413, "request_too_large")
         result = bytearray()
         try:
             async with asyncio.timeout(self.settings.request_read_timeout_seconds):
                 async for chunk in request.stream():
-                    if len(result) + len(chunk) > self.settings.live_max_request_bytes:
+                    if len(result) + len(chunk) > limit:
                         raise LiveError(413, "request_too_large")
                     result.extend(chunk)
         except TimeoutError:
@@ -100,6 +132,58 @@ class LiveAPI:
         )
 
     def _routes(self):
+        @self.router.post("/v2/ingest/media")
+        async def media(request: Request):
+            try:
+                principal = self.authenticate(request)
+                if principal.role != "source":
+                    raise LiveError(403, "source_forbidden")
+                if self.media is None:
+                    raise LiveError(503, "live_media_unavailable")
+                try:
+                    payload = media_adapter.validate_json(
+                        await self.body(
+                            request,
+                            self.settings.live_media_max_request_bytes,
+                            admission="media",
+                        )
+                    )
+                except (ValidationError, ValueError):
+                    raise LiveError(422, "invalid_request") from None
+                return self.response(self.media.admit(principal, payload), status_code=202)
+            except LiveError as error:
+                return self.error(error)
+
+        @self.router.get("/v2/evidence/{evidence_id}")
+        async def evidence(evidence_id: str, request: Request):
+            try:
+                principal = self.authenticate(request)
+                if self.media is None:
+                    raise LiveError(503, "live_media_unavailable")
+                item = self.media.evidence(principal, evidence_id)
+                audit.info(
+                    json.dumps(
+                        {
+                            "event": "evidence_access",
+                            "principal_id": principal.principal_id,
+                            "incident_id": item.incident_id,
+                            "evidence_id": evidence_id,
+                        },
+                        separators=(",", ":"),
+                    )
+                )
+                return Response(
+                    item.data,
+                    media_type=item.content_type,
+                    headers={
+                        "Cache-Control": "no-store",
+                        "X-Content-Type-Options": "nosniff",
+                        "Content-Disposition": "inline",
+                    },
+                )
+            except LiveError as error:
+                return self.error(error)
+
         @self.router.get("/v2/session")
         async def session(request: Request):
             try:
@@ -151,7 +235,9 @@ class LiveAPI:
                     raise LiveError(400, "invalid_idempotency_key")
                 store = self.require_store()
                 try:
-                    payload = command_adapter.validate_json(await self.body(request))
+                    payload = command_adapter.validate_json(
+                        await self.body(request, admission="command")
+                    )
                 except (ValidationError, ValueError):
                     raise LiveError(422, "invalid_request") from None
                 receipt, replayed = store.command(principal, incident_id, key, payload)

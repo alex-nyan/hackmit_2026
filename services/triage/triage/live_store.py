@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from triage.config import Settings
+from triage.live_media_schemas import ContextSummary, MediaResult
 from triage.live_schemas import (
     AlertCommand,
     AlertEvent,
@@ -72,6 +73,7 @@ class LiveStore:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.lock = threading.RLock()
+        self.publication_failures: set[tuple[str, str]] = set()
         settings.live_database_path.parent.mkdir(parents=True, exist_ok=True)
         self.connection = sqlite3.connect(settings.live_database_path, check_same_thread=False)
         self.connection.row_factory = sqlite3.Row
@@ -99,6 +101,11 @@ class LiveStore:
                 principal_id TEXT NOT NULL, incident_id TEXT NOT NULL, key TEXT NOT NULL,
                 fingerprint TEXT NOT NULL, receipt TEXT NOT NULL,
                 PRIMARY KEY (principal_id, incident_id, key)
+            );
+            CREATE TABLE IF NOT EXISTS live_media_keys (
+                source_id TEXT NOT NULL, boot_id TEXT NOT NULL, sequence INTEGER NOT NULL,
+                kind TEXT NOT NULL, media_id TEXT NOT NULL, revision INTEGER NOT NULL,
+                PRIMARY KEY (source_id, boot_id, sequence, kind)
             );
             """
         )
@@ -241,7 +248,7 @@ class LiveStore:
                 state = self._load(self.connection, incident_id)
         except sqlite3.Error:
             raise LiveError(503, "live_store_unavailable") from None
-        state.pop("runtime")
+        runtime = state.pop("runtime")
         configured = {source.source_id for source in self.settings.live_sources}
         state["sources"] = [
             source
@@ -255,9 +262,46 @@ class LiveStore:
             source["age_seconds"] = (
                 max(0, (now - timestamp(measured)).total_seconds()) if measured else None
             )
-            if measured and source["age_seconds"] > self.settings.live_freshness_seconds:
+            source_limit = self._freshness_limit(
+                {
+                    "camera": "visual",
+                    "microphone": "transcript",
+                }.get(source["kind"], "source_health")
+            )
+            if (
+                measured
+                and source["age_seconds"] > source_limit
+                and source["availability"] == "available"
+            ):
                 source["availability"] = "stale"
                 source["reason"] = "no_recent_source_data"
+            if self.settings.live_media_enabled and source["kind"] in {"camera", "microphone"}:
+                media_kind = "visual" if source["kind"] == "camera" else "transcript"
+                latest = runtime[source["source_id"]]["latest"].get(media_kind)
+                machine = next(
+                    (
+                        item
+                        for item in state["observations"]
+                        if latest and item["observation_id"] == latest["observation_id"]
+                    ),
+                    None,
+                )
+                if (incident_id, source["source_id"]) in self.publication_failures:
+                    source["availability"] = "unavailable"
+                    source["reason"] = "inference_publication_unavailable"
+                elif source["availability"] not in {"unavailable", "interrupted"}:
+                    if machine is None:
+                        source["availability"] = "unknown"
+                        source["reason"] = "awaiting_inference"
+                    elif machine["value"]["status"] == "unavailable":
+                        source["availability"] = "unavailable"
+                        source["reason"] = "inference_unavailable"
+                    elif (now - timestamp(machine["measured_at"])).total_seconds() > source_limit:
+                        source["availability"] = "stale"
+                        source["reason"] = "no_recent_inference"
+                    elif "monitoring_gap" in machine["warnings"]:
+                        source["availability"] = "unknown"
+                        source["reason"] = "service_restarted"
         state["observations"] = [
             item for item in state["observations"] if item["source_id"] in visible
         ]
@@ -268,11 +312,15 @@ class LiveStore:
                 observation["freshness"] = (
                     "stale"
                     if (
-                        age > self.settings.live_freshness_seconds
+                        age > self._freshness_limit(observation["kind"])
                         or "monitoring_gap" in observation["warnings"]
                     )
                     else "fresh"
                 )
+            if observation["kind"] == "context" and (
+                state["revision"] > observation["value"]["snapshot_revision"] + 1
+            ):
+                observation["freshness"] = "stale"
         state["alerts"] = [
             item
             for item in state["alerts"]
@@ -280,7 +328,16 @@ class LiveStore:
         ]
         for alert in state["alerts"]:
             age = (now - timestamp(alert["observed_at"])).total_seconds()
-            alert["freshness"] = "stale" if age > self.settings.live_freshness_seconds else "fresh"
+            alert_limit = (
+                self._freshness_limit("visual")
+                if alert["kind"]
+                in {
+                    "possible_visible_weapon",
+                    "visual_review",
+                }
+                else self.settings.live_freshness_seconds
+            )
+            alert["freshness"] = "stale" if age > alert_limit else "fresh"
         for report in state["scene_reports"]:
             report["effective"] = (
                 report["revoked_by"] is None
@@ -289,6 +346,17 @@ class LiveStore:
             )
         state["generated_at"] = now.isoformat()
         return IncidentSnapshot.model_validate(state)
+
+    def _freshness_limit(self, kind: str) -> float:
+        if kind in {"visual", "context"}:
+            return min(
+                self.settings.live_freshness_seconds, self.settings.live_media_frame_max_age_seconds
+            )
+        if kind == "transcript":
+            return min(
+                self.settings.live_freshness_seconds, self.settings.live_media_audio_max_age_seconds
+            )
+        return self.settings.live_freshness_seconds
 
     def ingest(
         self,
@@ -341,6 +409,8 @@ class LiveStore:
                     if (sample.value.measured_until - now).total_seconds() > 10:
                         raise LiveError(422, "future_sample")
                 warnings = []
+                if age < 0:
+                    warnings.append("clock_ahead")
                 latest = runtime["latest"].get(sample.kind)
                 highwater = runtime["boots"].get(sample.boot_id)
                 historical = age > self.settings.live_freshness_seconds
@@ -604,6 +674,303 @@ class LiveStore:
                 (principal.principal_id, incident_id, key, digest, receipt.model_dump_json()),
             )
             return receipt, False
+
+    def _machine_source(self, state: dict, source_id: str, kind: str) -> dict:
+        configured = next(
+            (
+                item
+                for item in self.settings.live_sources
+                if item.source_id == source_id and item.incident_id == state["incident_id"]
+            ),
+            None,
+        )
+        if configured is None or configured.kind != kind:
+            raise LiveError(403, "machine_source_forbidden")
+        return next(source for source in state["sources"] if source["source_id"] == source_id)
+
+    @staticmethod
+    def _retire_observations(state: dict, source_id: str, kind: str) -> None:
+        for previous in state["observations"]:
+            if previous["source_id"] == source_id and previous["kind"] == kind:
+                previous["freshness"] = "historical"
+
+    def _prune_machine_observations(self, state: dict) -> None:
+        machine_kinds = {"visual", "transcript", "context"}
+        while (
+            sum(item["kind"] in machine_kinds for item in state["observations"])
+            > self.settings.live_media_results_per_incident
+        ):
+            retired = next(
+                (
+                    index
+                    for index, item in enumerate(state["observations"])
+                    if item["kind"] in machine_kinds and item["freshness"] == "historical"
+                ),
+                None,
+            )
+            if retired is None:
+                raise LiveError(503, "media_observation_capacity_reached")
+            del state["observations"][retired]
+        self._prune_observations(state)
+
+    def publish_media(self, result: MediaResult, *, now: datetime | None = None) -> int:
+        identity = (result.incident_id, result.source_id)
+        try:
+            revision, inserted = self._publish_media(result, now=now)
+        except Exception:
+            if any(
+                (item.incident_id, item.source_id) == identity
+                for item in self.settings.live_sources
+            ):
+                self.publication_failures.add(identity)
+            raise
+        if inserted:
+            self.publication_failures.discard(identity)
+        return revision
+
+    def _publish_media(
+        self,
+        result: MediaResult,
+        *,
+        now: datetime | None = None,
+    ) -> tuple[int, bool]:
+        """Internal detector/ASR boundary; source tokens cannot publish these outputs.
+
+        Persisted sequence identities survive process restarts. Received/processed
+        time never replaces capture time when deciding source coverage or urgency.
+        """
+        if not self.settings.live_media_enabled:
+            raise LiveError(503, "live_media_unavailable")
+        now = now or datetime.now(UTC)
+        age = (now - result.captured_at).total_seconds()
+        if age < -2 or (result.processed_at - now).total_seconds() > 10:
+            raise LiveError(422, "future_machine_result")
+        if result.kind == "frame" and result.transcript is not None:
+            raise LiveError(422, "machine_kind_mismatch")
+        if result.kind == "audio" and result.detections:
+            raise LiveError(422, "machine_kind_mismatch")
+        if result.transcript is not None and (
+            result.transcript.incident_id != result.incident_id
+            or result.transcript.source_id != result.source_id
+            or result.transcript.captured_at != result.captured_at
+        ):
+            raise LiveError(422, "machine_identity_mismatch")
+        max_age = (
+            self.settings.live_media_frame_max_age_seconds
+            if result.kind == "frame"
+            else self.settings.live_media_audio_max_age_seconds
+        )
+        stale = age > max_age
+        with self._transaction() as connection:
+            state = self._load(connection, result.incident_id)
+            source = self._machine_source(
+                state,
+                result.source_id,
+                "camera" if result.kind == "frame" else "microphone",
+            )
+            duplicate = connection.execute(
+                "SELECT revision FROM live_media_keys "
+                "WHERE source_id=? AND boot_id=? AND sequence=? AND kind=?",
+                (result.source_id, result.boot_id, result.sequence, result.kind),
+            ).fetchone()
+            if duplicate:
+                return duplicate["revision"], False
+            kind = "visual" if result.kind == "frame" else "transcript"
+            runtime = state["runtime"][result.source_id]
+            previous = runtime["latest"].get(kind)
+            historical = stale or (
+                previous is not None and result.captured_at <= timestamp(previous["measured_at"])
+            )
+            warnings = list(result.warnings)
+            if age < 0:
+                warnings.append("clock_ahead")
+            if historical:
+                warnings.append("historical_machine_result")
+            if result.status == "unavailable":
+                warnings.append("inference_coverage_unavailable")
+            if not historical:
+                self._retire_observations(state, result.source_id, kind)
+                self._retire_observations(state, result.source_id, "context")
+                runtime["latest"][kind] = {
+                    "measured_at": result.captured_at.isoformat(),
+                    "observation_id": result.media_id,
+                }
+            observation = Observation(
+                observation_id=result.media_id,
+                source_id=result.source_id,
+                subject_id=None,
+                kind=kind,
+                measured_at=result.captured_at,
+                received_at=result.processed_at,
+                boot_id=result.boot_id,
+                sequence=result.sequence,
+                value=result,
+                provenance="machine_observed",
+                freshness="historical" if historical else "fresh",
+                age_seconds=max(0, age),
+                warnings=list(dict.fromkeys(warnings)),
+            )
+            state["observations"].append(observation.model_dump(mode="json"))
+            self._prune_machine_observations(state)
+            health = runtime["latest"].get("source_health")
+            after_health = health is None or result.captured_at > timestamp(health["measured_at"])
+            after_source = source["last_measured_at"] is None or result.captured_at > timestamp(
+                source["last_measured_at"]
+            )
+            if not historical and after_health and after_source:
+                source["availability"] = (
+                    "available" if result.status == "observed" else "unavailable"
+                )
+                source["reason"] = None if result.status == "observed" else "inference_unavailable"
+                source["last_measured_at"] = result.captured_at.isoformat()
+                source["boot_id"] = result.boot_id
+            elif stale and after_health and after_source:
+                source["availability"] = "unavailable"
+                source["reason"] = "media_expired_before_publication"
+                source["last_measured_at"] = result.captured_at.isoformat()
+            source["last_received_at"] = now.isoformat()
+            if not historical and result.status == "observed" and result.evidence_refs:
+                self._apply_detector_policy(state, result, now)
+            event_kind = "visual_observed" if result.kind == "frame" else "transcript_observed"
+            self._append_event(connection, state, event_kind, now)
+            connection.execute(
+                "INSERT INTO live_media_keys VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    result.source_id,
+                    result.boot_id,
+                    result.sequence,
+                    result.kind,
+                    result.media_id,
+                    state["revision"],
+                ),
+            )
+            connection.execute(
+                "DELETE FROM live_media_keys WHERE rowid IN (SELECT rowid FROM live_media_keys "
+                "ORDER BY rowid DESC LIMIT -1 OFFSET ?)",
+                (self.settings.live_media_dedupe_entries,),
+            )
+            return state["revision"], True
+
+    def _apply_detector_policy(self, state: dict, result: MediaResult, now: datetime) -> None:
+        # Generic COCO labels do not establish a validated firearm capability.
+        # Neither ASR text nor Gemma output is an input to this deterministic policy.
+        if result.kind != "frame":
+            return
+        supported = set(self.settings.live_evaluated_weapon_labels)
+        labels = sorted(
+            {detection.label for detection in result.detections if detection.label in supported}
+        )
+        for label in labels:
+            claim = f"Possible {label}-like object in camera view; human review required"
+            previous = next(
+                (
+                    alert
+                    for alert in reversed(state["alerts"])
+                    if alert["source_id"] == result.source_id
+                    and alert["claim"] == claim
+                    and alert["kind"] == "possible_visible_weapon"
+                    and alert["disposition"] == "open"
+                    and alert["evidence_status"] != "human_rejected"
+                    and 0
+                    <= (result.captured_at - timestamp(alert["observed_at"])).total_seconds()
+                    <= self.settings.live_alert_dedupe_seconds
+                ),
+                None,
+            )
+            if previous is not None:
+                previous["observed_at"] = result.captured_at.isoformat()
+                previous["evidence_refs"] = list(
+                    dict.fromkeys(previous["evidence_refs"] + result.evidence_refs)
+                )[-8:]
+                previous["freshness"] = "fresh"
+            else:
+                self._make_alert_space(state)
+                alert = AlertEvent(
+                    alert_id="alert-" + str(uuid.uuid4()),
+                    kind="possible_visible_weapon",
+                    claim=claim,
+                    source_id=result.source_id,
+                    subject_id=None,
+                    observed_at=result.captured_at,
+                    created_at=now,
+                    evidence_refs=result.evidence_refs,
+                    priority="urgent_review",
+                    evidence_status="machine_observed",
+                    attention="unacknowledged",
+                    disposition="open",
+                    freshness="fresh",
+                    created_by=None,
+                )
+                state["alerts"].append(alert.model_dump(mode="json"))
+            for report in state["scene_reports"]:
+                if report["status"] == "reported_clear" and report["revoked_by"] is None:
+                    report["reassessment_required"] = True
+                    report["effective"] = False
+
+    def publish_context(self, summary: ContextSummary, *, now: datetime | None = None) -> bool:
+        """Advisory-only descriptive output: exact revision and current evidence required."""
+        if not self.settings.live_context_enabled:
+            return False
+        if (summary.incident_id, summary.source_id) in self.publication_failures:
+            return False
+        now = now or datetime.now(UTC)
+        with self._transaction() as connection:
+            state = self._load(connection, summary.incident_id)
+            self._machine_source(state, summary.source_id, "camera")
+            if summary.snapshot_revision != state["revision"]:
+                return False
+            if abs((now - summary.generated_at).total_seconds()) > 10:
+                return False
+            references = set(summary.evidence_refs)
+            matching = [
+                item
+                for item in state["observations"]
+                if item["kind"] == "visual"
+                and item["source_id"] == summary.source_id
+                and item["freshness"] == "fresh"
+                and item["value"]["status"] == "observed"
+                and "monitoring_gap" not in item["warnings"]
+                and 0
+                <= (now - timestamp(item["measured_at"])).total_seconds()
+                <= min(self._freshness_limit("visual"), self.settings.live_evidence_ttl_seconds)
+            ]
+            allowed = {
+                reference for item in matching for reference in item["value"]["evidence_refs"]
+            }
+            if not references <= allowed or not matching:
+                return False
+            # Source health events advance the revision; never wrap an interrupted view
+            # in fresh-looking model prose even if a caller fabricates that new revision.
+            source = next(
+                item for item in state["sources"] if item["source_id"] == summary.source_id
+            )
+            if source["availability"] != "available":
+                return False
+            referenced = [
+                item for item in matching if references.intersection(item["value"]["evidence_refs"])
+            ]
+            basis = min(referenced, key=lambda item: timestamp(item["measured_at"]))
+            self._retire_observations(state, summary.source_id, "context")
+            state["observations"].append(
+                Observation(
+                    observation_id=summary.context_id,
+                    source_id=summary.source_id,
+                    subject_id=None,
+                    kind="context",
+                    measured_at=timestamp(basis["measured_at"]),
+                    received_at=now,
+                    boot_id=basis["boot_id"],
+                    sequence=basis["sequence"],
+                    value=summary,
+                    provenance="unverified_model_context",
+                    freshness="fresh",
+                    age_seconds=max(0, (now - timestamp(basis["measured_at"])).total_seconds()),
+                    warnings=["model_context_is_unverified_and_cannot_authorize_actions"],
+                ).model_dump(mode="json")
+            )
+            self._prune_machine_observations(state)
+            self._append_event(connection, state, "context_updated", now)
+            return True
 
     def _make_alert_space(self, state: dict) -> None:
         if len(state["alerts"]) < self.settings.live_max_alerts_per_incident:

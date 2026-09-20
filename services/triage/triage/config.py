@@ -65,12 +65,40 @@ class Settings(BaseSettings):
     live_max_idempotency_records: int = Field(default=10_000, ge=100, le=100_000)
     live_sse_heartbeat_seconds: float = Field(default=10, ge=0.1, le=60)
     live_max_sse_connections: int = Field(default=32, ge=1, le=256)
+    live_media_enabled: bool = False
+    live_media_max_request_bytes: int = Field(default=1_500_000, ge=1024, le=2_000_000)
+    live_media_ingress_limit: int = Field(default=2, ge=1, le=8)
+    live_telemetry_ingress_limit: int = Field(default=8, ge=1, le=32)
+    live_command_ingress_limit: int = Field(default=4, ge=1, le=16)
+    live_frame_queue_sources: int = Field(default=8, ge=1, le=32)
+    live_audio_queue_size: int = Field(default=4, ge=1, le=32)
+    live_media_frame_max_age_seconds: float = Field(default=3, ge=0.1, le=30)
+    live_media_audio_max_age_seconds: float = Field(default=15, ge=1, le=60)
+    live_detector_timeout_seconds: float = Field(default=10, ge=0.1, le=60)
+    live_asr_timeout_seconds: float = Field(default=20, ge=0.1, le=120)
+    live_evidence_ttl_seconds: float = Field(default=120, ge=1, le=900)
+    live_evidence_max_bytes: int = Field(default=16_000_000, ge=1024, le=100_000_000)
+    live_evidence_max_items: int = Field(default=32, ge=1, le=256)
+    live_media_dedupe_entries: int = Field(default=2048, ge=10, le=10_000)
+    live_context_enabled: bool = False
+    live_context_interval_seconds: float = Field(default=5, ge=0.1, le=300)
+    live_context_timeout_seconds: float = Field(default=20, ge=0.1, le=120)
+    live_context_queue_size: int = Field(default=2, ge=1, le=8)
+    live_evaluated_weapon_labels: list[str] = Field(default_factory=list, max_length=20)
+    live_media_results_per_incident: int = Field(default=32, ge=1, le=256)
+    live_alert_dedupe_seconds: float = Field(default=5, ge=0.1, le=30)
 
     @model_validator(mode="after")
     def valid_deployment(self):
         token = self.api_token.get_secret_value()
         if not token.isascii() or any(character.isspace() for character in token):
             raise ValueError("API token must be ASCII without whitespace")
+        if self.live_media_enabled and not self.live_enabled:
+            raise ValueError("live media requires enabled live incidents")
+        if self.live_context_enabled and not self.live_media_enabled:
+            raise ValueError("live context requires enabled live media")
+        if any(not label.strip() or len(label) > 80 for label in self.live_evaluated_weapon_labels):
+            raise ValueError("evaluated detector labels must be non-empty bounded strings")
         if self.live_enabled:
             if not self.live_incident_ids or not self.live_principals:
                 raise ValueError("live mode requires explicit incidents and principals")
@@ -84,12 +112,23 @@ class Settings(BaseSettings):
                 raise ValueError("source references unknown incident")
             for incident_id in incident_ids:
                 current_capacity = sum(
-                    2 if source.kind in {"watch", "gps"} else 1
+                    3
+                    if source.kind == "camera"
+                    else 2
+                    if source.kind in {"watch", "gps", "microphone"}
+                    else 1
                     for source in self.live_sources
                     if source.incident_id == incident_id
                 )
                 if current_capacity > self.live_max_observations_per_incident:
                     raise ValueError("observation capacity must preserve current enrolled sources")
+                media_capacity = sum(
+                    2 if source.kind == "camera" else 1
+                    for source in self.live_sources
+                    if source.incident_id == incident_id and source.kind in {"camera", "microphone"}
+                )
+                if media_capacity > self.live_media_results_per_incident:
+                    raise ValueError("media capacity must preserve current enrolled sources")
             principal_ids = {principal.principal_id for principal in self.live_principals}
             tokens = {principal.token.get_secret_value() for principal in self.live_principals}
             if len(principal_ids) != len(self.live_principals):
