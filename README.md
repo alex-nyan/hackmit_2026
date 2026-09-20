@@ -1,18 +1,17 @@
 # Paw Patrol · HackMIT 2026
 
-A full-screen, interactive 3D building map of MIT, Harvard, Cambridge, and Boston.
-This repository preserves the working local map's appearance, camera presets,
-light/dark themes, and real Mapbox building extrusions.
-
-The foundation is **Next.js App Router + React + TypeScript + Mapbox GL JS**.
-It runs with normal Node/pnpm commands: no Codex, Sites plugin, Cloudflare account,
-database, or platform-specific tooling is needed.
+Start here for the Dispatch, Officer and Hospital workspaces. The repository also
+contains the original live fleet map and a separate visual hazard-triage service.
+The three workspaces share the dashboard implementation in `apps/paw-patrol`;
+each runs as its own local server with its own build output.
 
 ## Quick start
 
 Requirements:
 
-- Node.js **26.9.0** and pnpm **12.4.2** are the tested toolchain (`.nvmrc` selects Node).
+- Node.js **26.9.0** (`.nvmrc` selects Node) for the root launcher and map.
+- The dashboard lockfile uses **npm 11.6.2**; use the pinned command below.
+- **pnpm 12.4.2** only for installing/checking the optional original map.
 - Git.
 - Your own **Mapbox public access token**, beginning with `pk.`.
 - An internet connection and a browser with WebGL support.
@@ -22,36 +21,61 @@ git clone https://github.com/alex-nyan/hackmit_2026.git
 cd hackmit_2026
 ```
 
-The command clones the default `main` branch. Check `node --version` and
-`pnpm --version` before installing. With nvm installed, run `nvm install` and
-`nvm use` inside the repository. If pnpm is not available, enable the pinned
-package manager with your Node toolchain or install pnpm 12.4.2.
-
-Then install the dependencies and create your local configuration:
+With nvm installed, run `nvm install` and `nvm use` inside the repository.
+Install the dashboard dependencies once and create local configuration:
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm run setup
+npx --yes npm@11.6.2 ci --prefix apps/paw-patrol
+npm run setup
 ```
 
-Edit the newly created `.env.local`:
+Set your public Mapbox token in `apps/paw-patrol/.env.local`:
 
 ```dotenv
 NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_public_mapbox_token
 ```
 
 Create a public token at <https://account.mapbox.com/access-tokens/>. Do not use a
-secret `sk.` token. If URL restrictions are enabled, allow `http://localhost:5173/*`
-(and `http://127.0.0.1:5173/*` if you use that address).
+secret `sk.` token. If URL restrictions are enabled, allow localhost and 127.0.0.1
+on ports **5176, 5177 and 5178**.
+
+Then start all three from the **repository root** with one command:
 
 ```bash
-pnpm run dev
+npm run dev
 ```
 
-Open **http://localhost:5173**. The initial view is MIT, tilted to show building
-heights. The setup script works on macOS, Windows, and Linux, and **never overwrites
-an existing `.env.local`**. Mapbox serves the remote map data; its account limits
-and pricing still apply.
+| Workspace          | Address                 | Source            |
+| ------------------ | ----------------------- | ----------------- |
+| Dispatch (Command) | <http://localhost:5176> | `apps/paw-patrol` |
+| Officer            | <http://localhost:5177> | `apps/paw-patrol` |
+| Hospital           | <http://localhost:5178> | `apps/paw-patrol` |
+
+Each server opens its assigned workspace. **Ctrl+C stops all servers started by
+the launcher.** An occupied port produces an error; it does not terminate an
+unrelated server. Stop an older dashboard on 5176 before starting the launcher.
+Run a subset with `npm run dev -- officer hospital`, or see `npm run dev -- --help`.
+
+These are independent, synthetic browser demo sessions. Starting playback or
+entering a handoff in one browser does not update another. Port separation selects
+the UI; it is not authentication or role authorization. Live feeds and the triage
+backend are not automatically connected.
+
+See [the development guide](docs/development.md) for the directory map, individual
+commands and troubleshooting. Setup preserves existing local configuration.
+
+## Original map (optional, port 5173)
+
+The root Next.js app retains the interactive 3D building map and live fleet tracking.
+Install its dependencies with `pnpm install --frozen-lockfile`, set the public token
+in the root `.env.local`, then run `npm run dev:map`. Allow localhost/127.0.0.1 port
+5173 in your Mapbox token restrictions too. To run it alongside the workspaces:
+
+```bash
+npm run dev -- dispatch officer hospital map
+```
+
+The following fleet, map and production instructions refer to this original app.
 
 ## Live fleet tracking (optional)
 
@@ -121,8 +145,10 @@ and no location history is kept by the dashboard.
 
 ## Camera hazard triage (optional)
 
-`/capture` opens a phone-oriented page that sends camera frames to the hazard
-triage service in `services/triage`. Add to `.env.local`:
+Start the original app with `npm run dev:map`, then open
+<http://localhost:5173/capture> for the phone-oriented camera page. It sends frames
+to the hazard triage service in `services/triage`; it is separate from the three
+demo workspaces on ports 5176–5178. Add to the root `.env.local`:
 
 ```dotenv
 TRIAGE_URL=http://127.0.0.1:8090
@@ -222,9 +248,8 @@ stay in the foreground. Only a native app can do otherwise.
   the service token stays on the server.
 - Isolated map feature modules, TypeScript, tests, and CI checks.
 
-There are intentionally **no energy overlays, mock metrics, heatmap circles,
-dashboards, or live GPS integrations**. Traccar/phone tracking is a separate future
-integration; adding a device in Traccar does not connect it to this app.
+The separate Paw Patrol workspaces use synthetic demonstration data; Traccar
+tracking is available in the original map only.
 
 ## Production build, locally
 
@@ -239,7 +264,7 @@ Open http://localhost:5173. Stop the development server first because both use
 that port. To use another port:
 
 ```bash
-pnpm run dev -- --port 5174
+pnpm run dev:map -- --port 5174
 # Or, after a build:
 pnpm start -- --port 5174
 ```
@@ -252,8 +277,10 @@ development after token changes; rebuild production after token changes.
 | Command                          | Purpose                                                       |
 | -------------------------------- | ------------------------------------------------------------- |
 | `pnpm install --frozen-lockfile` | Reproduce the committed dependency lockfile                   |
-| `pnpm run setup`                 | Create `.env.local` safely from the tracked example           |
-| `pnpm run dev`                   | Start local development at port 5173                          |
+| `npm run setup`                  | Create map/dashboard local configuration without overwriting  |
+| `npm run dev`                    | Start Dispatch, Officer and Hospital on ports 5176–5178       |
+| `npm run dev:map`                | Start the original map at port 5173                           |
+| `npm run test:launcher`          | Check startup, port handling and process shutdown             |
 | `pnpm run format`                | Format supported source and configuration files with Prettier |
 | `pnpm run format:check`          | Verify formatting without changing files                      |
 | `pnpm run check`                 | Check formatting, types, lint, and tests                      |
@@ -272,6 +299,9 @@ does **not** mean the live map has been verified.
 
 ```text
 app/                    Next.js routes, metadata, and shared map styling
+apps/paw-patrol/         Shared Dispatch, Officer and Hospital dashboard
+scripts/dev.mjs         One-command local server supervisor
+services/triage/         Separate Python hazard-triage API
 app/api/live-position/  Server-only Traccar bridge; credentials never reach the browser
 features/boston-map/    Map lifecycle, camera settings, building layer, and UI
 features/live-track/    Position validation, freshness, live map layer, and panel
@@ -300,7 +330,7 @@ docs/architecture.md   Extension boundaries and map behavior
 - **WebGL unavailable:** enable hardware acceleration or use a WebGL-capable browser.
 - **Phone access:** `localhost` on a phone points to the phone, not your laptop.
   The default server binds to loopback. For a trusted LAN only, explicitly use
-  `pnpm run dev -- --hostname 0.0.0.0`, open the laptop's LAN address, and update
+  `pnpm run dev:map -- --hostname 0.0.0.0`, open the laptop's LAN address, and update
   token URL restrictions. Phone positions come from Traccar (see **Live fleet
   tracking**), not from the browser's geolocation API.
 
@@ -338,3 +368,34 @@ It includes an authenticated API, bounded inference, validated confidence and
 evidence contracts, durable retry handling, and mandatory human review. The map
 remains independently runnable. See the runbook for setup, the Mermaid architecture,
 testing, and the remaining production integration requirements.
+
+## Paw Patrol dashboard (consult update)
+
+The dashboard is in [`apps/paw-patrol`](apps/paw-patrol).
+It preserves the root tracking app and triage backend;
+its demonstration is not yet wired to their live feeds.
+
+The root quick start launches all three workspaces. For the original combined demo
+with workspace tabs, run only this app (also uses port 5176, so stop Dispatch first):
+
+```sh
+cd apps/paw-patrol
+npx --yes npm@11.6.2 ci
+npm run setup
+# Add your public Mapbox token to .env.local
+npm run dev
+```
+
+Open <http://localhost:5176>. Run `npm run verify` from that same app directory for
+its checks and production build. Do not replace either app's lockfile with the other.
+
+Features include Command, Officer and Hospital views, the supplied interactive human
+model, tactical descriptions, panic/acknowledgement, scene-gated EMS staging and MIST
+handoff observations. People, readings and coordination are explicitly simulated.
+ATAK is planned, not connected. No real dispatch or clinical decisions occur.
+
+Read the [updated team brief (PDF)](docs/paw-patrol/Paw_Patrol_Team_Brief_Updated.pdf)
+or [editable Word brief](docs/paw-patrol/Paw_Patrol_Team_Brief_Updated.docx).
+For a future Vercel project, select root directory `apps/paw-patrol` and Node 22;
+configure the Mapbox public environment variable before building. This branch does
+not itself create a hosted deployment.

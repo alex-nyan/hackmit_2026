@@ -1,4 +1,5 @@
 node_modules/
+apps/paw-patrol/
 .next/
 out/
 dist/

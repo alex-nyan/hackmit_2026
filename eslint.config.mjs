@@ -8,6 +8,7 @@ export default defineConfig([
   ...nextTs,
   prettierConfig,
   globalIgnores([
+    "apps/paw-patrol/**",
     ".next/**",
     "out/**",
     "coverage/**",
