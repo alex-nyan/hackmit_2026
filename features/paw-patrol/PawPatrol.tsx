@@ -12,16 +12,12 @@ import {
   RotateCcw,
   SkipForward,
   ArrowUpRight,
-  MapPin,
   Camera,
   Mic,
   Watch,
   Smartphone,
   Laptop,
   X,
-  LocateFixed,
-  Sun,
-  Moon,
   Check,
   ArrowRight,
   Ambulance,
@@ -29,12 +25,8 @@ import {
   Info,
   ChevronDown,
 } from "lucide-react";
-import { type MapFocus, type MapTheme, MAP_FOCUS } from "../boston-map/types";
-import { BuildingPanel } from "../boston-map/BuildingPanel";
-import type { BuildingFacts } from "../boston-map/buildingSelection";
 import { CapturePanel } from "@/features/camera-triage";
-import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-track";
-import { OperationsMap } from "./OperationsMap";
+import { OperationsMapPanel } from "./OperationsMapPanel";
 import {
   DURATION,
   EVENTS,
@@ -48,7 +40,6 @@ import {
   stamp,
 } from "./scenario";
 import { useScenario, type DemoAction } from "./useScenario";
-import { vehicleAt } from "./vehicles/vehicleMotion";
 import { useDemoTools } from "./useDemoTools";
 import { sceneAt, emsStatus, type MistRecord } from "./consult";
 import { SceneCoordination, TacticalBrief, MistHandoff, emptyTactical } from "./ConsultPanels";
@@ -75,9 +66,6 @@ const AnatomyViewer = dynamic(() => import("../anatomy/AnatomyViewer"), {
     </div>
   ),
 });
-/** Stable identity so a poll that finds nothing does not rerun the map effect. */
-const EMPTY_DEVICES: LiveDevice[] = [];
-
 const VIEW_NAMES = {
   command: "Command",
   officer: "Officer",
@@ -125,35 +113,9 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
     if (!fixedView) setSelectedView(nextView);
   }
   const [selectedId, setSelectedId] = useState<string>("P-01");
-  const [focus, setFocus] = useState<MapFocus>("mit");
-  const [theme, setTheme] = useState<MapTheme>("light");
-  const [recenterKey, setRecenterKey] = useState(0);
-  const [following, setFollowing] = useState(false);
   const [hardware, setHardware] = useState(false);
   const [evidence, setEvidence] = useState<"camera" | "audio" | null>(null);
-  // Both are opt-in: no camera, microphone or tracking request until asked.
-  const [tracking, setTracking] = useState(false);
-  const liveTrack = useLiveTrack(tracking);
-  const liveDevices = liveTrack.state === "tracking" ? liveTrack.devices : EMPTY_DEVICES;
-  const [building, setBuilding] = useState<BuildingFacts | null>(null);
-  const handleBuildingSelect = useCallback((next: BuildingFacts | null) => setBuilding(next), []);
-  const [fixRequest, setFixRequest] = useState<{
-    longitude: number;
-    latitude: number;
-    nonce: number;
-  } | null>(null);
-  // The nonce is what makes a repeat click move the camera again.
-  const handleFocusDevice = useCallback((device: LiveDevice) => {
-    if (!device.fix) return;
-    setFollowing(false);
-    setFixRequest((previous) => ({
-      longitude: device.fix!.longitude,
-      latitude: device.fix!.latitude,
-      nonce: (previous?.nonce ?? 0) + 1,
-    }));
-  }, []);
   const person = PEOPLE.find((p) => p.id === selectedId) ?? PEOPLE[0];
-  const vehicle = vehicleAt(person.id, time);
   const phase = phaseAt(time),
     medical = phase >= 3,
     complete = time === DURATION;
@@ -253,9 +215,6 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
   function reset() {
     dispatch({ type: "reset" });
     setSelectedId("P-01");
-    setFollowing(false);
-    setFocus("mit");
-    setRecenterKey((k) => k + 1);
     setEvidence(null);
     setRecords({});
     setTactical(emptyTactical);
@@ -296,116 +255,16 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
       }
     : null;
 
+  // One map, one legend, one set of positions, in all three workspaces.
   const map = (
-    <section className="map-panel" aria-label="Operations map">
-      <div className="map-heading">
-        <span>
-          <MapPin size={16} />
-          Boston & Cambridge
-        </span>
-        <div className="map-actions">
-          <button
-            className="follow-control"
-            disabled={!vehicle.routeId}
-            aria-pressed={following}
-            title={
-              following
-                ? "Stop following. You can also drag the map."
-                : "Keep the selected patrol vehicle centred"
-            }
-            onClick={() => setFollowing((value) => !value)}
-          >
-            <LocateFixed size={14} aria-hidden="true" />
-            {following ? "Stop following" : `Follow ${person.id}`}
-          </button>
-          <button
-            className="icon-control"
-            title="Centre selected officer"
-            aria-label="Centre selected officer"
-            onClick={() => setRecenterKey((k) => k + 1)}
-          >
-            <LocateFixed size={17} />
-          </button>
-          <button
-            className="icon-control"
-            data-on={tracking ? "true" : undefined}
-            aria-pressed={tracking}
-            title={tracking ? "Stop live tracking" : "Show real tracked units"}
-            aria-label={tracking ? "Stop live tracking" : "Show real tracked units"}
-            onClick={() => setTracking((value) => !value)}
-          >
-            {tracking ? <LocateFixed size={17} /> : <WifiOff size={17} />}
-          </button>
-          <button
-            className="icon-control"
-            title="Toggle map theme"
-            aria-label="Toggle map theme"
-            onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
-          >
-            {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
-          </button>
-        </div>
-      </div>
-      <div className="map-wrapper">
-        <OperationsMap
-          time={time}
-          running={running}
-          readClock={readClock}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          focus={focus}
-          theme={theme}
-          recenterKey={recenterKey}
-          following={following}
-          onStopFollowing={() => setFollowing(false)}
-          liveDevices={liveDevices}
-          fixRequest={fixRequest}
-          onBuildingSelect={handleBuildingSelect}
-        />
-        <div className="map-overlay">
-          <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
-          <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
-        </div>
-        <div className="campus-switch" aria-label="Map area">
-          {Object.entries(MAP_FOCUS).map(([key, target]) => (
-            <button
-              key={key}
-              aria-pressed={focus === key}
-              onClick={() => {
-                setFollowing(false);
-                setFocus(key as MapFocus);
-              }}
-            >
-              {target.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="vehicle-telemetry" aria-label="Selected unit simulated position">
-        <span>
-          <strong>{person.id}</strong>{" "}
-          {time >= 60 && person.id === "P-01" ? "Transport proxy" : personStatus(person.id, time)}
-        </span>
-        <span>
-          {vehicle.routeId ? `${Math.round(vehicle.speedMps * 3.6)} km/h` : "Route unavailable"}
-        </span>
-        {vehicle.routeId && (
-          <span className="vehicle-coordinates">
-            {vehicle.point[1].toFixed(5)}, {vehicle.point[0].toFixed(5)}
-          </span>
-        )}
-      </div>
-      <div className="map-legend">
-        <span>
-          <i className="legend-officer" />
-          Simulated patrol
-        </span>
-        <span>
-          <i className="legend-route" />
-          Cached street routes · not navigation
-        </span>
-      </div>
-    </section>
+    <OperationsMapPanel
+      time={time}
+      running={running}
+      readClock={readClock}
+      selectedId={selectedId}
+      onSelect={setSelectedId}
+      resetSignal={session}
+    />
   );
 
   return (
@@ -813,6 +672,10 @@ export function PawPatrol({ workspace = null }: { workspace?: Workspace | null }
 
         {view === "hospital" && (
           <div className="hospital-grid">
+            {/* The receiving desk sees the same picture as the other two: where
+                the units are, and where the report places the person of
+                interest. It is context for an arrival, not a clinical input. */}
+            {map}
             <section className="panel handoff-panel">
               <div className="panel-heading">
                 <span className={`tag ${selectedCase ? "sky" : "sage"}`}>

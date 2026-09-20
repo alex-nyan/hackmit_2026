@@ -34,6 +34,18 @@ P-01's transport representation uses the first **300 m** of the provider's secon
 
 P-04 uses a **720 m continuous subset** of its returned Harvard street route, starting at the Mount Auburn/Dunster junction. A short unnamed access-road prefix was omitted. Both clipped final coordinates are calculated within existing provider line segments, not joined to a new off-road destination. The original requested route and offsets remain recorded for reconstruction.
 
+## Reported person of interest (`features/paw-patrol/suspects.ts`)
+
+`S-01` is a **report the scenario invents**, not an identification, a detection, or anyone's recorded movement. The map draws it in red and labels it `UNVERIFIED`; the chip's accessible name carries the descriptor, the status and the source, so colour is never the only thing saying what it is.
+
+- **No provider request was made for this track.** Its coordinates are a hand-authored subset of geometry already in `street-routes.json`: the Main Street vertices of `p-03-response`, reversed, beginning at the incident point `[-71.090794, 42.362764]`.
+- Because those vertices come from OSRM's **driving** profile, they follow a road centreline. A person on foot would not; this is a demo approximation and is not a pedestrian route.
+- Window: demo seconds **15–45**, 94 m, mean 3.1 m/s. The report appears with the scripted camera signal at 00:15 and never before it — a reported position that predates its report would be a claim the scenario never made. From 00:45 the last reported position is held; the track does not loop, drift or disappear.
+
+| Track                  | Demo seconds | Distance | Average demo speed | Streets     |
+| ---------------------- | ------------ | -------- | ------------------ | ----------- |
+| S-01 reported movement | 15–45        | 94.3 m   | 3.14 m/s           | Main Street |
+
 ## Boundaries and verification
 
 - Every source request returned `code: "Ok"` and road geometry; none uses a guessed shortcut, water crossing, or fallback line.

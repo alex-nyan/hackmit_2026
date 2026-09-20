@@ -23,6 +23,7 @@ import { loadMapbox } from "../boston-map/mapboxClient";
 import { MAP_FOCUS, type MapFocus, type MapStatus, type MapTheme } from "../boston-map/types";
 import { addLiveLayers, updateLiveLayers, type LiveDevice } from "@/features/live-track";
 import { DESTINATION, INCIDENT, PEOPLE, personStatus } from "./scenario";
+import { SUSPECTS, type SuspectTrack, suspectAt, suspectStatus } from "./suspects";
 import type { DemoState } from "./useScenario";
 import { vehicleAt, vehicleRoute } from "./vehicles/vehicleMotion";
 import {
@@ -61,6 +62,14 @@ type UnitMarker = {
   button: HTMLButtonElement;
   label: HTMLSpanElement;
   dispose: () => void;
+};
+/** The pulsing ground light under a unit. Green for officers, red for reports. */
+type BeaconMarker = { marker: Marker; element: HTMLDivElement };
+type SuspectMarker = {
+  track: SuspectTrack;
+  beacon: BeaconMarker;
+  chip: Marker;
+  chipElement: HTMLDivElement;
 };
 const ROUTE_SOURCE = "paw-scenario-route";
 const ROUTE_LINE = "paw-scenario-route-line";
@@ -141,6 +150,8 @@ export function OperationsMap(props: OperationsMapProps) {
       lastLabelStamp = "";
     let selectedBuildingId: string | number | null = null;
     const markers: UnitMarker[] = [],
+      beacons: BeaconMarker[] = [],
+      suspects: SuspectMarker[] = [],
       places: Marker[] = [],
       cleanups: Array<() => void> = [];
     const preference = window.matchMedia?.("(prefers-reduced-motion: reduce)");
@@ -224,7 +235,28 @@ export function OperationsMap(props: OperationsMapProps) {
         });
         ownMap = map;
         map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "bottom-right");
+        // A beacon sits on the ground at the unit's own coordinate; the label
+        // chip is a separate marker so it can float above the 3D car without
+        // lifting the light off the street. Colour is the whole point of it:
+        // green is an officer, red is a report about someone else.
+        const createBeacon = (kind: "officer" | "suspect", point: [number, number]) => {
+          const element = document.createElement("div");
+          element.className = styles.beacon;
+          element.dataset.kind = kind;
+          element.setAttribute("aria-hidden", "true");
+          for (const delay of ["0s", "-1.1s"]) {
+            const ring = document.createElement("i");
+            ring.className = styles.beaconRing;
+            ring.style.animationDelay = delay;
+            element.append(ring);
+          }
+          return {
+            element,
+            marker: new mapboxgl.Marker({ element }).setLngLat(point).addTo(map),
+          } satisfies BeaconMarker;
+        };
         for (const person of PEOPLE) {
+          beacons.push(createBeacon("officer", vehicleAt(person.id, frameTime).point));
           const anchor = document.createElement("div");
           anchor.className = styles.markerAnchor;
           const button = document.createElement("button");
@@ -268,6 +300,36 @@ export function OperationsMap(props: OperationsMapProps) {
             .setLngLat(DESTINATION)
             .addTo(map),
         );
+        // The same reported persons of interest appear on every workspace's
+        // map. The chip is not a control: a report is not a unit to select,
+        // and the label carries what the report is worth.
+        for (const track of SUSPECTS) {
+          const start = [...track.path[0]] as [number, number];
+          const chipElement = document.createElement("div");
+          chipElement.className = styles.suspectMarker;
+          chipElement.setAttribute("role", "img");
+          const id = document.createElement("span");
+          id.className = styles.suspectId;
+          id.textContent = track.id;
+          const note = document.createElement("span");
+          note.className = styles.suspectNote;
+          note.textContent = "UNVERIFIED";
+          chipElement.append(id, note);
+          suspects.push({
+            track,
+            beacon: createBeacon("suspect", start),
+            chipElement,
+            // Below the point: P-01 holds at the incident the report starts
+            // from, and two chips stacked on one coordinate read as one unit.
+            chip: new mapboxgl.Marker({
+              element: chipElement,
+              anchor: "top",
+              offset: [0, 12],
+            })
+              .setLngLat(start)
+              .addTo(map),
+          });
+        }
         const draw = () => {
           if (disposed) return;
           const current = latestRef.current;
@@ -279,9 +341,14 @@ export function OperationsMap(props: OperationsMapProps) {
               selected = person.id === current.selectedId,
               pose = vehicleAt(person.id, frameTime);
             const available = !!vehicleRoute(person.id, frameTime);
+            const beacon = beacons[i];
             marker.getElement().hidden = !available;
+            beacon.element.hidden = !available;
             if (!available) return;
             marker.setLngLat(pose.point).setOffset(detailed ? [0, -17] : [0, -4]);
+            beacon.marker.setLngLat(pose.point);
+            beacon.element.dataset.emergency = String(pose.emergency);
+            beacon.element.dataset.selected = String(selected);
             button.dataset.detail = String(detailed);
             button.dataset.selected = String(selected);
             button.dataset.emergency = String(pose.emergency);
@@ -297,6 +364,23 @@ export function OperationsMap(props: OperationsMapProps) {
               button.title = person.name + " · " + status + " · " + pose.roadName;
             }
           });
+          for (const { track, beacon, chip, chipElement } of suspects) {
+            const pose = suspectAt(track.id, frameTime);
+            beacon.element.hidden = !pose;
+            chipElement.hidden = !pose;
+            if (!pose) continue;
+            beacon.marker.setLngLat(pose.point);
+            chip.setLngLat(pose.point);
+            beacon.element.dataset.moving = String(pose.moving);
+            if (labelStamp !== lastLabelStamp) {
+              const status = suspectStatus(track.id, frameTime);
+              chipElement.setAttribute(
+                "aria-label",
+                track.descriptor + " " + track.id + ". " + status + ". " + track.source + ".",
+              );
+              chipElement.title = track.descriptor + " · " + status + " · " + track.source;
+            }
+          }
           lastLabelStamp = labelStamp;
           incidentElement.hidden = frameTime < 15;
           receivingElement.hidden = frameTime < 60;
@@ -582,6 +666,11 @@ export function OperationsMap(props: OperationsMapProps) {
         dispose();
         marker.remove();
       });
+      beacons.forEach(({ marker }) => marker.remove());
+      suspects.forEach(({ beacon, chip }) => {
+        beacon.marker.remove();
+        chip.remove();
+      });
       places.forEach((marker) => marker.remove());
       ownMap?.remove(); // Mapbox calls custom-layer onRemove to release Three resources.
     };
@@ -593,7 +682,7 @@ export function OperationsMap(props: OperationsMapProps) {
       <div
         ref={containerRef}
         className={styles.canvas}
-        aria-label="Interactive map of simulated patrol vehicles in Cambridge and Boston"
+        aria-label="Interactive map of simulated patrol vehicles and reported persons of interest in Cambridge and Boston"
       />
       {fallback && feedback.status === "ready" && (
         <div className={styles.fallback} role="status">

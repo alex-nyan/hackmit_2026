@@ -45,6 +45,16 @@ describe("workspace entry points", () => {
     },
   );
 
+  it("gives all three workspaces the same operations map", () => {
+    for (const workspace of ["dispatch", "officer", "hospital"] as const) {
+      const ui = render(<PawPatrol workspace={workspace} />);
+      const map = ui.getByRole("region", { name: "Operations map" });
+      expect(within(map).getByTestId("map-selection").textContent).toBe("P-01");
+      expect(within(map).getByText(/reported, unverified|none reported yet/)).toBeTruthy();
+      cleanup();
+    }
+  });
+
   it("keeps unit selection in dispatch without changing the workspace", () => {
     const ui = render(<PawPatrol workspace="dispatch" />);
     const nav = ui.getByRole("navigation", { name: "Workspace" });

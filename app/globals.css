@@ -648,11 +648,19 @@ footer {
   align-items: center;
   gap: 6px;
 }
-.legend-officer {
+.legend-officer,
+.legend-suspect {
   width: 10px;
   height: 10px;
-  background: var(--night);
   border-radius: 50%;
+}
+.legend-officer {
+  background: #15803d;
+  box-shadow: 0 0 0 2px rgb(34 197 94 / 32%);
+}
+.legend-suspect {
+  background: #b42318;
+  box-shadow: 0 0 0 2px rgb(239 68 68 / 32%);
 }
 .legend-route {
   width: 18px;
@@ -955,6 +963,14 @@ footer {
   grid-template-columns: minmax(240px, 1fr) minmax(330px, 1.25fr) minmax(240px, 0.9fr);
   gap: 16px;
   align-items: start;
+}
+/* The shared map leads the receiving desk rather than competing with the
+   handoff for a column. */
+.hospital-grid > .map-panel {
+  grid-column: 1/-1;
+}
+.hospital-grid > .map-panel .map-wrapper {
+  height: 420px;
 }
 .handoff-panel > h2 {
   font-size: 2.65rem;

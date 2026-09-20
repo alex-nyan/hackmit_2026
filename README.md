@@ -345,7 +345,7 @@ app/                     Next.js routes: dashboard, /map, /capture, and the API 
 app/api/live-position/   Server-only Traccar bridge; credentials never reach the browser
 app/api/triage/          Server-only bridge to the hazard-triage service
 app/api/transcribe/      Server-only bridge to audio transcription
-features/paw-patrol/     Workspace UI, scenario clock, and 3D patrol vehicles
+features/paw-patrol/     Workspace UI, shared operations map, scenario clock, and 3D patrol vehicles
 features/anatomy/        Officer anatomy viewer used by the hospital handoff
 features/boston-map/     Map lifecycle, camera settings, building layer, and selection
 features/live-track/     Position validation, freshness, live map layer, and panel

@@ -5,6 +5,7 @@ import { OperationsMap, type OperationsMapProps } from "./OperationsMap";
 import { MAP_FOCUS } from "../boston-map/types";
 import { initialDemo } from "./useScenario";
 import { PEOPLE } from "./scenario";
+import { SUSPECTS, suspectAt } from "./suspects";
 import { vehicleAt } from "./vehicles/vehicleMotion";
 import type { PatrolVehicleLayerOptions } from "./vehicles/PatrolVehicleLayer";
 import type { LiveDevice } from "@/features/live-track";
@@ -247,6 +248,10 @@ function device(name: string, ageSeconds: number): LiveDevice {
   };
 }
 
+function markerFor(element: Element) {
+  return mocked.markers.find((marker) => marker.options.element === element)!;
+}
+
 function frame(milliseconds = 40) {
   const callbacks = [...mocked.frames.values()];
   mocked.frames.clear();
@@ -482,6 +487,46 @@ describe("patrol map integration", () => {
     expect(onSelect).toHaveBeenLastCalledWith("P-04");
     expect(onBuildingSelect).not.toHaveBeenCalled();
     expect(map.queryRenderedFeatures).not.toHaveBeenCalled();
+  });
+
+  it("beams a green beacon from every officer and a red one from a reported person", async () => {
+    let time = 0;
+    const readClock = () => ({ ...initialDemo, time, running: true });
+    const { container } = await mount({ running: true, readClock });
+    const beacons = (kind: string) => [
+      ...container.querySelectorAll<HTMLElement>(`[data-kind="${kind}"]`),
+    ];
+    expect(beacons("officer")).toHaveLength(PEOPLE.length);
+    expect(beacons("suspect")).toHaveLength(SUSPECTS.length);
+    // Before the report is made, the red beacon is not on the map at all.
+    expect(beacons("suspect")[0].hidden).toBe(true);
+
+    time = 30;
+    frame();
+    const red = beacons("suspect")[0];
+    expect(red.hidden).toBe(false);
+    expect(markerFor(red).point).toEqual(suspectAt(SUSPECTS[0].id, time)!.point);
+    PEOPLE.forEach((person, index) => {
+      const green = beacons("officer")[index];
+      expect(green.hidden).toBe(false);
+      expect(markerFor(green).point).toEqual(vehicleAt(person.id, time).point);
+    });
+  });
+
+  it("marks the reported person as a report rather than a selectable unit", async () => {
+    let time = 30;
+    const readClock = () => ({ ...initialDemo, time, running: true });
+    const { getByRole, queryByRole } = await mount({ running: true, readClock });
+    const chip = getByRole("img", { name: new RegExp(SUSPECTS[0].id) });
+    expect(chip.tagName).toBe("DIV");
+    expect(chip.textContent).toContain("UNVERIFIED");
+    expect(chip.getAttribute("aria-label")).toContain(SUSPECTS[0].source);
+    expect(queryByRole("button", { name: new RegExp(SUSPECTS[0].id) })).toBeNull();
+
+    // The report holds its last position rather than disappearing or looping.
+    time = 90;
+    frame();
+    expect(markerFor(chip).point).toEqual([...SUSPECTS[0].path.at(-1)!]);
   });
 
   it("publishes tracked units to the live layer and refreshes them on each poll", async () => {
