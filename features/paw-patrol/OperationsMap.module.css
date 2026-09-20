@@ -125,8 +125,8 @@
 
 .feedback {
   position: absolute;
-  top: 22px;
-  left: 20px;
+  top: var(--map-feedback-top, 22px);
+  left: var(--map-feedback-left, 20px);
   right: 20px;
   z-index: 6;
   display: flex;
@@ -260,8 +260,8 @@
 
 @media (max-width: 480px) {
   .feedback {
-    top: 12px;
-    left: 12px;
+    top: var(--map-feedback-top, 12px);
+    left: var(--map-feedback-left, 12px);
     right: 12px;
     padding: 13px;
   }

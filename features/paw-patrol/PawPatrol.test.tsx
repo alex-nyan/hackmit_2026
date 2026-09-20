@@ -23,13 +23,13 @@ describe("workspace entry points", () => {
     const nav = within(ui.getByRole("navigation", { name: "Workspace" }));
     expect(nav.getAllByRole("button")).toHaveLength(3);
     fireEvent.click(nav.getByRole("button", { name: "Officer" }));
-    expect(ui.getByRole("heading", { level: 1 }).textContent).toBe("Never out there alone.");
+    expect(ui.getByRole("heading", { level: 1 }).textContent).toBe("Officer workspace");
     fireEvent.click(nav.getByRole("button", { name: "Hospital" }));
     expect(ui.getByRole("heading", { level: 1 }).textContent).toBe("Ready before arrival.");
   });
 
   it.each([
-    ["officer", "Officer", "Never out there alone."],
+    ["officer", "Officer", "Officer workspace"],
     ["hospital", "Hospital", "Ready before arrival."],
   ] as const)(
     "opens the fixed %s workspace without role switching controls",
@@ -45,6 +45,24 @@ describe("workspace entry points", () => {
     },
   );
 
+  it("keeps officer selection and map controls while removing the overview panels", () => {
+    const ui = render(<PawPatrol workspace="officer" />);
+    expect(ui.queryByText("Body viewer")).toBeNull();
+    expect(ui.queryByRole("heading", { name: "Heart rate" })).toBeNull();
+    expect(ui.queryByText("INCIDENT RESPONSE UNITS")).toBeNull();
+    expect(ui.queryByText(/Synthetic people and signals/)).toBeNull();
+    fireEvent.change(ui.getByLabelText("Selected person"), { target: { value: "P-03" } });
+    expect(ui.getByTestId("map-selection").textContent).toBe("P-03");
+    fireEvent.click(ui.getByRole("button", { name: "Follow P-03" }));
+    expect(ui.getByRole("button", { name: "Stop following" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    fireEvent.click(ui.getByRole("button", { name: "Camera" }));
+    expect(ui.getByRole("heading", { name: "Camera & audio" })).toBeTruthy();
+    fireEvent.click(ui.getByRole("button", { name: "Close camera" }));
+    expect(ui.queryByRole("heading", { name: "Camera & audio" })).toBeNull();
+  });
+
   it("keeps unit selection in dispatch without changing the workspace", () => {
     const ui = render(<PawPatrol workspace="dispatch" />);
     const nav = ui.getByRole("navigation", { name: "Workspace" });
@@ -55,6 +73,6 @@ describe("workspace entry points", () => {
     fireEvent.click(ui.getByRole("button", { name: new RegExp(`${PEOPLE[1].name}.*P-02`) }));
     expect(ui.getByTestId("map-selection").textContent).toBe("P-02");
     expect(ui.getByRole("heading", { name: "On the ground" })).toBeTruthy();
-    expect(ui.queryByRole("heading", { name: "Never out there alone." })).toBeNull();
+    expect(ui.queryByRole("heading", { name: "Officer workspace" })).toBeNull();
   });
 });

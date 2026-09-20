@@ -1,0 +1,347 @@
+.officer {
+  --glass: rgb(250 252 255 / 86%);
+  --ink: #263450;
+  --muted: #55627a;
+  --focus: #37619b;
+  --glass-line: rgb(255 255 255 / 90%);
+  --map-feedback-top: max(270px, calc(50% - 70px));
+  --map-feedback-left: max(16px, calc(50% - 200px));
+  --map-controls: 4;
+  --workspace-controls: 8;
+  --tool-panel: 10;
+  position: relative;
+  height: 100dvh;
+  min-height: 480px;
+  overflow: hidden;
+  background: #e6e8df;
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.officer :global(.topbar),
+.officer :global(.map-heading),
+.officer :global(.campus-switch),
+.unitPicker,
+.tools,
+.camera,
+.officer :global(.hardware-panel) {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  border-radius: 12px;
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  box-shadow: 0 2px 8px rgb(24 39 65 / 10%);
+}
+
+.officer :global(.topbar) {
+  position: absolute;
+  z-index: var(--workspace-controls);
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  min-height: 60px;
+  padding: 8px 16px;
+  gap: 16px;
+}
+
+.officer :global(.wordmark) {
+  gap: 9px;
+  font:
+    600 17px/1 Arial,
+    sans-serif;
+  letter-spacing: -0.025em;
+}
+
+.officer :global(.wordmark) > svg {
+  width: 23px;
+  height: 26px;
+}
+
+.officer :global(.nav-item) {
+  min-height: 40px;
+  padding: 8px 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.officer :global(.nav-item.active) {
+  background: rgb(55 97 155 / 10%);
+  color: var(--ink);
+}
+
+.officer :global(.hardware-toggle) {
+  color: var(--muted);
+  background: transparent;
+  min-height: 40px;
+  font-size: 13px;
+}
+
+.officer :global(main) {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  padding: 0;
+}
+
+.officer :global(.map-panel),
+.officer :global(.map-wrapper) {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.officer :global(.map-heading) {
+  position: absolute;
+  z-index: var(--map-controls);
+  top: 92px;
+  right: 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px;
+}
+
+.officer :global(.map-heading) > span {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.officer :global(.map-actions) {
+  gap: 4px;
+}
+
+.officer :global(.icon-control),
+.officer :global(.follow-control) {
+  min-width: 40px;
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+}
+
+.officer :global(.follow-control) {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.officer :global(.icon-control[data-on="true"]),
+.officer :global(.follow-control[aria-pressed="true"]) {
+  background: #343e8a;
+  color: #fff;
+}
+
+.officer :global(.campus-switch) {
+  top: auto;
+  left: 16px;
+  bottom: 38px;
+  padding: 5px;
+}
+
+.officer :global(.campus-switch button) {
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  color: var(--ink);
+}
+
+.officer :global(.campus-switch button[aria-pressed="true"]) {
+  background: #343e8a;
+  color: #fff;
+}
+
+.unitPicker {
+  position: absolute;
+  z-index: var(--workspace-controls);
+  top: 92px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.unitPicker select {
+  width: 180px;
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.unitPicker > span {
+  padding-left: 12px;
+  border-left: 1px solid rgb(38 52 80 / 16%);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tools {
+  position: absolute;
+  z-index: var(--workspace-controls);
+  bottom: 38px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+}
+
+.tools button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  min-width: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.tools button[aria-expanded="true"] {
+  background: rgb(55 97 155 / 12%);
+}
+
+.officer button:hover:not(:disabled) {
+  background: rgb(55 97 155 / 14%);
+  color: var(--ink);
+}
+
+.officer :global(.map-overlay) {
+  top: 166px;
+  bottom: auto;
+  left: 16px;
+  max-height: calc(100% - 270px);
+  width: min(320px, calc(100% - 32px));
+}
+
+.officer :global(.live-card),
+.officer :global(.building-card) {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  box-shadow: none;
+  backdrop-filter: blur(22px);
+}
+
+.camera,
+.officer :global(.hardware-panel) {
+  position: absolute;
+  z-index: var(--tool-panel);
+  top: 190px;
+  right: 16px;
+  width: min(370px, calc(100% - 32px));
+  max-height: calc(100% - 290px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  color: var(--ink);
+}
+
+.camera[hidden] {
+  display: none;
+}
+
+.officer :global(.hardware-panel) {
+  top: 92px;
+  max-height: calc(100% - 192px);
+}
+
+.officer :global(.hardware-grid) {
+  grid-template-columns: 1fr;
+}
+
+.camera h2,
+.officer :global(.hardware-panel h2) {
+  font:
+    600 16px/1.4 Arial,
+    sans-serif;
+}
+
+.officer :global(.mapboxgl-ctrl-bottom-right) {
+  right: 12px;
+  bottom: 32px;
+}
+
+/* Keep the regional selector and playback tools apart on smaller screens. */
+@media (max-width: 1050px) {
+  .tools {
+    left: auto;
+    right: 64px;
+    transform: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .officer :global(.topbar) {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    padding: 6px 10px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .officer :global(.topbar nav) {
+    gap: 0;
+  }
+  .officer :global(.wordmark) {
+    font-size: 15px;
+  }
+  .officer :global(.nav-item) {
+    padding: 8px;
+    gap: 5px;
+  }
+  .officer :global(.hardware-toggle) {
+    padding: 6px;
+  }
+  .unitPicker {
+    top: 136px;
+    left: 10px;
+    right: 10px;
+    padding: 6px 10px;
+  }
+  .unitPicker select {
+    flex: 1;
+    width: 130px;
+    min-width: 0;
+  }
+  .officer :global(.map-heading) {
+    top: 198px;
+    right: 10px;
+    padding: 5px;
+  }
+  .officer :global(.map-heading) > span {
+    display: none;
+  }
+  .officer :global(.campus-switch) {
+    left: 10px;
+    bottom: 96px;
+  }
+  .officer :global(.campus-switch button) {
+    padding: 8px 12px;
+  }
+  .tools {
+    left: 10px;
+    right: auto;
+    bottom: 34px;
+  }
+  .officer :global(.map-overlay) {
+    top: 256px;
+    left: 10px;
+    max-height: calc(100% - 412px);
+  }
+  .camera,
+  .officer :global(.hardware-panel) {
+    top: 256px;
+    right: 10px;
+    width: calc(100% - 20px);
+    max-height: calc(100% - 350px);
+  }
+}
