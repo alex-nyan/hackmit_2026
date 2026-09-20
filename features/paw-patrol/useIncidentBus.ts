@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { IncidentDraft, IncidentEvent } from "./incidents";
 
 const ENDPOINT = "/api/incidents";
+/** Fast enough that a panic button feels immediate, slow enough to be cheap. */
+const POLL_MS = 1_500;
 
 export type BusStatus = "connecting" | "live" | "offline";
 
@@ -21,47 +23,51 @@ export function useIncidentBus() {
   const [events, setEvents] = useState<IncidentEvent[]>([]);
   const [status, setStatus] = useState<BusStatus>("connecting");
   const seenRef = useRef<Set<number>>(new Set());
+  const sinceRef = useRef(0);
 
   useEffect(() => {
-    if (typeof EventSource === "undefined") {
-      // No subscription is possible here. Reported after commit rather than in
-      // the effect body: setting it synchronously would cascade a render, and
-      // deciding during render would disagree with the server, where
-      // EventSource is always absent.
-      const timer = setTimeout(() => setStatus("offline"), 0);
-      return () => clearTimeout(timer);
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const inFlight = new AbortController();
+
+    async function poll() {
+      try {
+        const response = await fetch(`${ENDPOINT}?since=${sinceRef.current}`, {
+          cache: "no-store",
+          signal: inFlight.signal,
+        });
+        if (!response.ok) throw new Error(String(response.status));
+        const body = (await response.json()) as { events?: unknown };
+        if (stopped) return;
+
+        const arriving = Array.isArray(body.events) ? (body.events as IncidentEvent[]) : [];
+        const fresh = arriving.filter(
+          (event) => typeof event?.seq === "number" && !seenRef.current.has(event.seq),
+        );
+        if (fresh.length > 0) {
+          for (const event of fresh) seenRef.current.add(event.seq);
+          // The cursor only advances on events this workspace has accepted,
+          // so a partial read is retried rather than skipped.
+          sinceRef.current = Math.max(sinceRef.current, ...fresh.map((event) => event.seq));
+          setEvents((current) => [...current, ...fresh]);
+        }
+        setStatus("live");
+      } catch {
+        // A failed poll is not a quiet incident: the log stays on screen and
+        // the status says it can no longer be trusted.
+        if (!stopped) setStatus("offline");
+      } finally {
+        if (!stopped) timer = setTimeout(() => void poll(), POLL_MS);
+      }
     }
 
-    const source = new EventSource(ENDPOINT);
+    void poll();
 
-    source.addEventListener("open", () => setStatus("live"));
-
-    source.addEventListener("incident", (message) => {
-      const payload = (message as MessageEvent<string>).data;
-      let event: IncidentEvent;
-      try {
-        event = JSON.parse(payload) as IncidentEvent;
-      } catch {
-        return;
-      }
-      if (typeof event?.seq !== "number") return;
-      // A reconnect can replay an event this workspace already rendered.
-      if (seenRef.current.has(event.seq)) return;
-      seenRef.current.add(event.seq);
-      setEvents((current) => [...current, event]);
-    });
-
-    source.addEventListener("reset", () => {
-      seenRef.current.clear();
-      setEvents([]);
-    });
-
-    source.addEventListener("error", () => {
-      // EventSource retries by itself; report the gap while it is open.
-      setStatus(source.readyState === EventSource.CLOSED ? "offline" : "connecting");
-    });
-
-    return () => source.close();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      inFlight.abort();
+    };
   }, []);
 
   const publish = useCallback(async (draft: IncidentDraft): Promise<boolean> => {
@@ -86,6 +92,7 @@ export function useIncidentBus() {
       // Local state is cleared by the caller's own reset regardless.
     }
     seenRef.current.clear();
+    sinceRef.current = 0;
     setEvents([]);
   }, []);
 
