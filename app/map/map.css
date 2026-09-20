@@ -1,0 +1,282 @@
+/*
+ * Chrome for the standalone Boston map at /map. Scoped to this route segment so
+ * the dashboard's own design system in globals.css stays untouched; the shared
+ * widgets these panels contain (capture, fleet, building) live in globals.css
+ * because the dashboard renders them too.
+ */
+
+/* The map owns its own type and tokens rather than inheriting the dashboard's
+   serif display face and navy ground. */
+.map-app,
+.map-app button {
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.map-app h1,
+.map-app h2,
+.map-app h3 {
+  font-family: inherit;
+}
+
+.map-app {
+  position: relative;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #dfe4e7;
+  color: var(--ink);
+}
+
+.map-app--dark {
+  --ink: #e8eef0;
+  --muted: #94a3aa;
+  --line: rgb(255 255 255 / 13%);
+  --surface: rgb(18 26 32 / 92%);
+  --raised: rgb(255 255 255 / 8%);
+  --on-ink: #121a20;
+  --danger: #f08a6b;
+  --shadow: 0 1px 2px rgb(0 0 0 / 28%), 0 8px 24px rgb(0 0 0 / 32%);
+
+  background: #0f171d;
+}
+
+/* Shared chrome: one surface treatment instead of a different card per widget. */
+.map-brand,
+.area-picker,
+.icon-button,
+.map-status,
+.map-panels > * {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+}
+
+.map-header {
+  position: fixed;
+  z-index: 20;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.map-header > * {
+  pointer-events: auto;
+}
+
+.map-brand {
+  display: flex;
+  height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.map-brand svg {
+  color: var(--accent);
+}
+
+.area-picker {
+  display: flex;
+  height: 40px;
+  gap: 2px;
+  margin-inline: auto;
+  padding: 3px;
+}
+
+.area-picker__button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.area-picker__button:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.area-picker__button.is-active {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.map-header__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  color: var(--ink);
+}
+
+.icon-button.is-active {
+  border-color: rgb(217 80 46 / 45%);
+  color: var(--accent);
+}
+
+.map-stage {
+  position: fixed;
+  inset: 0;
+}
+
+.map-status {
+  position: absolute;
+  z-index: 12;
+  top: 68px;
+  left: 50%;
+  display: flex;
+  height: 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  transform: translateX(-50%);
+}
+
+.map-status--error {
+  max-width: calc(100vw - 32px);
+  height: auto;
+  padding: 9px 14px;
+  border-radius: var(--radius);
+  color: var(--danger);
+  line-height: 1.45;
+}
+
+.map-status__spinner {
+  animation: spin 900ms linear infinite;
+}
+
+.map-config-error {
+  position: absolute;
+  z-index: 15;
+  top: 50%;
+  left: 50%;
+  width: min(420px, calc(100vw - 32px));
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(12px);
+}
+
+.map-config-error strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.map-config-error p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.map-panels {
+  position: absolute;
+  z-index: 10;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  width: min(300px, calc(100vw - 32px));
+  max-height: calc(100dvh - 88px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.map-panels > * {
+  flex-shrink: 0;
+  padding: 12px 14px;
+  pointer-events: auto;
+}
+
+/* Mapbox ships its own control chrome; restyle it only inside this route so the
+   dashboard map keeps the lighter treatment it defines in globals.css. */
+.map-app .mapboxgl-ctrl-group {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+.map-app .mapboxgl-ctrl-attrib {
+  border-radius: 6px 0 0 0;
+  background: var(--surface) !important;
+  font-size: 9px !important;
+}
+
+.map-app .mapboxgl-ctrl-attrib a {
+  color: var(--muted) !important;
+}
+
+@media (max-width: 760px) {
+  .map-header {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    flex-wrap: wrap;
+  }
+
+  .map-header__actions {
+    margin-left: auto;
+  }
+
+  .area-picker {
+    order: 1;
+    width: 100%;
+    margin-inline: 0;
+    overflow-x: auto;
+  }
+
+  .map-status {
+    top: 118px;
+  }
+
+  .map-panels {
+    left: 12px;
+    bottom: 12px;
+    max-height: calc(100dvh - 132px);
+  }
+
+  .map-app .mapboxgl-ctrl-bottom-right {
+    bottom: 140px;
+  }
+}

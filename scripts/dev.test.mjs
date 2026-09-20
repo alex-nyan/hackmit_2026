@@ -12,6 +12,9 @@ import { createCommands, preflight, runServices, selectServices } from "./dev.mj
 test("default startup selects all three workspaces; subsets retain their order", () => {
   assert.deepEqual(selectServices([]), ["dispatch", "officer", "hospital"]);
   assert.deepEqual(selectServices(["hospital", "map", "hospital"]), ["hospital", "map"]);
+  // pnpm forwards the separator; npm removes it. Both must reach the same set.
+  assert.deepEqual(selectServices(["--", "officer"]), ["officer"]);
+  assert.deepEqual(selectServices(["--"]), ["dispatch", "officer", "hospital"]);
   assert.throws(() => selectServices(["unknown"]), /Unknown service/);
   assert.throws(() => selectServices(["__proto__"]), /Unknown service/);
 });
@@ -27,7 +30,7 @@ test("service commands isolate caches and override inherited role configuration"
     [5176, 5177, 5178, 5173],
   );
   for (const service of commands.slice(0, 3)) {
-    assert.equal(service.cwd, path.join("/project", "apps/paw-patrol"));
+    assert.equal(service.cwd, "/project");
     assert.equal(service.command, process.execPath);
     assert.equal(service.env.PAW_PATROL_WORKSPACE, service.name);
     assert.equal(service.env.PAW_PATROL_DIST_DIR, `.next-${service.name}`);
@@ -40,6 +43,8 @@ test("service commands isolate caches and override inherited role configuration"
       String(service.port),
     ]);
   }
+  // map serves every route from the same app; it just pins no role.
+  assert.equal(commands[3].cwd, "/project");
   assert.equal(commands[3].env.PAW_PATROL_WORKSPACE, undefined);
   assert.equal(commands[3].env.PAW_PATROL_DIST_DIR, undefined);
 });
@@ -79,7 +84,7 @@ async function close(server) {
 
 test("preflight gives the correct install command for missing app dependencies", async (t) => {
   const commands = await fixture(t);
-  await assert.rejects(preflight(commands), /npx --yes npm@11\.6\.2 ci --prefix apps\/paw-patrol/);
+  await assert.rejects(preflight(commands), /pnpm install --frozen-lockfile/);
 });
 
 test("preflight checks all dependencies, not just the Next binary", async (t) => {

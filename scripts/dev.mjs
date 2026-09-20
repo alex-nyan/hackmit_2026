@@ -9,14 +9,17 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
 const hostname = "127.0.0.1";
+// One app, four ways in. Dispatch, Officer and Hospital pin a workspace so the
+// dashboard renders a single role; map leaves it unset, which serves every
+// route including the standalone Boston map at /map.
 const services = {
-  dispatch: { port: 5176, directory: "apps/paw-patrol" },
-  officer: { port: 5177, directory: "apps/paw-patrol" },
-  hospital: { port: 5178, directory: "apps/paw-patrol" },
-  map: { port: 5173, directory: "." },
+  dispatch: { port: 5176 },
+  officer: { port: 5177 },
+  hospital: { port: 5178 },
+  map: { port: 5173 },
 };
 
-export const help = `Usage: npm run dev -- [dispatch officer hospital map]
+export const help = `Usage: pnpm run dev -- [dispatch officer hospital map]
 
 With no arguments, starts dispatch, officer, and hospital.
 Choose one or more names to start only those services.
@@ -24,19 +27,22 @@ Choose one or more names to start only those services.
   dispatch  http://localhost:5176
   officer   http://localhost:5177
   hospital  http://localhost:5178
-  map       http://localhost:5173  (optional original map)
+  map       http://localhost:5173  (all routes, including /map)
 
 Examples:
-  npm run dev
-  npm run dev -- officer hospital
-  npm run dev -- dispatch officer hospital map
-  npm run dev:map
+  pnpm run dev
+  pnpm run dev -- officer hospital
+  pnpm run dev -- dispatch officer hospital map
+  pnpm run dev:map
 
 Ctrl+C stops every server started by this launcher.
 `;
 
 export function selectServices(args) {
-  const selected = args.length ? args : ["dispatch", "officer", "hospital"];
+  // npm swallows the `--` separator; pnpm forwards it verbatim. Accept both so
+  // the documented `run dev -- officer` form works under either package manager.
+  const names = args.filter((argument) => argument !== "--");
+  const selected = names.length ? names : ["dispatch", "officer", "hospital"];
   for (const name of selected) {
     if (!Object.hasOwn(services, name)) {
       throw new Error(`Unknown service '${name}'. Use --help to see the options.`);
@@ -48,7 +54,7 @@ export function selectServices(args) {
 export function createCommands(names, root = repositoryRoot, env = process.env) {
   return names.map((name) => {
     const service = services[name];
-    const cwd = path.join(root, service.directory);
+    const cwd = root;
     const childEnv = { ...env };
     // Inherited role settings must never leak into another service.
     delete childEnv.PAW_PATROL_WORKSPACE;
@@ -108,12 +114,8 @@ export async function preflight(commands) {
         ),
       ]);
     } catch {
-      const install =
-        service.name === "map"
-          ? "pnpm install --frozen-lockfile"
-          : "npx --yes npm@11.6.2 ci --prefix apps/paw-patrol";
       throw new Error(
-        `${service.name}: dependencies are missing. From the repository root, run '${install}'.`,
+        `${service.name}: dependencies are missing. From the repository root, run 'pnpm install --frozen-lockfile'.`,
       );
     }
   }
