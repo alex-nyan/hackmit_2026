@@ -50,8 +50,20 @@ export function OperationsMapPanel({
   const [theme, setTheme] = useState<MapTheme>("light");
   const [recenterKey, setRecenterKey] = useState(0);
   const [following, setFollowing] = useState(false);
-  // Opt-in: no tracking request until someone asks for one.
-  const [tracking, setTracking] = useState(false);
+  /**
+   * On, and switchable off.
+   *
+   * This started off so that nothing reached out to a Traccar server until
+   * somebody asked. That reasoning belonged to a tracking server with
+   * credentials somewhere else; the positions now come from this deployment's
+   * own store, and the dashboard puts a join code on screen inviting people to
+   * publish into it. Somebody holding that code has already asked.
+   *
+   * Leaving it off meant a phone could scan, join, publish — and appear
+   * nowhere, because the one switch that would have drawn it is in the map
+   * header and nobody knew to press it.
+   */
+  const [tracking, setTracking] = useState(true);
   const liveTrack = useLiveTrack(tracking);
   const liveDevices = liveTrack.state === "tracking" ? liveTrack.devices : EMPTY_DEVICES;
   const [building, setBuilding] = useState<BuildingFacts | null>(null);

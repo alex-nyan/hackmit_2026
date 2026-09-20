@@ -95,7 +95,10 @@ function JoinSession({ unitId, secure }: { unitId: string; secure: boolean }) {
     state: positionState,
     start: startPosition,
     stop: stopPosition,
-  } = useDevicePosition(unitId);
+    // The id is what everything publishes under; the label is what a
+    // dispatcher reads. Passing only the id put `guest-q4qd` in the roster,
+    // which is the storage key rather than a name for a person.
+  } = useDevicePosition(unitId, guestLabel(unitId));
   const {
     state: cameraState,
     videoRef,
