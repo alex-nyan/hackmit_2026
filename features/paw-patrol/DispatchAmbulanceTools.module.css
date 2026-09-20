@@ -1,0 +1,190 @@
+.tool {
+  min-width: 0;
+}
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 9px;
+  text-align: left;
+  border: 1px solid color-mix(in srgb, #64a7d0 55%, var(--bento-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, #64a7d0 7%, var(--bento-card));
+  cursor: pointer;
+}
+.trigger > svg {
+  width: 32px;
+  height: 52px;
+  flex: 0 0 auto;
+}
+.trigger strong,
+.trigger small {
+  display: block;
+}
+.trigger strong {
+  font-size: 12px;
+}
+.trigger small {
+  color: var(--bento-muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+.trigger:hover {
+  border-color: #64a7d0;
+}
+.dialog {
+  width: min(460px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--bento-border);
+  border-radius: 16px;
+  color: var(--bento-text);
+  background: var(--bento-card);
+  box-shadow: 0 24px 90px #0008;
+}
+.dialog::backdrop {
+  background: #02070bcc;
+  backdrop-filter: blur(5px);
+}
+.content {
+  padding: 20px;
+}
+.content header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.content header button {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border-radius: 6px;
+  background: var(--bento-raised);
+  cursor: pointer;
+}
+.eyebrow {
+  color: var(--bento-muted);
+  font:
+    10px ui-monospace,
+    monospace;
+  letter-spacing: 0.07em;
+}
+.content h2 {
+  margin: 12px 0 18px;
+  font-size: 25px;
+}
+.content p {
+  color: var(--bento-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 12px 0;
+}
+.selectLabel {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+}
+.selectLabel select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--bento-border);
+  background: var(--bento-raised);
+  color: var(--bento-text);
+  border-radius: 7px;
+}
+.location {
+  font-family: ui-monospace, monospace;
+  font-size: 11px !important;
+}
+.mission {
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--bento-border);
+  border-radius: 9px;
+  margin-top: 14px;
+  background: var(--bento-raised);
+}
+.mission svg {
+  width: 35px;
+  height: 66px;
+  flex: 0 0 auto;
+}
+.mission div {
+  display: grid;
+  gap: 6px;
+}
+.mission strong {
+  font:
+    600 13px ui-monospace,
+    monospace;
+}
+.mission span {
+  color: var(--bento-muted);
+  font-size: 11px;
+}
+.mission b {
+  font-size: 13px;
+  color: var(--bento-accent);
+}
+.mission[data-state="engaged"] b {
+  color: var(--bento-good);
+}
+.hold {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--bento-accent) !important;
+}
+.hold svg {
+  flex: 0 0 auto;
+}
+.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 10px 14px;
+  border: 1px solid var(--bento-accent);
+  border-radius: 7px;
+  background: var(--bento-accent);
+  color: var(--bento-bg) !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+}
+.confirm {
+  padding: 12px;
+  border: 1px solid var(--bento-accent);
+  border-radius: 8px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.actions > button:not(.primary) {
+  padding: 9px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--bento-border);
+  background: var(--bento-raised);
+  cursor: pointer;
+}
+.message {
+  min-height: 1em;
+  font-size: 11px !important;
+}
+.content footer {
+  border-top: 1px solid var(--bento-border);
+  padding-top: 12px;
+  color: var(--bento-muted);
+  font-size: 10px;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .dialog::backdrop {
+    backdrop-filter: none;
+  }
+}

@@ -1,0 +1,307 @@
+.handoff {
+  --handoff-ink: var(--ink, #e9edf3);
+  --handoff-muted: var(--muted, #a8b2c1);
+  --handoff-surface: var(--surface, #17202a);
+  --handoff-raised: var(--raised, #233040);
+  --handoff-line: var(--line, #384655);
+  width: calc(100% - 48px);
+  max-width: 1200px;
+  margin: 24px auto 0;
+  padding: 20px;
+  border: 1px solid var(--handoff-line);
+  border-radius: 14px;
+  background: var(--handoff-surface);
+  color: var(--handoff-ink);
+  font:
+    13px/1.5 Arial,
+    Helvetica,
+    sans-serif;
+}
+.heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.eyebrow,
+.connection,
+.routeHeading,
+.timelineHeading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--handoff-muted);
+  font:
+    10px/1.4 ui-monospace,
+    monospace;
+  letter-spacing: 0.08em;
+}
+.heading h2 {
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1.2;
+  margin: 0;
+}
+.connection {
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: var(--handoff-raised);
+  color: var(--handoff-muted);
+  font-size: 11px;
+}
+.connection[data-fresh="false"] {
+  border: 1px solid color-mix(in srgb, #b8792c 55%, var(--handoff-line));
+}
+.disclaimer {
+  margin: 8px 0 18px;
+  color: var(--handoff-muted);
+  font-size: 11px;
+}
+.selection {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr);
+  gap: 6px 14px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.selection label {
+  font-weight: 600;
+  font-size: 12px;
+}
+.selection select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--handoff-line);
+  border-radius: 7px;
+  background: var(--handoff-surface);
+  color: var(--handoff-ink);
+  font: inherit;
+}
+.selection select:focus-visible {
+  outline: 2px solid var(--focus, #80adf0);
+  outline-offset: 3px;
+}
+.selection small {
+  grid-column: 2;
+  color: var(--handoff-muted);
+  font-size: 10px;
+}
+.stageBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, #bd8b49 55%, var(--handoff-line));
+  border-radius: 9px;
+  background: color-mix(in srgb, #bd8b49 8%, var(--handoff-surface));
+}
+.stageBanner[data-authorized="true"] {
+  border-color: color-mix(in srgb, #668ac0 65%, var(--handoff-line));
+  background: color-mix(in srgb, #668ac0 9%, var(--handoff-surface));
+}
+.stageBanner > svg {
+  flex: 0 0 auto;
+}
+.stageBanner > div {
+  min-width: 0;
+}
+.stageBanner strong,
+.stageBanner span {
+  display: block;
+}
+.stageBanner strong {
+  font-size: 13px;
+}
+.stageBanner span {
+  font:
+    10px/1.6 ui-monospace,
+    monospace;
+  overflow-wrap: anywhere;
+}
+.stageBanner small {
+  flex: 1 1 230px;
+  margin-left: auto;
+  max-width: 480px;
+  color: var(--handoff-muted);
+  font-size: 11px;
+}
+.progress {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 18px;
+  padding: 0;
+  list-style: none;
+}
+.progress li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px;
+  border-bottom: 2px solid var(--handoff-line);
+  color: var(--handoff-muted);
+  font-size: 11px;
+}
+.progress li > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--handoff-raised);
+  font:
+    11px ui-monospace,
+    monospace;
+}
+.progress li[data-current="true"] {
+  border-bottom-color: #bb8b4b;
+  color: var(--handoff-ink);
+}
+.progress li[data-complete="true"] {
+  color: var(--handoff-ink);
+}
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 18px;
+}
+.context {
+  min-width: 0;
+}
+.routeHeading h3,
+.timelineHeading {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.route > div {
+  min-width: 0;
+}
+.route span,
+.route strong,
+.route code {
+  display: block;
+}
+.route span {
+  color: var(--handoff-muted);
+  font-size: 10px;
+}
+.route strong {
+  margin: 3px 0;
+  font-size: 12px;
+}
+.route code,
+.routeNote code {
+  font:
+    10px/1.5 ui-monospace,
+    monospace;
+  overflow-wrap: anywhere;
+}
+.routeNote {
+  margin: 10px 0 16px;
+  color: var(--handoff-muted);
+  font-size: 10px;
+}
+.timestamps {
+  margin: 7px 0 0;
+}
+.timestamps > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--handoff-line);
+}
+.timestamps dt {
+  color: var(--handoff-muted);
+  font-size: 10px;
+}
+.timestamps dd {
+  margin: 0;
+  font:
+    10px/1.5 ui-monospace,
+    monospace;
+  text-align: right;
+}
+.sample {
+  --bento-text: var(--handoff-ink);
+  --bento-muted: var(--handoff-muted);
+  --bento-card: var(--handoff-surface);
+  --bento-raised: var(--handoff-raised);
+  --bento-border: var(--handoff-line);
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--handoff-line);
+  border-radius: 11px;
+}
+.sample > div {
+  height: auto;
+}
+.sample h2 {
+  font-size: 16px;
+  margin: 4px 0 0;
+}
+.sample > p {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--handoff-line);
+  color: var(--handoff-muted);
+  font-size: 10px;
+}
+.empty {
+  padding: 18px;
+  margin: 0;
+  border: 1px dashed var(--handoff-line);
+  border-radius: 9px;
+  color: var(--handoff-muted);
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .selection {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .selection small {
+    grid-column: 1;
+  }
+}
+@media (max-width: 480px) {
+  .handoff {
+    width: calc(100% - 24px);
+    padding: 14px;
+    margin-top: 14px;
+  }
+  .progress {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .progress li {
+    padding: 6px;
+  }
+  .route {
+    gap: 8px;
+  }
+  .timestamps > div {
+    flex-direction: column;
+    gap: 1px;
+  }
+  .timestamps dd {
+    text-align: left;
+  }
+}

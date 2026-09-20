@@ -33,6 +33,8 @@ import type { Workspace } from "./workspace";
 import type { useDemoHotspots } from "./useDemoHotspots";
 import { PixelHotspotFlag } from "./PixelHotspotFlag";
 import { InferencePreview } from "./InferencePreview";
+import { DispatchAmbulanceTools } from "./DispatchAmbulanceTools";
+import type { useDemoAmbulances } from "./useDemoAmbulances";
 import styles from "./DispatchDashboard.module.css";
 
 interface Props {
@@ -53,6 +55,11 @@ interface Props {
   joinPanel: ReactNode;
   events: IncidentEvent[];
   busStatus: BusStatus;
+  ambulanceTools?: ReturnType<typeof useDemoAmbulances>;
+  selectedHotspotId?: string | null;
+  onSelectHotspot?: (id: string) => void;
+  handoffStatus?: "connecting" | "synced" | "offline";
+  handoffBridge?: ReactNode;
   hotspotTools?: ReturnType<typeof useDemoHotspots> & {
     placing: boolean;
     dragPoint: { x: number; y: number; dropping: boolean } | null;
@@ -267,6 +274,11 @@ export function DispatchDashboard({
   busStatus,
   localHeartRate,
   hotspotTools,
+  ambulanceTools,
+  selectedHotspotId = null,
+  onSelectHotspot,
+  handoffStatus,
+  handoffBridge,
 }: Props) {
   const [query, setQuery] = useState("");
   const [area, setArea] = useState("all");
@@ -385,6 +397,7 @@ export function DispatchDashboard({
 
   return (
     <div className={styles.dashboard} data-theme={theme}>
+      {handoffBridge}
       <a className="skip-link" href="#workspace">
         Skip to workspace
       </a>
@@ -610,6 +623,11 @@ export function DispatchDashboard({
 
           <BentoCell className={styles.coverageCell} labelledBy="dispatch-inference-title">
             <InferencePreview />
+            {selectedHotspotId && (
+              <p className={styles.inferenceContext}>
+                Selected incident: {selectedHotspotId} · sample context only
+              </p>
+            )}
           </BentoCell>
 
           <BentoCell className={styles.connectionsCell} labelledBy="dispatch-tools-title">
@@ -617,96 +635,120 @@ export function DispatchDashboard({
             <h2 id="dispatch-tools-title">Tools</h2>
             {hotspotTools && (
               <>
-                <button
-                  ref={flagButton}
-                  type="button"
-                  className={styles.hotspotTool}
-                  aria-pressed={hotspotTools.placing}
-                  aria-label="Place demo hotspot"
-                  onClick={() => {
-                    if (Date.now() < ignoreFlagClickUntil.current) return;
-                    if (hotspotTools.placing) hotspotTools.onCancel();
-                    else {
-                      hotspotTools.onBegin();
-                      requestAnimationFrame(() => {
-                        if (window.innerWidth <= 900) {
-                          mapFrame.current?.scrollIntoView({
-                            block: "center",
-                            behavior: "instant",
-                          });
-                        }
-                        mapFrame.current
-                          ?.querySelector<HTMLButtonElement>("[data-hotspot-centre]")
-                          ?.focus({ preventScroll: true });
-                      });
-                    }
-                  }}
-                  onPointerDown={(event) => {
-                    if (event.button !== 0 || !event.isPrimary || flagGesture.current) return;
-                    flagGesture.current = {
-                      x: event.clientX,
-                      y: event.clientY,
-                      pointerId: event.pointerId,
-                      dragging: false,
-                    };
-                    event.currentTarget.setPointerCapture(event.pointerId);
-                  }}
-                  onPointerMove={(event) => {
-                    const gesture = flagGesture.current;
-                    if (!gesture || event.pointerId !== gesture.pointerId) return;
-                    if (
-                      !gesture.dragging &&
-                      Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) < 6
-                    )
-                      return;
-                    if (!gesture.dragging) {
-                      gesture.dragging = true;
-                      hotspotTools.onBegin();
-                    }
-                    event.preventDefault();
-                    hotspotTools.onDrag({ x: event.clientX, y: event.clientY, dropping: false });
-                  }}
-                  onPointerUp={(event) => {
-                    const gesture = flagGesture.current;
-                    if (gesture && event.pointerId !== gesture.pointerId) return;
-                    flagGesture.current = null;
-                    if (gesture?.dragging) {
-                      ignoreFlagClickUntil.current = Date.now() + 500;
-                      hotspotTools.onDrag({ x: event.clientX, y: event.clientY, dropping: true });
-                    }
-                  }}
-                  onPointerCancel={(event) => {
-                    if (flagGesture.current && event.pointerId !== flagGesture.current.pointerId)
-                      return;
-                    flagGesture.current = null;
-                    hotspotTools.onCancel();
-                  }}
-                  onLostPointerCapture={(event) => {
-                    if (flagGesture.current && event.pointerId !== flagGesture.current.pointerId)
-                      return;
-                    if (flagGesture.current?.dragging) hotspotTools.onCancel();
-                    flagGesture.current = null;
-                  }}
-                >
-                  <PixelHotspotFlag />
-                  <span>
-                    <strong>
-                      {hotspotTools.placing ? "Choose a map location" : "Hotspot flag"}
-                    </strong>
-                    <small>Drag onto map or click to place</small>
-                    <small>Nearby demo units respond · no real alerts</small>
-                  </span>
-                  <span className={styles.hotspotCount}>
-                    {hotspotTools.hotspots.filter((hotspot) => hotspot.resolvedAt === null).length}
-                    <small>active</small>
-                  </span>
-                </button>
+                <div className={styles.toolActions}>
+                  <button
+                    ref={flagButton}
+                    type="button"
+                    className={styles.hotspotTool}
+                    aria-pressed={hotspotTools.placing}
+                    aria-label="Place demo hotspot"
+                    onClick={() => {
+                      if (Date.now() < ignoreFlagClickUntil.current) return;
+                      if (hotspotTools.placing) hotspotTools.onCancel();
+                      else {
+                        hotspotTools.onBegin();
+                        requestAnimationFrame(() => {
+                          if (window.innerWidth <= 900) {
+                            mapFrame.current?.scrollIntoView({
+                              block: "center",
+                              behavior: "instant",
+                            });
+                          }
+                          mapFrame.current
+                            ?.querySelector<HTMLButtonElement>("[data-hotspot-centre]")
+                            ?.focus({ preventScroll: true });
+                        });
+                      }
+                    }}
+                    onPointerDown={(event) => {
+                      if (event.button !== 0 || !event.isPrimary || flagGesture.current) return;
+                      flagGesture.current = {
+                        x: event.clientX,
+                        y: event.clientY,
+                        pointerId: event.pointerId,
+                        dragging: false,
+                      };
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    }}
+                    onPointerMove={(event) => {
+                      const gesture = flagGesture.current;
+                      if (!gesture || event.pointerId !== gesture.pointerId) return;
+                      if (
+                        !gesture.dragging &&
+                        Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) < 6
+                      )
+                        return;
+                      if (!gesture.dragging) {
+                        gesture.dragging = true;
+                        hotspotTools.onBegin();
+                      }
+                      event.preventDefault();
+                      hotspotTools.onDrag({ x: event.clientX, y: event.clientY, dropping: false });
+                    }}
+                    onPointerUp={(event) => {
+                      const gesture = flagGesture.current;
+                      if (gesture && event.pointerId !== gesture.pointerId) return;
+                      flagGesture.current = null;
+                      if (gesture?.dragging) {
+                        ignoreFlagClickUntil.current = Date.now() + 500;
+                        hotspotTools.onDrag({ x: event.clientX, y: event.clientY, dropping: true });
+                      }
+                    }}
+                    onPointerCancel={(event) => {
+                      if (flagGesture.current && event.pointerId !== flagGesture.current.pointerId)
+                        return;
+                      flagGesture.current = null;
+                      hotspotTools.onCancel();
+                    }}
+                    onLostPointerCapture={(event) => {
+                      if (flagGesture.current && event.pointerId !== flagGesture.current.pointerId)
+                        return;
+                      if (flagGesture.current?.dragging) hotspotTools.onCancel();
+                      flagGesture.current = null;
+                    }}
+                  >
+                    <PixelHotspotFlag />
+                    <span>
+                      <strong>
+                        {hotspotTools.placing ? "Choose a map location" : "Hotspot flag"}
+                      </strong>
+                      <small>Drag onto map or click to place</small>
+                      <small>Nearby demo units respond · no real alerts</small>
+                    </span>
+                    <span className={styles.hotspotCount}>
+                      {
+                        hotspotTools.hotspots.filter((hotspot) => hotspot.resolvedAt === null)
+                          .length
+                      }
+                      <small>active</small>
+                    </span>
+                  </button>
+                  {ambulanceTools && onSelectHotspot && (
+                    <DispatchAmbulanceTools
+                      hotspots={hotspotTools.hotspots}
+                      selectedId={selectedHotspotId}
+                      onSelect={onSelectHotspot}
+                      ambulance={ambulanceTools}
+                      time={time}
+                    />
+                  )}
+                </div>
                 <p className={styles.hotspotMessage} role="status" aria-live="polite">
                   {hotspotTools.placing
                     ? "Hold near a map edge to pan. Release to place; Escape cancels."
                     : hotspotTools.message ||
                       "Click a placed flag to resolve it. Demo history resets on reload."}
                 </p>
+                {ambulanceTools && (
+                  <p className={styles.handoffState} role="status">
+                    Browser relay ·{" "}
+                    {handoffStatus === "synced"
+                      ? "ready for Medic handoff"
+                      : handoffStatus === "offline"
+                        ? "handoff offline — keep medics holding"
+                        : "waiting for demo handoff"}
+                  </p>
+                )}
               </>
             )}
             <details className={styles.connectionDetails}>

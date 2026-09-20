@@ -983,13 +983,36 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  margin-top: 10px;
+  margin: 0;
   padding: 9px 10px;
   text-align: left;
   border: 1px solid color-mix(in srgb, #ec5968 55%, var(--bento-border));
   border-radius: 10px;
   background: color-mix(in srgb, #ec5968 7%, var(--bento-card));
   cursor: grab;
+}
+.toolActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 7px;
+  margin-top: 10px;
+}
+.toolActions .hotspotTool {
+  gap: 7px;
+  padding: 9px 7px;
+}
+.toolActions .hotspotTool > svg {
+  width: 30px;
+  height: 44px;
+}
+.toolActions .hotspotCount {
+  display: none;
+}
+.handoffState,
+.inferenceContext {
+  color: var(--bento-muted);
+  font-size: 9px;
+  margin: 4px 0;
 }
 .hotspotTool:hover,
 .hotspotTool[aria-pressed="true"] {

@@ -18,6 +18,8 @@ import type { BusStatus } from "./useIncidentBus";
 import { OfficerFeed, type OfficerMediaInput } from "./OfficerFeed";
 import styles from "./HospitalWorkspace.module.css";
 import { HospitalHeartMonitor } from "./HospitalHeartMonitor";
+import { HospitalDispatchHandoff } from "./HospitalDispatchHandoff";
+import type { DemoAmbulanceMission } from "./demoAmbulance";
 
 // Scene reports in the existing demo bus use these exact titles. Neither model
 // detections nor missing observations can create an access clearance.
@@ -60,6 +62,7 @@ export function HospitalWorkspace({
   onPlay,
   onPause,
   onReset,
+  handoff,
 }: {
   person: Person;
   onSelect: (id: string) => void;
@@ -72,6 +75,11 @@ export function HospitalWorkspace({
   onPlay: () => void;
   onPause: () => void;
   onReset: () => void;
+  handoff?: {
+    missions: DemoAmbulanceMission[];
+    status: "connecting" | "synced" | "offline";
+    updatedAt: string | null;
+  };
 }) {
   const access = hospitalAccess(events, person.id, busStatus);
   const audio = events
@@ -121,6 +129,7 @@ export function HospitalWorkspace({
       </section>
 
       <div className={styles.utilities} id="hospital-connections">
+        {handoff && <HospitalDispatchHandoff {...handoff} />}
         <details className={styles.connections}>
           <summary>
             <SlidersHorizontal size={18} aria-hidden="true" />

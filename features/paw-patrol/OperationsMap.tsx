@@ -28,6 +28,8 @@ import { vehicleAt, vehicleRoute, type VehiclePosition } from "./vehicles/vehicl
 import { createPatrolCarMarker, patrolCarScreenHeading } from "./vehicles/createPatrolCarMarker";
 import type { DemoHotspot } from "./hotspots";
 import { PixelHotspotFlag, PIXEL_HOTSPOT_FLAG_SVG } from "./PixelHotspotFlag";
+import { DEMO_HEALTH_CENTRES, type DemoAmbulanceMission } from "./demoAmbulance";
+import { PIXEL_AMBULANCE_SVG } from "./PixelAmbulance";
 import styles from "./OperationsMap.module.css";
 
 export interface OperationsMapProps {
@@ -61,7 +63,17 @@ export interface OperationsMapProps {
     onPlace: (point: [number, number]) => void;
     onCancel: () => void;
     onResolve: (id: string) => void;
+    onSelect?: (id: string) => void;
     sampleVehicle: (id: string, time: number) => VehiclePosition;
+  };
+  /** Local demo transport only. No real facilities, routing, or dispatch. */
+  ambulance?: {
+    missions: DemoAmbulanceMission[];
+    sample: (
+      mission: DemoAmbulanceMission,
+      time: number,
+    ) => { point: [number, number]; heading: number };
+    onSelect: (hotspotId: string) => void;
   };
 }
 /** The pulsing ground light under a unit. Green for officers, red for reports. */
@@ -74,6 +86,7 @@ type Runtime = {
   flyToFix: () => void;
   syncHotspots: () => void;
   syncHotspotDrag: () => void;
+  syncAmbulances: () => void;
   placeHotspotAtCenter: () => void;
 };
 type UnitMarker = {
@@ -142,6 +155,9 @@ export function OperationsMap(props: OperationsMapProps) {
     runtimeRef.current?.syncHotspotDrag();
   }, [props.hotspot?.dragPoint, props.hotspot?.placing]);
   useEffect(() => {
+    runtimeRef.current?.syncAmbulances();
+  }, [props.ambulance]);
+  useEffect(() => {
     if (selectedHotspotId) hotspotCancelRef.current?.focus();
   }, [selectedHotspotId]);
   useEffect(() => {
@@ -180,6 +196,17 @@ export function OperationsMap(props: OperationsMapProps) {
       string,
       { marker: Marker; glow: Marker; button: HTMLButtonElement; dispose: () => void }
     >();
+    const ambulanceMarkers = new Map<
+      string,
+      {
+        marker: Marker;
+        labelMarker: Marker;
+        button: HTMLButtonElement;
+        label: HTMLSpanElement;
+        dispose: () => void;
+      }
+    >();
+    const healthCentreMarkers = new Map<string, Marker>();
     const sampleVehicle = (id: string, clock: number) =>
       latestRef.current.hotspot?.sampleVehicle(id, clock) ?? vehicleAt(id, clock);
     const preference = window.matchMedia?.("(prefers-reduced-motion: reduce)");
@@ -330,6 +357,33 @@ export function OperationsMap(props: OperationsMapProps) {
             dispose: () => button.removeEventListener("click", select),
           });
         }
+        const drawAmbulances = () => {
+          const interaction = latestRef.current.ambulance;
+          if (!interaction) return;
+          for (const mission of interaction.missions) {
+            const item = ambulanceMarkers.get(mission.id);
+            if (!item || mission.status === "cancelled") continue;
+            const pose = interaction.sample(mission, frameTime);
+            item.marker
+              .setLngLat(pose.point)
+              .setRotation(patrolCarScreenHeading(map, pose.point, pose.heading));
+            item.labelMarker.setLngLat(pose.point);
+            item.button.dataset.status = mission.status;
+            item.label.dataset.status = mission.status;
+            const status =
+              mission.status === "staged"
+                ? "Staged nearby. Holding for human authorisation"
+                : mission.status === "engaged"
+                  ? "Authorised to engage in the demo"
+                  : "En route to nearby staging";
+            item.button.setAttribute(
+              "aria-label",
+              `${mission.id}, demo ambulance for ${mission.hotspotId}. ${status}. Select medical response.`,
+            );
+            item.button.title = `${mission.id} · ${mission.hotspotId} · ${status} · simulation only`;
+            item.label.textContent = `${mission.id} · ${mission.status === "staged" ? "HOLD" : mission.status === "engaged" ? "ENGAGED" : "EN ROUTE"}`;
+          }
+        };
         const draw = (followCamera = true) => {
           if (disposed) return;
           const current = latestRef.current;
@@ -376,6 +430,7 @@ export function OperationsMap(props: OperationsMapProps) {
               button.title = person.name + " · " + status + " · " + pose.roadName;
             }
           });
+          drawAmbulances();
           lastLabelStamp = labelStamp;
           if (
             followCamera &&
@@ -454,6 +509,86 @@ export function OperationsMap(props: OperationsMapProps) {
         // Safe before restore() has run: updateLiveLayers no-ops without a source.
         const syncLiveDevices = () => {
           if (!disposed) updateLiveLayers(map, latestRef.current.liveDevices);
+        };
+        const syncAmbulances = () => {
+          if (disposed) return;
+          const interaction = latestRef.current.ambulance;
+          const active =
+            interaction?.missions.filter((mission) => mission.status !== "cancelled") ?? [];
+          const activeIds = new Set(active.map((mission) => mission.id));
+          for (const [id, item] of ambulanceMarkers) {
+            if (activeIds.has(id)) continue;
+            item.dispose();
+            item.marker.remove();
+            item.labelMarker.remove();
+            ambulanceMarkers.delete(id);
+          }
+          for (const mission of active) {
+            if (ambulanceMarkers.has(mission.id)) continue;
+            const pose = interaction!.sample(mission, latestRef.current.readClock().time);
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = styles.ambulanceMarker;
+            button.dataset.ambulanceMarker = mission.id;
+            button.dataset.hotspotId = mission.hotspotId;
+            button.innerHTML = PIXEL_AMBULANCE_SVG;
+            const select = (event: MouseEvent) => {
+              event.stopPropagation();
+              if (!latestRef.current.hotspot?.placing) {
+                setSelectedHotspotId(null);
+                latestRef.current.ambulance?.onSelect(mission.hotspotId);
+              }
+            };
+            button.addEventListener("click", select);
+            const marker = new mapboxgl.Marker({
+              element: button,
+              anchor: "center",
+              rotationAlignment: "viewport",
+              pitchAlignment: "viewport",
+            })
+              .setLngLat(pose.point)
+              .addTo(map);
+            button.setAttribute("role", "button");
+            const label = document.createElement("span");
+            label.className = styles.ambulanceLabel;
+            label.setAttribute("aria-hidden", "true");
+            const labelMarker = new mapboxgl.Marker({
+              element: label,
+              anchor: "bottom",
+              offset: [0, -34],
+            })
+              .setLngLat(pose.point)
+              .addTo(map);
+            ambulanceMarkers.set(mission.id, {
+              marker,
+              labelMarker,
+              button,
+              label,
+              dispose: () => button.removeEventListener("click", select),
+            });
+          }
+          if (!interaction) {
+            healthCentreMarkers.forEach((marker) => marker.remove());
+            healthCentreMarkers.clear();
+          } else {
+            for (const centre of DEMO_HEALTH_CENTRES) {
+              if (healthCentreMarkers.has(centre.id)) continue;
+              const element = document.createElement("span");
+              element.className = styles.healthCentreMarker;
+              element.dataset.healthCentre = centre.id;
+              element.textContent = "+";
+              element.setAttribute(
+                "aria-label",
+                `${centre.name}. Fictional demo staging base, not a real facility.`,
+              );
+              element.title = `${centre.name} · fictional demo base`;
+              const marker = new mapboxgl.Marker({ element, anchor: "center" })
+                .setLngLat(centre.point)
+                .addTo(map);
+              healthCentreMarkers.set(centre.id, marker);
+            }
+          }
+          updateScene();
         };
         const flyToFix = () => {
           const target = latestRef.current.fixRequest;
@@ -625,6 +760,7 @@ export function OperationsMap(props: OperationsMapProps) {
               if (latestRef.current.hotspot?.placing) return;
               hotspotMarkerRef.current = button;
               setSelectedHotspotId(item.id);
+              latestRef.current.hotspot?.onSelect?.(item.id);
             };
             button.addEventListener("click", open);
             const marker = new mapboxgl.Marker({
@@ -662,6 +798,7 @@ export function OperationsMap(props: OperationsMapProps) {
           updateScene,
           moveCamera,
           syncLiveDevices,
+          syncAmbulances,
           flyToFix,
           syncHotspots,
           syncHotspotDrag,
@@ -849,6 +986,7 @@ export function OperationsMap(props: OperationsMapProps) {
         if (latestRef.current.following) moveCamera(true);
         syncHotspots();
         syncHotspotDrag();
+        syncAmbulances();
         updateScene();
         if (map.isStyleLoaded()) restore();
       } catch {
@@ -876,6 +1014,12 @@ export function OperationsMap(props: OperationsMapProps) {
         marker.remove();
         glow.remove();
       });
+      ambulanceMarkers.forEach(({ marker, labelMarker, dispose }) => {
+        dispose();
+        marker.remove();
+        labelMarker.remove();
+      });
+      healthCentreMarkers.forEach((marker) => marker.remove());
       ownMap?.remove(); // Mapbox calls custom-layer onRemove to release Three resources.
     };
   }, [attempt]);

@@ -30,6 +30,8 @@ import { JoinCard, type JoinLink } from "@/features/join";
 import { OperationsMap } from "./OperationsMap";
 import { DispatchDashboard } from "./DispatchDashboard";
 import { useDemoHotspots } from "./useDemoHotspots";
+import { useDemoAmbulances } from "./useDemoAmbulances";
+import { useDemoHandoff } from "./useDemoHandoff";
 import { OfficerOverview } from "./OfficerOverview";
 import { GlassEffect } from "@/components/ui/liquid-glass";
 import glassStyles from "./OfficerGlass.module.css";
@@ -220,6 +222,15 @@ export function PawPatrol({
     enabled: dispatchDashboard,
     unavailableIds: unavailableHotspotUnits,
   });
+  const [selectedHotspotId, setSelectedHotspotId] = useState<string | null>(null);
+  const handoffPublisher = workspace === null || workspace === "dispatch";
+  const ambulances = useDemoAmbulances({
+    hotspots: hotspots.hotspots,
+    time,
+    readClock,
+    enabled: handoffPublisher,
+  });
+  const handoff = useDemoHandoff({ publisher: handoffPublisher, missions: ambulances.missions });
   const [hardware, setHardware] = useState(false);
   const [evidence, setEvidence] = useState<"camera" | "audio" | null>(null);
   // The camera and microphone stay opt-in. Tracking does not: it was opt-in
@@ -472,7 +483,17 @@ export function PawPatrol({
                   },
                   onCancel: cancelHotspotPlacement,
                   onResolve: hotspots.resolve,
+                  onSelect: setSelectedHotspotId,
                   sampleVehicle: hotspots.sampleVehicle,
+                }
+              : undefined
+          }
+          ambulance={
+            dispatchDashboard
+              ? {
+                  missions: ambulances.missions,
+                  sample: ambulances.sampleAmbulance,
+                  onSelect: setSelectedHotspotId,
                 }
               : undefined
           }
@@ -568,6 +589,7 @@ export function PawPatrol({
         localHeartRate={{ personId: person.id, connection: heartRate }}
         hotspotTools={{
           ...hotspots,
+          logs: [...hotspots.logs, ...ambulances.logs],
           placing: placingHotspot,
           dragPoint: hotspotDrag,
           onDrag: setHotspotDrag,
@@ -579,6 +601,18 @@ export function PawPatrol({
           },
           onCancel: cancelHotspotPlacement,
         }}
+        ambulanceTools={{
+          ...ambulances,
+          dispatchAmbulance: (id) => {
+            const accepted = ambulances.dispatchAmbulance(id);
+            if (accepted) dispatch({ type: "play" });
+            return accepted;
+          },
+        }}
+        selectedHotspotId={selectedHotspotId}
+        onSelectHotspot={setSelectedHotspotId}
+        handoffStatus={handoff.status}
+        handoffBridge={handoff.bridge}
       />
     );
   }
@@ -620,6 +654,7 @@ export function PawPatrol({
         )}
       </header>
       <main id="workspace">
+        {view === "hospital" && handoff.bridge}
         {view === "command" && (
           <>
             <div className="page-heading">
@@ -973,6 +1008,11 @@ export function PawPatrol({
             onPlay={play}
             onPause={() => dispatch({ type: "pause" })}
             onReset={reset}
+            handoff={{
+              missions: handoff.missions,
+              status: handoff.status,
+              updatedAt: handoff.updatedAt,
+            }}
           />
         )}
 
