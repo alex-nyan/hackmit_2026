@@ -85,7 +85,7 @@ export function pickRecorderMimeType(
 
 /** Strips the data URL wrapper FileReader produces, leaving raw base64. */
 export function stripAudioDataUrl(dataUrl: string): string | null {
-  const match = /^data:[^;,]*;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  const match = /^data:[^,]*;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
   return match ? match[1] : null;
 }
 

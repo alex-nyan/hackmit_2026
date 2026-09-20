@@ -2,14 +2,17 @@
 
 import base64
 import os
+import sys
+import wave
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import httpx
 import pytest
 
 from triage.app import create_app
-from triage.audio import AudioError, prepared_audio
+from triage.audio import AudioError, PreparedAudio, prepared_audio
 from triage.config import Settings
 from triage.schemas import ModelProvenance, TranscriptionRequest
 from triage.transcription import (
@@ -18,6 +21,7 @@ from triage.transcription import (
     TranscriptionError,
     TranscriptionService,
     build_transcription,
+    decode_bounded_audio,
 )
 
 TOKEN = "t" * 32
@@ -236,6 +240,35 @@ class TestAudioBoundary:
             with prepared_audio(self.request(raw, media_type), self.settings(tmp_path)) as audio:
                 assert os.path.exists(audio.path)
 
+    @pytest.mark.parametrize("second", [0xF0, 0xF1, 0xF8, 0xF9])
+    def test_accepts_adts_with_or_without_crc(self, tmp_path, second):
+        raw = bytes([0xFF, second]) + bytes(40)
+        with prepared_audio(self.request(raw, "audio/aac"), self.settings(tmp_path)) as audio:
+            assert audio.byte_count == len(raw)
+
+    @pytest.mark.parametrize("second", [0xFA, 0xFB, 0xF2, 0xF3, 0xE2, 0xE3])
+    def test_accepts_mpeg_versions_with_or_without_crc(self, tmp_path, second):
+        raw = bytes([0xFF, second, 0x90, 0]) + bytes(40)
+        with prepared_audio(self.request(raw, "audio/mpeg"), self.settings(tmp_path)) as audio:
+            assert audio.byte_count == len(raw)
+
+    @pytest.mark.parametrize(
+        ("media_type", "header"),
+        [
+            ("audio/aac", b"\xff\xf2\x00\x00"),
+            ("audio/mpeg", b"\xff\xea\x90\x00"),  # Reserved version.
+            ("audio/mpeg", b"\xff\xf8\x90\x00"),  # Reserved layer.
+            ("audio/mpeg", b"\xff\xfa\xf0\x00"),  # Reserved bitrate.
+            ("audio/mpeg", b"\xff\xfa\x9c\x00"),  # Reserved sample rate.
+        ],
+    )
+    def test_rejects_reserved_audio_header_bits(self, tmp_path, media_type, header):
+        with pytest.raises(AudioError, match="audio_format_mismatch"):
+            with prepared_audio(
+                self.request(header + bytes(40), media_type), self.settings(tmp_path)
+            ):
+                pass
+
 
 class TestTranscriptShape:
     def test_joins_segments_and_keeps_their_timings(self):
@@ -295,3 +328,100 @@ class TestOptionalDependency:
 
     def test_unknown_error_codes_collapse_to_a_generic_failure(self):
         assert TranscriptionError("something_new").code == "transcriber_failed"
+
+
+class TestBoundedDecoder:
+    def test_stops_decoding_over_limit_before_loading_or_running_a_model(
+        self, tmp_path, monkeypatch
+    ):
+        decoded_frames = []
+        closed = []
+
+        class Frame:
+            samples = 16_000
+            pts = 0
+
+            def to_ndarray(self):
+                return bytes(self.samples * 2)
+
+        class Container:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                closed.append(True)
+
+            def decode(self, **kwargs):
+                for index in range(100):
+                    decoded_frames.append(index)
+                    yield Frame()
+
+        class Resampler:
+            def __init__(self, **kwargs):
+                assert kwargs == {"format": "s16", "layout": "mono", "rate": 16_000}
+
+            def resample(self, frame):
+                return [frame] if frame is not None else []
+
+        monkeypatch.setitem(
+            sys.modules,
+            "av",
+            SimpleNamespace(open=lambda *a, **kw: Container(), AudioResampler=Resampler),
+        )
+        # The limit must trigger before array conversion, independent of extras.
+        monkeypatch.setitem(sys.modules, "numpy", SimpleNamespace())
+        settings = Settings(
+            api_token=TOKEN,
+            database_path=tmp_path / "r.sqlite3",
+            transcription_enabled=True,
+            max_audio_seconds=1,
+        )
+        transcriber = FasterWhisperTranscriber(settings)
+        monkeypatch.setattr(
+            transcriber, "_ensure_model", lambda: pytest.fail("must reject before model load")
+        )
+        with pytest.raises(AudioError, match="audio_too_long"):
+            transcriber.transcribe(PreparedAudio("clip.wav", "a" * 64, 1024), None)
+        assert decoded_frames == [0, 1]
+        assert closed == [True]
+
+    def test_missing_decoder_dependency_is_reported_as_unavailable(self, monkeypatch):
+        monkeypatch.setitem(sys.modules, "av", None)
+        with pytest.raises(TranscriptionError, match="transcriber_unavailable"):
+            decode_bounded_audio("clip.wav", 120)
+
+    def test_passes_decoded_samples_to_whisper(self, tmp_path, monkeypatch):
+        decoded = [0.0] * 16_000
+        monkeypatch.setattr("triage.transcription.decode_bounded_audio", lambda *args: decoded)
+
+        class Model:
+            def transcribe(self, audio, **kwargs):
+                assert audio is decoded
+                assert kwargs["language"] == "en"
+                return iter([Segment(0, 1, "hello")]), Info(duration=1000)
+
+        settings = Settings(
+            api_token=TOKEN, database_path=tmp_path / "r.sqlite3", transcription_enabled=True
+        )
+        transcriber = FasterWhisperTranscriber(settings)
+        transcriber._model = Model()
+        result = transcriber.transcribe(PreparedAudio("clip.wav", "a" * 64, 1024), "en")
+        assert result.text == "hello"
+        assert result.duration_seconds == 1
+
+    def test_real_decoder_resamples_stereo_and_rejects_long_audio(self, tmp_path):
+        pytest.importorskip("av")
+        np = pytest.importorskip("numpy")
+        path = tmp_path / "stereo.wav"
+        with wave.open(str(path), "wb") as clip:
+            clip.setnchannels(2)
+            clip.setsampwidth(2)
+            clip.setframerate(48_000)
+            clip.writeframes(bytes(48_000 * 2 * 2))
+
+        decoded = decode_bounded_audio(str(path), 1)
+        assert decoded.shape == (16_000,)
+        assert decoded.dtype == np.float32
+        assert np.isfinite(decoded).all()
+        with pytest.raises(AudioError, match="audio_too_long"):
+            decode_bounded_audio(str(path), 0.5)

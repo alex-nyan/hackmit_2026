@@ -9,8 +9,41 @@ const CLIP_MS = 10_000;
 
 export type AudioState =
   | { state: "off" }
+  | { state: "requesting-microphone" }
   | { state: "unsupported"; reason: string }
   | { state: "recording"; lastResult: TranscriptionResult | null; lastError: string | null };
+
+interface AudioSession {
+  stream: MediaStream | null;
+  recorder: MediaRecorder | null;
+  timer: ReturnType<typeof setTimeout> | null;
+  request: AbortController | null;
+}
+
+function detachRecorder(recorder: MediaRecorder) {
+  recorder.ondataavailable = null;
+  recorder.onstop = null;
+  recorder.onerror = null;
+}
+
+function releaseSession(session: AudioSession) {
+  if (session.timer !== null) clearTimeout(session.timer);
+  session.request?.abort();
+  if (session.recorder) {
+    // stop() queues a final data event. Detach it before stopping so a user
+    // cancelling capture never sends another clip or restarts the recorder.
+    detachRecorder(session.recorder);
+    try {
+      if (session.recorder.state !== "inactive") session.recorder.stop();
+    } catch {
+      // Tracks must still be released if the recorder has already failed.
+    }
+  }
+  session.stream?.getTracks().forEach((track) => {
+    track.onended = null;
+    track.stop();
+  });
+}
 
 function readAsDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -21,16 +54,10 @@ function readAsDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-/**
- * Records fixed-length clips from an existing stream and sends each one for
- * transcription. Clips are sent one at a time: the service shares its model
- * budget with the vision pipeline, so overlapping uploads would only queue.
- */
+/** Records complete, independently decodable clips, with at most one upload. */
 export function useAudioTranscription(sourceId: string) {
   const [state, setState] = useState<AudioState>({ state: "off" });
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const inFlightRef = useRef(false);
+  const sessionRef = useRef<AudioSession | null>(null);
   const sourceIdRef = useRef(sourceId);
 
   useEffect(() => {
@@ -38,75 +65,81 @@ export function useAudioTranscription(sourceId: string) {
   }, [sourceId]);
 
   const stop = useCallback(() => {
-    try {
-      recorderRef.current?.stop();
-    } catch {
-      // A recorder already stopped throws; nothing to recover.
-    }
-    recorderRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
+    const session = sessionRef.current;
+    sessionRef.current = null;
+    if (session) releaseSession(session);
     setState({ state: "off" });
   }, []);
 
-  const send = useCallback(async (blob: Blob, mimeType: string) => {
-    // Drop a clip rather than pile requests onto a service that takes one at a
-    // time; the next clip is a better use of the slot than a stale one.
-    if (inFlightRef.current || blob.size === 0) return;
-    inFlightRef.current = true;
-    try {
-      const body = buildTranscriptionRequest({
-        dataUrl: await readAsDataUrl(blob),
-        recorderMimeType: mimeType,
-        sourceId: sourceIdRef.current,
-        capturedAt: new Date(Date.now() - CLIP_MS),
-      });
-      if (!body) {
+  const send = useCallback(
+    async (
+      session: AudioSession,
+      blob: Blob,
+      mimeType: string,
+      capturedAt: Date,
+      clipSourceId: string,
+    ) => {
+      // Prefer the next fresh clip to queuing audio while the service is busy.
+      if (sessionRef.current !== session || session.request || blob.size === 0) return;
+      const request = new AbortController();
+      session.request = request;
+      const reportError = (lastError: string) => {
         setState((current) =>
-          current.state === "recording"
-            ? { ...current, lastError: "This browser recorded a format the service rejects." }
+          sessionRef.current === session && current.state === "recording"
+            ? { ...current, lastError }
             : current,
         );
-        return;
-      }
+      };
+      try {
+        const dataUrl = await readAsDataUrl(blob);
+        if (sessionRef.current !== session) return;
+        const body = buildTranscriptionRequest({
+          dataUrl,
+          recorderMimeType: mimeType,
+          sourceId: clipSourceId,
+          capturedAt,
+        });
+        if (!body) {
+          reportError("This browser recorded a clip the service rejects.");
+          return;
+        }
 
-      const response = await fetch("/api/transcribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        cache: "no-store",
-      });
+        const response = await fetch("/api/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: request.signal,
+          cache: "no-store",
+        });
+        if (sessionRef.current !== session) return;
+        if (!response.ok) {
+          reportError(`Transcription returned ${response.status}.`);
+          return;
+        }
 
-      if (!response.ok) {
+        const result = (await response.json()) as TranscriptionResult;
         setState((current) =>
-          current.state === "recording"
-            ? { ...current, lastError: `Transcription returned ${response.status}.` }
+          sessionRef.current === session && current.state === "recording"
+            ? { state: "recording", lastResult: result, lastError: null }
             : current,
         );
-        return;
+      } catch {
+        reportError("Could not reach the transcription route.");
+      } finally {
+        if (session.request === request) session.request = null;
       }
-
-      const result = (await response.json()) as TranscriptionResult;
-      setState((current) =>
-        current.state === "recording"
-          ? { state: "recording", lastResult: result, lastError: null }
-          : current,
-      );
-    } catch {
-      setState((current) =>
-        current.state === "recording"
-          ? { ...current, lastError: "Could not reach the transcription route." }
-          : current,
-      );
-    } finally {
-      inFlightRef.current = false;
-    }
-  }, []);
+    },
+    [],
+  );
 
   const start = useCallback(async () => {
-    if (recorderRef.current) return;
+    if (sessionRef.current) return;
 
-    if (typeof window === "undefined" || typeof MediaRecorder === "undefined") {
+    if (
+      typeof MediaRecorder === "undefined" ||
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
       setState({
         state: "unsupported",
         reason: "This browser cannot record audio. A secure context is required.",
@@ -114,33 +147,104 @@ export function useAudioTranscription(sourceId: string) {
       return;
     }
 
-    const mimeType = pickRecorderMimeType((candidate) => MediaRecorder.isTypeSupported(candidate));
-    if (!mimeType) {
+    const supportedMimeType = pickRecorderMimeType((candidate) =>
+      MediaRecorder.isTypeSupported(candidate),
+    );
+    if (!supportedMimeType) {
       setState({
         state: "unsupported",
         reason: "This browser records no audio format the service accepts.",
       });
       return;
     }
+    const mimeType: string = supportedMimeType;
+
+    // Reserve the session before awaiting permission. Stop and unmount also
+    // invalidate pending permission grants and any callbacks from old sessions.
+    const session: AudioSession = { stream: null, recorder: null, timer: null, request: null };
+    sessionRef.current = session;
+    setState({ state: "requesting-microphone" });
+    const fail = (reason: string) => {
+      if (sessionRef.current !== session) return;
+      sessionRef.current = null;
+      releaseSession(session);
+      setState({ state: "unsupported", reason });
+    };
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      streamRef.current = stream;
-      const recorder = new MediaRecorder(stream, { mimeType });
-      recorder.ondataavailable = (event) => void send(event.data, mimeType);
-      // A timeslice emits a clip every interval without stopping the recorder.
-      recorder.start(CLIP_MS);
-      recorderRef.current = recorder;
+      if (sessionRef.current !== session) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      session.stream = stream;
+      stream.getTracks().forEach((track) => {
+        track.onended = () => fail("Microphone capture ended. Start listening to try again.");
+      });
+
+      function recordClip() {
+        if (sessionRef.current !== session) return;
+        const recorder = new MediaRecorder(stream, { mimeType });
+        session.recorder = recorder;
+        const capturedAt = new Date();
+        const clipSourceId = sourceIdRef.current;
+        const chunks: Blob[] = [];
+        let clipComplete = false;
+        recorder.ondataavailable = (event) => {
+          if (sessionRef.current === session && event.data.size > 0) chunks.push(event.data);
+        };
+        recorder.onerror = () => fail("Audio recording failed. Start listening to try again.");
+        recorder.onstop = () => {
+          if (sessionRef.current !== session) return;
+          detachRecorder(recorder);
+          session.recorder = null;
+          if (session.timer !== null) clearTimeout(session.timer);
+          session.timer = null;
+          if (!clipComplete) {
+            fail("Microphone capture ended. Start listening to try again.");
+            return;
+          }
+          const recordedMimeType = recorder.mimeType || mimeType;
+          const blob = new Blob(chunks, { type: recordedMimeType });
+          try {
+            recordClip();
+          } catch {
+            fail("Audio recording failed. Start listening to try again.");
+            return;
+          }
+          void send(session, blob, recordedMimeType, capturedAt, clipSourceId);
+        };
+        // Timeslice blobs belong to one container and need not be playable on
+        // their own. Finalize a complete recording before starting the next.
+        recorder.start();
+        session.timer = setTimeout(() => {
+          if (sessionRef.current !== session) return;
+          clipComplete = true;
+          try {
+            recorder.stop();
+          } catch {
+            fail("Audio recording failed. Start listening to try again.");
+          }
+        }, CLIP_MS);
+      }
+
+      recordClip();
       setState({ state: "recording", lastResult: null, lastError: null });
     } catch {
-      setState({
-        state: "unsupported",
-        reason: "Microphone permission was declined, or no microphone is available.",
-      });
+      fail("Microphone permission was declined, or no microphone is available.");
     }
   }, [send]);
 
-  useEffect(() => stop, [stop]);
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.hidden && sessionRef.current) stop();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      stop();
+    };
+  }, [stop]);
 
   return { state, start, stop };
 }

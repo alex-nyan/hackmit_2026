@@ -136,8 +136,9 @@ attaches the token and forwards to `/v1/triage`.
 
 The timeout covers the service's default inference deadlines plus overhead.
 Increase it if the service uses a longer provider timeout (maximum 3600 seconds).
-The dashboard has no user login: anyone who can reach `/api/triage` can submit a
-frame using the configured service credential. Keep this demo on a trusted LAN,
+The dashboard has no user login: anyone who can reach `/api/triage` or
+`/api/transcribe` can submit media using the configured service credential.
+Keep this demo on a trusted LAN,
 or put authenticated access in front of the dashboard before exposing it publicly.
 
 ### Camera access needs HTTPS
@@ -163,16 +164,28 @@ the optional dependency:
 
 ```bash
 cd services/triage
-uv sync --extra whisper
-TRIAGE_TRANSCRIPTION_ENABLED=true uv run uvicorn triage.app:create_app --factory
+uv sync --locked --extra yolo --extra whisper
+TRIAGE_TRANSCRIPTION_ENABLED=true uv run --no-sync uvicorn triage.app:create_app --factory \
+  --host 127.0.0.1 --port 8090 --workers 1 --no-access-log
 ```
 
 `TRIAGE_WHISPER_MODEL` defaults to `base` on CPU with `int8`. The service starts
 and serves triage normally without the dependency, reporting transcription as
 unavailable rather than failing.
 
-Safari records AAC in an MP4 container and cannot record WebM, so the page picks
-`audio/mp4` first; a WebM-first list records nothing at all on an iPhone.
+Keep `--extra yolo` when adding Whisper to the existing camera service so syncing
+does not remove its detector dependencies. For a deployment with YOLO disabled,
+`--extra whisper` alone is sufficient. Whisper loads on first use and may download
+the configured model; set `TRIAGE_WHISPER_MODEL` to a provisioned local model
+directory to avoid that first-request download.
+
+The page prefers `audio/mp4` when the browser supports it, then falls back to
+WebM or Ogg. Each ten-second recording is finalized as a complete file before
+upload; clips are dropped while an earlier upload is in flight. Stop and
+backgrounding release the microphone and cancel pending uploads.
+
+`TRIAGE_TIMEOUT_SECONDS` in the dashboard environment also controls the
+transcription proxy's timeout; increase it for slower local models.
 
 A transcript is a model hypothesis, not a record of speech. Empty text means
 nothing was recognised, which is **not** the same as nothing having been said —

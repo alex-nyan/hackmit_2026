@@ -4,7 +4,7 @@ import { forwardClip } from "./transcribeProxy";
 import type { TriageSettings } from "./triageProxy";
 
 const SETTINGS: TriageSettings = {
-  baseUrl: "http://127.0.0.1:8099",
+  baseUrl: "http://127.0.0.1:8090",
   token: "a".repeat(32),
   timeoutMs: 240_000,
 };
@@ -15,12 +15,46 @@ function upstream(status: number, body: string) {
 }
 
 describe("forwarding a clip", () => {
+  it.each([
+    {
+      label: "waits beyond the old one-minute deadline",
+      timeoutMs: undefined,
+      delay: 61_000,
+      status: 200,
+    },
+    { label: "honors a configured timeout", timeoutMs: 2000, delay: 3000, status: 504 },
+  ])("$label", async ({ timeoutMs, delay, status }) => {
+    vi.useFakeTimers();
+    vi.spyOn(AbortSignal, "timeout").mockImplementation((milliseconds) => {
+      const controller = new AbortController();
+      setTimeout(
+        () => controller.abort(new DOMException("Timed out", "TimeoutError")),
+        milliseconds,
+      );
+      return controller.signal;
+    });
+    try {
+      const pending = forwardClip({ ...SETTINGS, timeoutMs }, BODY, async (_url, init) => {
+        return new Promise<Response>((resolve, reject) => {
+          setTimeout(() => resolve(new Response('{"text":"hello"}')), delay);
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
+            once: true,
+          });
+        });
+      });
+      await vi.advanceTimersByTimeAsync(delay);
+      expect((await pending).status).toBe(status);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("posts to the transcription endpoint with the bearer token", async () => {
     const fetchMock = upstream(200, '{"text":"hello"}');
     await forwardClip(SETTINGS, BODY, fetchMock as unknown as typeof fetch);
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("http://127.0.0.1:8099/v1/transcribe");
+    expect(url).toBe("http://127.0.0.1:8090/v1/transcribe");
     expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${SETTINGS.token}`);
     expect(init.cache).toBe("no-store");
   });
@@ -33,16 +67,6 @@ describe("forwarding a clip", () => {
       upstream(200, transcript) as unknown as typeof fetch,
     );
     expect(outcome).toEqual({ status: 200, body: transcript });
-  });
-
-  it("measures the limit in bytes, not UTF-16 length", async () => {
-    const fetchMock = upstream(200, "{}");
-    // Multi-byte characters make a string shorter than the bytes it encodes to.
-    const body = "\u00e9".repeat(6_000_000);
-    expect(body.length).toBeLessThan(11_300_001);
-    const outcome = await forwardClip(SETTINGS, body, fetchMock as unknown as typeof fetch);
-    expect(outcome.status).toBe(413);
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rejects an oversized clip without calling the service", async () => {
@@ -66,6 +90,16 @@ describe("forwarding a clip", () => {
     expect(outcome.status).toBe(401);
     expect(outcome.body).not.toContain(SETTINGS.token);
     expect(JSON.parse(outcome.body)).toEqual({ error: "upstream", status: 401 });
+  });
+
+  it("measures the limit in bytes, not UTF-16 length", async () => {
+    const fetchMock = upstream(200, "{}");
+    // Multi-byte characters make a string shorter than the bytes it encodes to.
+    const body = "é".repeat(6_000_000);
+    expect(body.length).toBeLessThan(11_300_001);
+    const outcome = await forwardClip(SETTINGS, body, fetchMock as unknown as typeof fetch);
+    expect(outcome.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("passes a disabled service through as its own status", async () => {

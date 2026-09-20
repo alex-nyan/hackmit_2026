@@ -12,8 +12,9 @@ export function CameraTriageView() {
   const { state, videoRef, start, stop } = useCameraTriage({ sourceId });
   const audio = useAudioTranscription(sourceId);
   const running = state.state === "running";
+  const listening =
+    audio.state.state === "recording" || audio.state.state === "requesting-microphone";
   const active = running || state.state === "requesting-camera";
-  const listening = audio.state.state === "recording";
 
   return (
     <main className={styles.root}>
@@ -29,7 +30,7 @@ export function CameraTriageView() {
             onChange={(event) => setSourceId(event.target.value)}
             placeholder="Unit name"
             aria-label="Unit name"
-            disabled={active}
+            disabled={active || listening}
           />
           <button
             type="button"
@@ -54,6 +55,10 @@ export function CameraTriageView() {
 
         {audio.state.state === "unsupported" && (
           <p className={styles.error}>{audio.state.reason}</p>
+        )}
+
+        {audio.state.state === "requesting-microphone" && (
+          <p className={styles.notice}>Waiting for microphone permission…</p>
         )}
 
         {audio.state.state === "recording" && (

@@ -1,4 +1,4 @@
-import { MAX_BODY_BYTES, type TriageSettings } from "./triageProxy";
+import { MAX_BODY_BYTES, REQUEST_TIMEOUT_MS, type TriageSettings } from "./triageProxy";
 
 export interface ClipProxyOutcome {
   status: number;
@@ -27,8 +27,8 @@ export async function forwardClip(
         "Content-Type": "application/json",
       },
       body,
-      // Transcription is slower than a frame; it shares the configured budget.
-      signal: AbortSignal.timeout(settings.timeoutMs ?? 240_000),
+      // Transcription shares the configured inference budget.
+      signal: AbortSignal.timeout(settings.timeoutMs ?? REQUEST_TIMEOUT_MS),
       cache: "no-store",
     });
 

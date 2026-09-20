@@ -25,8 +25,8 @@ _SUFFIXES = {
 # than handed to a decoder. Offset 4 covers the ISO-BMFF "ftyp" box.
 _SIGNATURES: dict[str, tuple[tuple[int, bytes], ...]] = {
     "audio/mp4": ((4, b"ftyp"),),
-    "audio/aac": ((0, b"\xff\xf1"), (0, b"\xff\xf9"), (0, b"ADIF")),
-    "audio/mpeg": ((0, b"ID3"), (0, b"\xff\xfb"), (0, b"\xff\xf3"), (0, b"\xff\xf2")),
+    "audio/aac": ((0, b"ADIF"),),
+    "audio/mpeg": ((0, b"ID3"),),
     "audio/wav": ((0, b"RIFF"),),
     "audio/webm": ((0, b"\x1a\x45\xdf\xa3"),),
     "audio/ogg": ((0, b"OggS"),),
@@ -47,6 +47,22 @@ class PreparedAudio:
 
 
 def _matches_signature(media_type: str, raw: bytes) -> bool:
+    if media_type == "audio/aac" and len(raw) >= 2:
+        # ADTS: 12 sync bits and layer 00; MPEG ID and CRC presence may vary.
+        if raw[0] == 0xFF and raw[1] & 0xF6 == 0xF0:
+            return True
+    if media_type == "audio/mpeg" and len(raw) >= 4:
+        # MPEG audio headers permit CRC protection and multiple versions/layers.
+        # Exclude reserved version, layer, bitrate, and sample-rate values.
+        if (
+            raw[0] == 0xFF
+            and raw[1] & 0xE0 == 0xE0
+            and raw[1] & 0x18 != 0x08
+            and raw[1] & 0x06 != 0
+            and raw[2] & 0xF0 != 0xF0
+            and raw[2] & 0x0C != 0x0C
+        ):
+            return True
     for offset, magic in _SIGNATURES.get(media_type, ()):
         if raw[offset : offset + len(magic)] == magic:
             return True

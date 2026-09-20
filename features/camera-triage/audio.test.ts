@@ -70,6 +70,11 @@ describe("data urls", () => {
     expect(stripAudioDataUrl("data:audio/webm;base64,ZZZ=")).toBe("ZZZ=");
   });
 
+  it("accepts codec parameters preserved from MediaRecorder blobs", () => {
+    expect(stripAudioDataUrl("data:audio/webm;codecs=opus;base64,ZZZ=")).toBe("ZZZ=");
+    expect(stripAudioDataUrl("data:audio/mp4;codecs=mp4a.40.2;base64,ZZZ=")).toBe("ZZZ=");
+  });
+
   it("rejects anything that is not a base64 data url", () => {
     expect(stripAudioDataUrl("AAABBB")).toBeNull();
     expect(stripAudioDataUrl("")).toBeNull();

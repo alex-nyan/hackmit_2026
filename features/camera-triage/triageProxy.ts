@@ -5,7 +5,7 @@ export interface TriageSettings {
 }
 
 // Matches submit_frame.py's default: two 90-second provider calls plus overhead.
-const REQUEST_TIMEOUT_MS = 240_000;
+export const REQUEST_TIMEOUT_MS = 240_000;
 /** Matches the service's own request ceiling, rejecting oversized bodies early. */
 export const MAX_BODY_BYTES = 11_300_000;
 export const KEY_PATTERN = /^[A-Za-z0-9_.:-]{1,128}$/;

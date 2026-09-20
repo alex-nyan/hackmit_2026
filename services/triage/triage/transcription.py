@@ -1,12 +1,14 @@
 """Speech to text. A transcript is a model hypothesis, never a record of speech."""
 
 import asyncio
+import io
+import itertools
 import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from triage.audio import PreparedAudio
+from triage.audio import AudioError, PreparedAudio
 from triage.config import Settings
 from triage.schemas import ModelProvenance, TranscriptSegment
 
@@ -54,6 +56,44 @@ def _clamp_probability(value: Any) -> float | None:
     return min(1.0, max(0.0, number))
 
 
+def decode_bounded_audio(path: str, max_seconds: float) -> Any:
+    """Bound decoded samples before Whisper performs VAD or model inference.
+
+    Compressed byte size does not bound a clip's duration. Passing a filename to
+    Whisper would decode the entire file before its duration becomes available.
+    """
+    try:
+        import av
+        import numpy as np
+    except ImportError as error:
+        raise TranscriptionError("transcriber_unavailable") from error
+
+    sample_rate = 16_000
+    sample_limit = int(max_seconds * sample_rate)
+    sample_count = 0
+    raw = io.BytesIO()
+    try:
+        resampler = av.AudioResampler(format="s16", layout="mono", rate=sample_rate)
+        with av.open(path, mode="r", metadata_errors="ignore") as container:
+            # None flushes the resampler's final buffered samples.
+            for frame in itertools.chain(container.decode(audio=0), [None]):
+                if frame is not None:
+                    frame.pts = None
+                for output in resampler.resample(frame):
+                    sample_count += output.samples
+                    if sample_count > sample_limit:
+                        raise AudioError("audio_too_long")
+                    raw.write(output.to_ndarray())
+    except AudioError:
+        raise
+    except Exception as error:
+        raise AudioError("audio_decode_failed") from error
+
+    if not sample_count:
+        raise AudioError("audio_decode_failed")
+    return np.frombuffer(raw.getbuffer(), dtype=np.int16).astype(np.float32) / 32768.0
+
+
 class FasterWhisperTranscriber:
     """
     Loads the model on first use and serializes access, because a Whisper model
@@ -94,10 +134,11 @@ class FasterWhisperTranscriber:
             raise TranscriptionError("transcriber_disabled")
 
         with self._lock:
+            decoded = decode_bounded_audio(audio.path, self.settings.max_audio_seconds)
             model = self._ensure_model()
             try:
                 segments, info = model.transcribe(
-                    audio.path,
+                    decoded,
                     language=language,
                     beam_size=self.settings.whisper_beam_size,
                     vad_filter=True,
@@ -106,10 +147,7 @@ class FasterWhisperTranscriber:
             except Exception as error:
                 raise TranscriptionError("transcriber_failed") from error
 
-        duration = float(getattr(info, "duration", 0.0) or 0.0)
-        if duration > self.settings.max_audio_seconds:
-            raise TranscriptionError("audio_too_long")
-
+        duration = len(decoded) / 16_000
         return build_transcription(collected, info, duration)
 
     def provenance(self) -> ModelProvenance:
