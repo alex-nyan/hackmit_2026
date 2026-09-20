@@ -1,0 +1,404 @@
+// !$*UTF8*$!
+{
+	"archiveVersion" = 1;
+	"classes" = {
+	};
+	"objectVersion" = 56;
+	"objects" = {
+		"D734D671A93C77A774CA932C" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "Sources/CaptureCore/CaptureCore.swift";
+			"sourceTree" = "<group>";
+		};
+		"20E60BF29AFAE9C54EDE1319" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "Sources/CaptureCore/WireModels.swift";
+			"sourceTree" = "<group>";
+		};
+		"04291E25CD14D2F0A1011294" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "Watch/WatchCaptureApp.swift";
+			"sourceTree" = "<group>";
+		};
+		"7C4FF7A69015D0F5466755B2" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "iOS/CaptureApp.swift";
+			"sourceTree" = "<group>";
+		};
+		"4C6E64F38068B003C7AB7D8C" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "iOS/CaptureCoordinator.swift";
+			"sourceTree" = "<group>";
+		};
+		"EAF1332BE0356C3EEBA8B5BB" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "iOS/DeviceCapture.swift";
+			"sourceTree" = "<group>";
+		};
+		"1A1D703F9DF1CF20246D0244" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "iOS/RelayClient.swift";
+			"sourceTree" = "<group>";
+		};
+		"3F3F3DCEE4F7E25C82E55BAF" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "iOS/WatchMirror.swift";
+			"sourceTree" = "<group>";
+		};
+		"6D2E5714560CB3D4DD7C46F0" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "text.xml";
+			"path" = "Config/PrivacyInfo.xcprivacy";
+			"sourceTree" = "<group>";
+		};
+		"1825D3F15E879F91DF58FF36" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "text.plist.xml";
+			"path" = "Config/iOS-Info.plist";
+			"sourceTree" = "<group>";
+		};
+		"BE567A998199AD21E35F587F" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "text.plist.xml";
+			"path" = "Config/Watch-Info.plist";
+			"sourceTree" = "<group>";
+		};
+		"D2DDEEA53D51E226F41D9442" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "text.plist.xml";
+			"path" = "Config/HealthKit.entitlements";
+			"sourceTree" = "<group>";
+		};
+		"CD9AF436DEFFAF9EA09E2ED6" = {
+			"isa" = "PBXFileReference";
+			"explicitFileType" = "wrapper.application";
+			"includeInIndex" = 0;
+			"path" = "SafetyCapture.app";
+			"sourceTree" = "BUILT_PRODUCTS_DIR";
+		};
+		"770EFCB4C728236833ED279F" = {
+			"isa" = "PBXFileReference";
+			"explicitFileType" = "wrapper.application";
+			"includeInIndex" = 0;
+			"path" = "SafetyWatch.app";
+			"sourceTree" = "BUILT_PRODUCTS_DIR";
+		};
+		"0A3E27B8CA818264D75C8D81" = {
+			"isa" = "PBXGroup";
+			"children" = ("CD9AF436DEFFAF9EA09E2ED6", "770EFCB4C728236833ED279F");
+			"name" = "Products";
+			"sourceTree" = "<group>";
+		};
+		"0D6E4079E36703EBD37C0072" = {
+			"isa" = "PBXGroup";
+			"children" = ("D734D671A93C77A774CA932C", "20E60BF29AFAE9C54EDE1319", "04291E25CD14D2F0A1011294", "7C4FF7A69015D0F5466755B2", "4C6E64F38068B003C7AB7D8C", "EAF1332BE0356C3EEBA8B5BB", "1A1D703F9DF1CF20246D0244", "3F3F3DCEE4F7E25C82E55BAF", "6D2E5714560CB3D4DD7C46F0", "1825D3F15E879F91DF58FF36", "BE567A998199AD21E35F587F", "D2DDEEA53D51E226F41D9442", "0A3E27B8CA818264D75C8D81");
+			"sourceTree" = "<group>";
+		};
+		"081BF086A003D7F4476DF37B" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "D734D671A93C77A774CA932C";
+		};
+		"984529BE7F1048CB096EA4AB" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "20E60BF29AFAE9C54EDE1319";
+		};
+		"68F5EFE8B19543955A424E42" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "04291E25CD14D2F0A1011294";
+		};
+		"DB4A7387F73AC96458284846" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("081BF086A003D7F4476DF37B", "984529BE7F1048CB096EA4AB", "68F5EFE8B19543955A424E42");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"8ECD15F9E2045DAA1CA05952" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "6D2E5714560CB3D4DD7C46F0";
+		};
+		"44D020E9E45A21262FBCE365" = {
+			"isa" = "PBXResourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("8ECD15F9E2045DAA1CA05952");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"7E20EFE7AD2D04A28F08E8D2" = {
+			"isa" = "PBXFrameworksBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"F5FEB6FAD3AB862BD1D7F612" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"SWIFT_VERSION" = "5.0";
+				"SWIFT_STRICT_CONCURRENCY" = "targeted";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"CURRENT_PROJECT_VERSION" = "1";
+				"MARKETING_VERSION" = "0.1.0";
+				"GENERATE_INFOPLIST_FILE" = "NO";
+				"CODE_SIGN_ENTITLEMENTS" = "Config/HealthKit.entitlements";
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"SWIFT_EMIT_LOC_STRINGS" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SDKROOT" = "watchos";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "org.hackmit.safetycapture.watchkitapp";
+				"INFOPLIST_FILE" = "Config/Watch-Info.plist";
+				"TARGETED_DEVICE_FAMILY" = "4";
+				"SUPPORTED_PLATFORMS" = "watchos watchsimulator";
+				"WATCHOS_DEPLOYMENT_TARGET" = "10.0";
+				"SKIP_INSTALL" = "YES";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+			};
+			"name" = "Debug";
+		};
+		"292236A20372D6506B12A892" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"SWIFT_VERSION" = "5.0";
+				"SWIFT_STRICT_CONCURRENCY" = "targeted";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"CURRENT_PROJECT_VERSION" = "1";
+				"MARKETING_VERSION" = "0.1.0";
+				"GENERATE_INFOPLIST_FILE" = "NO";
+				"CODE_SIGN_ENTITLEMENTS" = "Config/HealthKit.entitlements";
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"SWIFT_EMIT_LOC_STRINGS" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SDKROOT" = "watchos";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "org.hackmit.safetycapture.watchkitapp";
+				"INFOPLIST_FILE" = "Config/Watch-Info.plist";
+				"TARGETED_DEVICE_FAMILY" = "4";
+				"SUPPORTED_PLATFORMS" = "watchos watchsimulator";
+				"WATCHOS_DEPLOYMENT_TARGET" = "10.0";
+				"SKIP_INSTALL" = "YES";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
+			};
+			"name" = "Release";
+		};
+		"0659BB390F3E4E43443B8280" = {
+			"isa" = "XCConfigurationList";
+			"buildConfigurations" = ("F5FEB6FAD3AB862BD1D7F612", "292236A20372D6506B12A892");
+			"defaultConfigurationIsVisible" = 0;
+			"defaultConfigurationName" = "Release";
+		};
+		"850F66FA0F5875C00CBFAEF3" = {
+			"isa" = "PBXNativeTarget";
+			"buildConfigurationList" = "0659BB390F3E4E43443B8280";
+			"buildPhases" = ("DB4A7387F73AC96458284846", "7E20EFE7AD2D04A28F08E8D2", "44D020E9E45A21262FBCE365");
+			"buildRules" = ();
+			"dependencies" = ();
+			"name" = "SafetyWatch";
+			"productName" = "SafetyWatch";
+			"productReference" = "770EFCB4C728236833ED279F";
+			"productType" = "com.apple.product-type.application";
+		};
+		"EA53F2AC5B9FE06A260D3493" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "D734D671A93C77A774CA932C";
+		};
+		"7BFCFF1E6001954FF5ECF1BB" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "20E60BF29AFAE9C54EDE1319";
+		};
+		"7DBA5021E8A40C7566206138" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "7C4FF7A69015D0F5466755B2";
+		};
+		"11BA449B5DC8B935813EF381" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "4C6E64F38068B003C7AB7D8C";
+		};
+		"AC2534D74652D45CF4AF1BDB" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "EAF1332BE0356C3EEBA8B5BB";
+		};
+		"7A53E2380A1E92E7AB2BDC71" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "1A1D703F9DF1CF20246D0244";
+		};
+		"12D6C8CCD162571AFE8E7BA7" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "3F3F3DCEE4F7E25C82E55BAF";
+		};
+		"7B0E9DF256F3E46FF770FFDD" = {
+			"isa" = "PBXSourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("EA53F2AC5B9FE06A260D3493", "7BFCFF1E6001954FF5ECF1BB", "7DBA5021E8A40C7566206138", "11BA449B5DC8B935813EF381", "AC2534D74652D45CF4AF1BDB", "7A53E2380A1E92E7AB2BDC71", "12D6C8CCD162571AFE8E7BA7");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"8F23E100BE89B53F7EC6926E" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "6D2E5714560CB3D4DD7C46F0";
+		};
+		"8DAFA4C783499CEB11ECE322" = {
+			"isa" = "PBXResourcesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ("8F23E100BE89B53F7EC6926E");
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"09A9D9D5E6F760D5D4304657" = {
+			"isa" = "PBXFrameworksBuildPhase";
+			"buildActionMask" = 2147483647;
+			"files" = ();
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"E58B6CEB64A55D12B5B01B27" = {
+			"isa" = "PBXContainerItemProxy";
+			"containerPortal" = "244210E48437B6556980A702";
+			"proxyType" = 1;
+			"remoteGlobalIDString" = "850F66FA0F5875C00CBFAEF3";
+			"remoteInfo" = "SafetyWatch";
+		};
+		"F21179846E5C08211227A457" = {
+			"isa" = "PBXTargetDependency";
+			"target" = "850F66FA0F5875C00CBFAEF3";
+			"targetProxy" = "E58B6CEB64A55D12B5B01B27";
+		};
+		"1C322F0B42D7EFE0821C2D25" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "770EFCB4C728236833ED279F";
+			"settings" = {
+				"ATTRIBUTES" = ("RemoveHeadersOnCopy");
+			};
+		};
+		"0CEA60F04830969E4A592BB0" = {
+			"isa" = "PBXCopyFilesBuildPhase";
+			"buildActionMask" = 2147483647;
+			"dstPath" = "$(CONTENTS_FOLDER_PATH)/Watch";
+			"dstSubfolderSpec" = 16;
+			"files" = ("1C322F0B42D7EFE0821C2D25");
+			"name" = "Embed Watch Content";
+			"runOnlyForDeploymentPostprocessing" = 0;
+		};
+		"7CC192C29DBE3840C28A1EA5" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"SWIFT_VERSION" = "5.0";
+				"SWIFT_STRICT_CONCURRENCY" = "targeted";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"CURRENT_PROJECT_VERSION" = "1";
+				"MARKETING_VERSION" = "0.1.0";
+				"GENERATE_INFOPLIST_FILE" = "NO";
+				"CODE_SIGN_ENTITLEMENTS" = "Config/HealthKit.entitlements";
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"SWIFT_EMIT_LOC_STRINGS" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SDKROOT" = "iphoneos";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "org.hackmit.safetycapture";
+				"INFOPLIST_FILE" = "Config/iOS-Info.plist";
+				"TARGETED_DEVICE_FAMILY" = "1";
+				"SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator";
+				"IPHONEOS_DEPLOYMENT_TARGET" = "17.0";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+			};
+			"name" = "Debug";
+		};
+		"3BD5D66534F4ADB1E6968601" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"SWIFT_VERSION" = "5.0";
+				"SWIFT_STRICT_CONCURRENCY" = "targeted";
+				"CODE_SIGN_STYLE" = "Automatic";
+				"CURRENT_PROJECT_VERSION" = "1";
+				"MARKETING_VERSION" = "0.1.0";
+				"GENERATE_INFOPLIST_FILE" = "NO";
+				"CODE_SIGN_ENTITLEMENTS" = "Config/HealthKit.entitlements";
+				"PRODUCT_NAME" = "$(TARGET_NAME)";
+				"SWIFT_EMIT_LOC_STRINGS" = "YES";
+				"ENABLE_USER_SCRIPT_SANDBOXING" = "YES";
+				"SDKROOT" = "iphoneos";
+				"PRODUCT_BUNDLE_IDENTIFIER" = "org.hackmit.safetycapture";
+				"INFOPLIST_FILE" = "Config/iOS-Info.plist";
+				"TARGETED_DEVICE_FAMILY" = "1";
+				"SUPPORTED_PLATFORMS" = "iphoneos iphonesimulator";
+				"IPHONEOS_DEPLOYMENT_TARGET" = "17.0";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
+			};
+			"name" = "Release";
+		};
+		"D0F58AE525A392BD514C52CD" = {
+			"isa" = "XCConfigurationList";
+			"buildConfigurations" = ("7CC192C29DBE3840C28A1EA5", "3BD5D66534F4ADB1E6968601");
+			"defaultConfigurationIsVisible" = 0;
+			"defaultConfigurationName" = "Release";
+		};
+		"86404FBD538A19DB9A767E6E" = {
+			"isa" = "PBXNativeTarget";
+			"buildConfigurationList" = "D0F58AE525A392BD514C52CD";
+			"buildPhases" = ("7B0E9DF256F3E46FF770FFDD", "09A9D9D5E6F760D5D4304657", "8DAFA4C783499CEB11ECE322", "0CEA60F04830969E4A592BB0");
+			"buildRules" = ();
+			"dependencies" = ("F21179846E5C08211227A457");
+			"name" = "SafetyCapture";
+			"productName" = "SafetyCapture";
+			"productReference" = "CD9AF436DEFFAF9EA09E2ED6";
+			"productType" = "com.apple.product-type.application";
+		};
+		"73EBF6644258C120893E685D" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"CLANG_ENABLE_MODULES" = "YES";
+				"ENABLE_STRICT_OBJC_MSGSEND" = "YES";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-Onone";
+			};
+			"name" = "Debug";
+		};
+		"0B0C687DF8B6B8DC790B519C" = {
+			"isa" = "XCBuildConfiguration";
+			"buildSettings" = {
+				"CLANG_ENABLE_MODULES" = "YES";
+				"ENABLE_STRICT_OBJC_MSGSEND" = "YES";
+				"SWIFT_OPTIMIZATION_LEVEL" = "-O";
+			};
+			"name" = "Release";
+		};
+		"76F8DEC3DFE0BDB465198890" = {
+			"isa" = "XCConfigurationList";
+			"buildConfigurations" = ("73EBF6644258C120893E685D", "0B0C687DF8B6B8DC790B519C");
+			"defaultConfigurationIsVisible" = 0;
+			"defaultConfigurationName" = "Release";
+		};
+		"244210E48437B6556980A702" = {
+			"isa" = "PBXProject";
+			"attributes" = {
+				"BuildIndependentTargetsInParallel" = "YES";
+				"LastUpgradeCheck" = "1600";
+				"TargetAttributes" = {
+					"86404FBD538A19DB9A767E6E" = {
+						"SystemCapabilities" = {
+							"com.apple.HealthKit" = {
+								"enabled" = 1;
+							};
+						};
+					};
+					"850F66FA0F5875C00CBFAEF3" = {
+						"SystemCapabilities" = {
+							"com.apple.HealthKit" = {
+								"enabled" = 1;
+							};
+						};
+					};
+				};
+			};
+			"buildConfigurationList" = "76F8DEC3DFE0BDB465198890";
+			"compatibilityVersion" = "Xcode 14.0";
+			"developmentRegion" = "en";
+			"hasScannedForEncodings" = 0;
+			"knownRegions" = ("en", "Base");
+			"mainGroup" = "0D6E4079E36703EBD37C0072";
+			"productRefGroup" = "0A3E27B8CA818264D75C8D81";
+			"projectDirPath" = "";
+			"projectRoot" = "";
+			"targets" = ("86404FBD538A19DB9A767E6E", "850F66FA0F5875C00CBFAEF3");
+		};
+	};
+	"rootObject" = "244210E48437B6556980A702";
+}

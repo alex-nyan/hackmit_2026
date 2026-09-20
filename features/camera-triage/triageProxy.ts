@@ -1,3 +1,5 @@
+import { parseTriageResult } from "../../shared/contracts";
+
 export interface TriageSettings {
   baseUrl: string;
   token: string;
@@ -67,7 +69,17 @@ export async function forwardFrame(
       };
     }
 
-    return { status: 200, body: await upstream.text(), json: true };
+    const responseBody = await upstream.text();
+    try {
+      parseTriageResult(JSON.parse(responseBody));
+    } catch {
+      return {
+        status: 502,
+        body: JSON.stringify({ error: "invalid-upstream-contract" }),
+        json: true,
+      };
+    }
+    return { status: 200, body: responseBody, json: true };
   } catch (error) {
     const timedOut = error instanceof Error && error.name === "TimeoutError";
     return {

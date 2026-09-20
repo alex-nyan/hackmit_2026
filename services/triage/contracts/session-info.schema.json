@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "incident_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9_.:-]+$",
+        "type": "string"
+      },
+      "title": "Incident Ids",
+      "type": "array"
+    },
+    "patient_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9_.:-]+$",
+        "type": "string"
+      },
+      "title": "Patient Ids",
+      "type": "array"
+    },
+    "principal_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Principal Id",
+      "type": "string"
+    },
+    "role": {
+      "enum": [
+        "source",
+        "officer",
+        "dispatch",
+        "hospital"
+      ],
+      "title": "Role",
+      "type": "string"
+    },
+    "source_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9_.:-]+$",
+        "type": "string"
+      },
+      "title": "Source Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "principal_id",
+    "role",
+    "incident_ids",
+    "source_ids",
+    "patient_ids"
+  ],
+  "title": "SessionInfo",
+  "type": "object"
+}

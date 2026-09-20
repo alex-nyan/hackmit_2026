@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { transcriptFixture } from "../contracts/fixtures";
 import { forwardClip } from "./transcribeProxy";
 import type { TriageSettings } from "./triageProxy";
 
@@ -36,7 +37,7 @@ describe("forwarding a clip", () => {
     try {
       const pending = forwardClip({ ...SETTINGS, timeoutMs }, BODY, async (_url, init) => {
         return new Promise<Response>((resolve, reject) => {
-          setTimeout(() => resolve(new Response('{"text":"hello"}')), delay);
+          setTimeout(() => resolve(new Response(JSON.stringify(transcriptFixture()))), delay);
           init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
             once: true,
           });
@@ -60,7 +61,7 @@ describe("forwarding a clip", () => {
   });
 
   it("returns the transcript unchanged on success", async () => {
-    const transcript = '{"request_id":"r1","text":"dispatch","speech_detected":true}';
+    const transcript = JSON.stringify(transcriptFixture());
     const outcome = await forwardClip(
       SETTINGS,
       BODY,
@@ -68,6 +69,19 @@ describe("forwarding a clip", () => {
     );
     expect(outcome).toEqual({ status: 200, body: transcript });
   });
+
+  it.each(["{}", '{"transcript_semantics":"verbatim"}', "not json"])(
+    "rejects malformed upstream success: %s",
+    async (body) => {
+      const outcome = await forwardClip(
+        SETTINGS,
+        BODY,
+        upstream(200, body) as unknown as typeof fetch,
+      );
+      expect(outcome.status).toBe(502);
+      expect(JSON.parse(outcome.body)).toEqual({ error: "invalid-upstream-contract" });
+    },
+  );
 
   it("rejects an oversized clip without calling the service", async () => {
     const fetchMock = upstream(200, "{}");

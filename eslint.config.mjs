@@ -8,8 +8,8 @@ export default defineConfig([
   ...nextTs,
   prettierConfig,
   globalIgnores([
-    ".next/**",
-    ".next-*/**",
+    "**/.next/**",
+    "**/.next-*/**",
     "out/**",
     "coverage/**",
     "next-env.d.ts",

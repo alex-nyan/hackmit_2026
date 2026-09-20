@@ -7,6 +7,11 @@ tracking and the hazard-triage service. A workspace is a role the same app is
 pinned to, not a separate codebase; each runs as its own local server with its
 own build output.
 
+An explicit authenticated **live mode** now connects iPhone camera/microphone/GPS,
+Apple Watch heart rate, local inference and shared incident state. Start with the
+[live pipeline runbook](docs/live-pipeline.md) and its model-free replay. The
+default startup below remains the synthetic demonstration.
+
 ## Quick start
 
 Requirements:
