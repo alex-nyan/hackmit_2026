@@ -4,7 +4,7 @@ export type MapStatus = "loading" | "ready" | "error" | "missing-token";
 
 export const MAP_FOCUS = {
   all: {
-    label: "All Boston",
+    label: "All areas",
     center: [-71.077, 42.3505] as [number, number],
     zoom: 13.1,
   },
@@ -19,7 +19,7 @@ export const MAP_FOCUS = {
     zoom: 15.9,
   },
   boston: {
-    label: "Boston",
+    label: "Downtown",
     center: [-71.0715, 42.355] as [number, number],
     zoom: 15.4,
   },
