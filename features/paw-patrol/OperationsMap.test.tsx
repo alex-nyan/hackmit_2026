@@ -232,7 +232,7 @@ async function mount(overrides: Partial<OperationsMapProps> = {}) {
 
 function device(name: string, ageSeconds: number): LiveDevice {
   return {
-    id: 7,
+    id: "7",
     name,
     online: true,
     fix: {

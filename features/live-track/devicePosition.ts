@@ -141,7 +141,9 @@ export function activePositions(
   positions: readonly StoredPosition[],
   nowMs: number,
 ): StoredPosition[] {
-  return positions.filter((position) => positionAgeSeconds(position, nowMs) * 1000 <= DROP_AFTER_MS);
+  return positions.filter(
+    (position) => positionAgeSeconds(position, nowMs) * 1000 <= DROP_AFTER_MS,
+  );
 }
 
 export function toLiveFix(stored: StoredPosition, nowMs: number): LiveFix {

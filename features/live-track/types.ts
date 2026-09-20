@@ -25,12 +25,17 @@ export interface LiveFix {
 }
 
 export interface LiveDevice {
-  id: number;
+  /**
+   * Identity only — a React key and a map feature property, never arithmetic.
+   * Traccar numbers its devices; a phone publishing from the capture page is
+   * known by the unit name it was given, so this is a string either way.
+   */
+  id: string;
   name: string;
   /**
-   * Traccar's reachability flag. It tracks when data last arrived, which is not
-   * the same as how fresh the position is — a device can be online carrying a
-   * fix that is half an hour old.
+   * Whether the source considers the device reachable. It tracks when data last
+   * arrived, which is not the same as how fresh the position is — a device can
+   * be online carrying a fix that is half an hour old.
    */
   online: boolean;
   /** Null when the device has never produced a usable fix. */
