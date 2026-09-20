@@ -56,9 +56,6 @@ export function WorkspaceHome() {
       <main id="workspace" className={styles.main}>
         <section className={styles.hero} aria-labelledby="home-title">
           <div className={styles.heroCopy}>
-            <p className={styles.eyebrow}>
-              <span /> ONE TEAM. A SHARED PICTURE.
-            </p>
             <h1 id="home-title">
               Closer together.
               <br />
@@ -76,14 +73,12 @@ export function WorkspaceHome() {
                 Choose your workspace <ArrowDown size={16} aria-hidden="true" />
               </a>
             </div>
-            <p className={styles.demoNote}>HackMIT demonstration · Simulated incident signals</p>
           </div>
           <ResponseNetwork />
         </section>
         <section id="workspaces" className={styles.workspaces} aria-labelledby="workspaces-title">
           <div className={styles.sectionHeading}>
             <div>
-              <p className={styles.eyebrow}>YOUR ROLE. YOUR WORKSPACE.</p>
               <h2 id="workspaces-title">Where are you responding from?</h2>
             </div>
             <span>Three teams. One connected response.</span>
