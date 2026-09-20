@@ -82,6 +82,7 @@ reachable in one place:
 | `/hospital`      | The Hospital dashboard alone                                     |
 | `/map`           | The standalone 3D building map with live fleet tracking          |
 | `/capture`       | The phone-oriented camera page for hazard triage                 |
+| `/join`          | One-tap page behind the QR code: put this phone on the map       |
 | `/capture/check` | Whether this device will provide camera and microphone           |
 
 The three role routes are how you get separate dashboards that still share an
@@ -115,6 +116,35 @@ requested until you turn it on:
 
 Live tracking and triage each need their own configuration, below. Without it the
 panels say what is missing rather than inventing a reading.
+
+## Putting a phone on the map
+
+The fastest way to get a unit onto the map is to scan the code on the Dispatch
+dashboard. It appears at the foot of the **On the ground** panel and encodes the
+address the dashboard was actually opened on, so there is nothing to type and
+nothing to configure.
+
+Scanning opens `/join`: one button, one permission prompt, and the phone is on
+the map. No sign-in — the roster exists so two phones cannot publish as the same
+officer, which is the right rule for a shift and the wrong one for somebody who
+was handed the code ten seconds ago. A guest publishes under a `guest-` id
+instead, kept visibly distinct in the roster so it can never be read as an
+officer. The camera is a second, separate button.
+
+This needs `BLOB_READ_WRITE_TOKEN` and nothing else.
+
+Two situations produce a written explanation instead of a code, because a QR is
+a promise that scanning it will work:
+
+- **The dashboard is on `localhost`.** On somebody else's phone that address
+  means that phone. Deploy, or serve on the machine's network address.
+- **The dashboard is on plain HTTP.** Browsers only hand out a position on a
+  secure origin, so the scan would succeed and the permission would then be
+  refused. HTTPS is required.
+
+Stopping removes the unit. Only the latest fix per unit is kept, a unit that
+goes quiet ages through amber to grey rather than sitting on a street corner
+looking current, and nothing keeps a trail.
 
 ## Live fleet tracking (optional)
 
@@ -414,10 +444,13 @@ tokens are necessarily visible in browser requests; use a dedicated token with
 appropriate permissions and URL restrictions. Other service credentials belong
 on the server and must never use a `NEXT_PUBLIC_` variable.
 
-The repository is ready for a standard Next.js host. For a future Vercel deployment,
-select Next.js and configure `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` before building.
-Add the deployed domain to your token's allowed URLs. No hosted deployment is
-created by these local setup instructions.
+The deployment is live at <https://hackmit2026-iota.vercel.app>. `vercel deploy --prod` from the repository
+root publishes to it; `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` and `BLOB_READ_WRITE_TOKEN`
+are already configured on the project, and the Mapbox token permits that domain.
+
+A `NEXT_PUBLIC_` token is embedded at build time, so a token change needs a new
+deployment rather than a restart. If the map goes blank on a new domain, the
+token's allowed-URL list is the first thing to check.
 
 See [architecture](docs/architecture.md) and [contributing](CONTRIBUTING.md).
 

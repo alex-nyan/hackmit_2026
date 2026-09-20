@@ -65,10 +65,9 @@ pnpm start
 production build. Stop development before using production on the same port; select
 another with `pnpm start -- --port 5179`.
 
-For Vercel, select the repository root, Node 22, and configure
-`NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` before building; permit the deployed domain in
-Mapbox. Public tokens are embedded at build time. Do not upload private device data
-or server secrets. No hosted deployment has been created.
+Deployed at <https://hackmit2026-iota.vercel.app>. Public tokens are embedded at build
+time, so a token change needs a rebuild. Do not upload private device data or
+server secrets; `.vercelignore` keeps `.env` out of the bundle.
 
 ## Consult workflow
 
