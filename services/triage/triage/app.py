@@ -19,6 +19,7 @@ from starlette.requests import ClientDisconnect
 from triage.audio import AudioError, prepared_audio
 from triage.config import Settings
 from triage.images import ImageError, prepare_image
+from triage.live_api import LiveAPI
 from triage.pipeline import TriagePipeline
 from triage.schemas import TranscriptionRequest, TranscriptionResult, TriageRequest
 from triage.store import ResultStore, StoreError
@@ -99,6 +100,7 @@ def create_app(settings: Settings | None = None, pipeline=None, transcription=No
     in_flight_keys: set[str] = set()
     store = None
     expected_token = ("Bearer " + settings.api_token.get_secret_value()).encode("ascii")
+    live_api = LiveAPI(settings)
 
     def authenticate(request: Request) -> None:
         supplied = request.headers.get("authorization", "").encode("utf-8")
@@ -118,7 +120,8 @@ def create_app(settings: Settings | None = None, pipeline=None, transcription=No
                 settings.database_path, settings.retention_hours, settings.max_records
             )
             app.state.store = store
-            yield
+            async with live_api.lifespan():
+                yield
         finally:
             try:
                 await pipeline.close()
@@ -135,6 +138,8 @@ def create_app(settings: Settings | None = None, pipeline=None, transcription=No
         openapi_url=None,
     )
     app.state.admission = admission
+    app.state.live_api = live_api
+    app.include_router(live_api.router)
 
     @app.get("/health/live")
     async def live():

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { triageFixture, transcriptFixture } from "../contracts/fixtures";
 
 import type { Hazard, HazardCategory, HazardSeverity, TriageResult } from "../camera-triage/types";
 import type { TranscriptionResult } from "../camera-triage/audio";
@@ -23,7 +24,7 @@ function hazard(category: HazardCategory, severity: HazardSeverity, confidence =
 }
 
 function result(hazards: Hazard[]): TriageResult {
-  return {
+  return triageFixture({
     request_id: "req-1",
     source_id: "officer-P-01",
     captured_at: "2026-09-19T22:00:00Z",
@@ -38,10 +39,10 @@ function result(hazards: Hazard[]): TriageResult {
       limitations: ["Single frame"],
     },
     detections: [],
-    models: [{ provider: "ollama", model: "gemma4:26b" }],
+    models: [{ provider: "ollama", model: "gemma4:26b", revision: null }],
     warnings: [],
     timings_ms: {},
-  };
+  });
 }
 
 describe("significantHazard", () => {
@@ -87,7 +88,10 @@ describe("hazardIncident", () => {
     expect(incident?.origin).toBe("model");
     expect(incident?.requiresHumanReview).toBe(true);
     expect(incident?.title).toContain("unverified");
-    expect(incident?.provenance).toMatchObject({ provider: "ollama", model: "gemma4:26b" });
+    expect(incident?.provenance).toMatchObject({
+      provider: "ollama",
+      model: "gemma4:26b",
+    });
     // The score is stated, never as a probability.
     expect(incident?.detail).toContain("uncalibrated");
     expect(incident?.detail).toContain("Uncertainty:");
@@ -118,16 +122,17 @@ describe("distressTerms", () => {
 });
 
 describe("transcriptIncident", () => {
-  const transcript = (text: string, speech = true): TranscriptionResult => ({
-    request_id: "audio-1",
-    text,
-    speech_detected: speech,
-    language: "en",
-    language_probability: 0.9,
-    duration_seconds: 10,
-    segments: [],
-    warnings: [],
-  });
+  const transcript = (text: string, speech = true): TranscriptionResult =>
+    transcriptFixture({
+      request_id: "audio-1",
+      text,
+      speech_detected: speech,
+      language: "en",
+      language_probability: 0.9,
+      duration_seconds: 10,
+      segments: [],
+      warnings: [],
+    });
 
   it("publishes on a distress match and says what a transcript is", () => {
     const incident = transcriptIncident(transcript("officer down, send an ambulance"), context);

@@ -1,35 +1,15 @@
+import type {
+  TranscriptionRequest as TranscriptionRequestBody,
+  TranscriptionResult,
+} from "../../shared/contracts";
 import { toSourceId } from "./frame";
 
-/** Mirrors services/triage/contracts/transcription-request.schema.json. */
-export type AudioMediaType =
-  "audio/mp4" | "audio/aac" | "audio/mpeg" | "audio/wav" | "audio/webm" | "audio/ogg";
-
-export interface TranscriptionRequestBody {
-  audio_base64: string;
-  media_type: AudioMediaType;
-  source_id: string;
-  captured_at: string;
-  incident_id?: string | null;
-  language?: string | null;
-}
-
-export interface TranscriptSegment {
-  start_seconds: number;
-  end_seconds: number;
-  text: string;
-  no_speech_probability: number | null;
-}
-
-export interface TranscriptionResult {
-  request_id: string;
-  text: string;
-  speech_detected: boolean;
-  language: string | null;
-  language_probability: number | null;
-  duration_seconds: number;
-  segments: TranscriptSegment[];
-  warnings: string[];
-}
+export type {
+  TranscriptionRequest as TranscriptionRequestBody,
+  TranscriptionResult,
+  TranscriptSegment,
+} from "../../shared/contracts";
+export type AudioMediaType = TranscriptionRequestBody["media_type"];
 
 export const MAX_AUDIO_BASE64 = 11_200_000;
 

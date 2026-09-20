@@ -1,11 +1,12 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { transcriptFixture } from "../contracts/fixtures";
 import { useAudioTranscription } from "./useAudioTranscription";
 
 const getUserMedia = vi.fn<() => Promise<MediaStream>>();
 const fetchMock = vi.fn<typeof fetch>();
-const transcript = { request_id: "r1", text: "hello", speech_detected: true };
+const transcript = transcriptFixture({ request_id: "r1", text: "hello" });
 
 function microphone() {
   const track = { stop: vi.fn(), onended: null as (() => void) | null };
@@ -274,4 +275,42 @@ describe("complete audio clips", () => {
       expect(RecorderMock.instances).toHaveLength(1);
     },
   );
+});
+
+describe("validated incident callbacks", () => {
+  it("publishes a validated response to the incident subscriber", async () => {
+    getUserMedia.mockResolvedValue(microphone().stream);
+    const onResult = vi.fn();
+    const { result } = renderHook(() => useAudioTranscription("unit-01", onResult));
+    await act(async () => result.current.start());
+    await finishClip();
+    expect(onResult).toHaveBeenCalledExactlyOnceWith(transcript);
+  });
+
+  it("does not publish malformed success responses", async () => {
+    getUserMedia.mockResolvedValue(microphone().stream);
+    fetchMock.mockResolvedValueOnce(Response.json({ text: "help" }));
+    const onResult = vi.fn();
+    const { result } = renderHook(() => useAudioTranscription("unit-01", onResult));
+    await act(async () => result.current.start());
+    await finishClip();
+    expect(onResult).not.toHaveBeenCalled();
+    expect(result.current.state).toMatchObject({
+      lastError: "Invalid transcription response. Speech hypotheses are unavailable.",
+    });
+  });
+
+  it("does not publish a response whose body arrives after capture stops", async () => {
+    getUserMedia.mockResolvedValue(microphone().stream);
+    const body = Promise.withResolvers<unknown>();
+    fetchMock.mockResolvedValueOnce({ ok: true, json: () => body.promise } as Response);
+    const onResult = vi.fn();
+    const { result } = renderHook(() => useAudioTranscription("unit-01", onResult));
+    await act(async () => result.current.start());
+    await finishClip();
+    act(() => result.current.stop());
+    await act(async () => body.resolve(transcript));
+    expect(onResult).not.toHaveBeenCalled();
+    expect(result.current.state.state).toBe("off");
+  });
 });

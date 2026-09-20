@@ -35,7 +35,19 @@
         "y2"
       ],
       "title": "BoundingBox",
-      "type": "object"
+      "type": "object",
+      "x-ordered-pairs": [
+        [
+          "x1",
+          "x2",
+          "lt"
+        ],
+        [
+          "y1",
+          "y2",
+          "lt"
+        ]
+      ]
     },
     "Detection": {
       "additionalProperties": false,
@@ -166,7 +178,8 @@
       },
       "required": [
         "provider",
-        "model"
+        "model",
+        "revision"
       ],
       "title": "ModelProvenance",
       "type": "object"
@@ -343,6 +356,7 @@
     }
   },
   "required": [
+    "schema_version",
     "request_id",
     "source_id",
     "incident_id",
@@ -351,11 +365,15 @@
     "image_sha256",
     "status",
     "review_priority",
+    "requires_human_review",
+    "confidence_semantics",
     "assessment",
     "detections",
     "models",
     "warnings",
-    "timings_ms"
+    "timings_ms",
+    "policy_version",
+    "prompt_version"
   ],
   "title": "TriageResult",
   "type": "object"

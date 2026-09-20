@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "incident_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "frame",
+        "audio"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "media_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Media Id",
+      "type": "string"
+    },
+    "processing_semantics": {
+      "const": "admitted_not_processed",
+      "default": "admitted_not_processed",
+      "title": "Processing Semantics",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "accepted",
+        "replaced",
+        "duplicate"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "media_id",
+    "incident_id",
+    "source_id",
+    "kind",
+    "status",
+    "processing_semantics"
+  ],
+  "title": "MediaReceipt",
+  "type": "object"
+}
