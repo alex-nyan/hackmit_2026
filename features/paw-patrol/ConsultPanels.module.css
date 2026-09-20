@@ -1,0 +1,224 @@
+.scene {
+  border: 1px solid #bcc0d6;
+  background: #f2f3fa;
+  border-radius: 14px;
+  padding: 18px 22px;
+  margin: 18px 0;
+  color: #28326f;
+}
+.unsafe {
+  background: #fff4ed;
+  border-color: #d8b6a4;
+  color: #743c2c;
+}
+.sceneSummary {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.sceneSummary div {
+  display: grid;
+  gap: 5px;
+}
+.sceneSummary div:last-child {
+  margin-left: auto;
+}
+.scene small,
+.scene p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.scene p {
+  margin: 10px 0 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+}
+.actions button,
+.alert button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #9c9fc0;
+  border-radius: 7px;
+  padding: 9px 13px;
+  background: #fff;
+  color: #343e8a;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.actions .panic {
+  background: #893d30;
+  color: #fff;
+  border-color: #893d30;
+  margin-left: auto;
+}
+.alert {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-top: 1px solid #d8b6a4;
+  margin-top: 12px;
+  padding-top: 12px;
+  font-size: 14px;
+}
+.tactical {
+  border-top: 1px solid #d8d9e1;
+  margin-top: 18px;
+  padding-top: 18px;
+}
+.tactical h3 {
+  margin: 0;
+}
+.tactical p,
+.tactical small,
+.note {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #5b606f;
+}
+.tactical dl,
+.mist dl {
+  margin: 12px 0;
+}
+.tactical dl div,
+.mist dl div {
+  margin: 8px 0;
+}
+.tactical dt,
+.mist dt {
+  color: #686e7e;
+  font-size: 12px;
+}
+.tactical dd,
+.mist dd {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.tactical details,
+.mist details {
+  border-top: 1px solid #dbdde5;
+  padding: 14px 0;
+}
+.tactical summary,
+.mist summary {
+  cursor: pointer;
+  color: #343e8a;
+  font-size: 14px;
+  font-weight: 650;
+}
+.tactical label,
+.formGrid label {
+  display: grid;
+  gap: 7px;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-top: 12px;
+}
+.tactical input,
+.mist input,
+.mist select,
+.mist textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #b8bed0;
+  border-radius: 6px;
+  background: #fff;
+  color: #22283d;
+  font: inherit;
+  font-size: 14px;
+}
+.mist input:disabled {
+  background: #f1f1f4;
+}
+.mist {
+  margin-top: 20px;
+}
+.title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+.title h2 {
+  margin: 5px 0 20px;
+}
+.mistGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.mistGrid article {
+  padding: 17px;
+  border: 1px solid #dedfe8;
+  border-radius: 10px;
+  background: #fcfbf7;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.mistGrid b {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #343e8a;
+  color: #efdb98;
+  margin-bottom: 13px;
+}
+.mistGrid h3 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+.mistGrid p {
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 0;
+}
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.mist textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+@media (max-width: 1000px) {
+  .mistGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .formGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sceneSummary div:last-child {
+    margin-left: 0;
+  }
+}
+@media (max-width: 600px) {
+  .mistGrid,
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+  .actions .panic {
+    margin-left: 0;
+  }
+  .scene {
+    padding: 16px;
+  }
+}
