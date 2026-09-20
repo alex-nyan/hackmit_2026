@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { OperationsMap, type OperationsMapProps } from "./OperationsMap";
 import { BUILDING_LAYER_ID } from "../boston-map/buildingLayer";
 import { MAP_FOCUS } from "../boston-map/types";
@@ -48,7 +48,11 @@ class TestMap {
   setPaintProperty = vi.fn();
   setLayoutProperty = vi.fn();
   setFeatureState = vi.fn();
-  queryRenderedFeatures = vi.fn((): unknown[] => []);
+  // Mapbox takes a point (or a box) and an options object naming the layers.
+  // Typed rather than implemented, so a test can answer by layer.
+  queryRenderedFeatures: Mock<(geometry?: unknown, options?: unknown) => unknown[]> = vi.fn(
+    () => [],
+  );
   remove = vi.fn(() => {
     for (const layer of this.layers.values()) layer.onRemove?.();
     this.layers.clear();
@@ -617,7 +621,7 @@ describe("patrol map integration", () => {
     const onBuildingSelect = vi.fn();
     const { map } = await mount({ onBuildingSelect });
     onBuildingSelect.mockClear();
-    map.queryRenderedFeatures.mockReturnValueOnce([
+    const buildingHit = [
       {
         id: 4821,
         properties: { height: 48.5, min_height: 3 },
@@ -634,7 +638,22 @@ describe("patrol map integration", () => {
           ],
         },
       },
-    ]);
+    ];
+    // Answer by layer rather than by call order. The click handler asks the
+    // live layer before the building layer, so a plain one-shot return would
+    // be spent on the wrong question; the "once" this test needs is one
+    // building, to the first click that asks for one. The second click then
+    // finds empty sky, which is what clears the selection.
+    let remaining = buildingHit;
+    map.queryRenderedFeatures.mockImplementation((_point: unknown, options?: unknown) => {
+      const wantsBuildings = (options as { layers?: string[] } | undefined)?.layers?.includes(
+        BUILDING_LAYER_ID,
+      );
+      if (!wantsBuildings) return [];
+      const hit = remaining;
+      remaining = [];
+      return hit;
+    });
 
     // Far from every unit, so the click falls through to the building layer.
     act(() => map.emit("click", { point: { x: 5000, y: 5000 } }));
@@ -660,7 +679,12 @@ describe("patrol map integration", () => {
     act(() => map.emit("click", { point: map.project(vehicleAt("P-04", 0).point) }));
     expect(onSelect).toHaveBeenLastCalledWith("P-04");
     expect(onBuildingSelect).not.toHaveBeenCalled();
-    expect(map.queryRenderedFeatures).not.toHaveBeenCalled();
+    // A live-unit hit test runs on every click; what must not happen is the
+    // building query behind it.
+    expect(map.queryRenderedFeatures).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ layers: [BUILDING_LAYER_ID] }),
+    );
   });
 
   it("beams a green beacon from under every officer", async () => {

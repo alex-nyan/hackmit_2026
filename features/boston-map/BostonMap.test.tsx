@@ -36,6 +36,7 @@ vi.mock("./mapboxClient", () => ({
         this.layer = true;
       });
       addControl = vi.fn();
+      setPaintProperty = vi.fn();
       setFeatureState = vi.fn();
       features: unknown[] = [];
       queryRenderedFeatures = vi.fn(() => this.features);

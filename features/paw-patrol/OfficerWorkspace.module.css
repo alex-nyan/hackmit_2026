@@ -18,7 +18,6 @@
   font-family: Arial, Helvetica, sans-serif;
 }
 
-.officer :global(.topbar),
 .officer :global(.map-heading),
 .officer :global(.campus-switch),
 .unitPicker,
@@ -33,15 +32,73 @@
   box-shadow: 0 2px 8px rgb(24 39 65 / 10%);
 }
 
+/* Floating over the map. Geometry and motion apply to every glass header. */
 .officer :global(.topbar) {
   position: absolute;
   z-index: var(--workspace-controls);
   top: 16px;
-  left: 16px;
-  right: 16px;
-  min-height: 60px;
-  padding: 8px 16px;
+  left: 50%;
+  right: auto;
+  width: min(1520px, calc(100% - 32px));
+  margin: 0;
+  transform: translateX(-50%);
+  min-height: 64px;
+  padding: 8px 10px 8px 22px;
   gap: 16px;
+  animation: officer-glass-rise 0.75s cubic-bezier(0.22, 1.1, 0.32, 1) both;
+}
+
+/* The skin is ours only where no <GlassEffect /> is painting the surface;
+   Officer brings its own layers, and two glass treatments would fight. */
+.officer :global(.topbar):not(:has(> [data-liquid-glass])) {
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 80%), rgb(244 248 255 / 64%));
+  box-shadow:
+    0 28px 56px -32px rgb(20 33 60 / 62%),
+    0 3px 10px -5px rgb(20 33 60 / 26%),
+    inset 0 1px 0 rgb(255 255 255 / 95%),
+    inset 0 -1px 0 rgb(255 255 255 / 50%);
+  backdrop-filter: blur(30px) saturate(190%);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
+}
+
+.officer :global(.topbar)::before {
+  background: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 70%),
+    rgb(255 255 255 / 0) 45%,
+    rgb(255 255 255 / 0) 78%,
+    rgb(255 255 255 / 35%)
+  );
+}
+
+.officer :global(.topbar)::after {
+  background: linear-gradient(100deg, transparent 42%, rgb(255 255 255 / 85%) 50%, transparent 58%);
+  background-size: 260% 100%;
+}
+
+/* The bar is centred by a transform, so its entrance has to keep that. */
+@keyframes officer-glass-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.officer :global(.topbar nav) {
+  --nav-track: rgb(38 52 80 / 6%);
+  --nav-track-line: inset 0 1px 1px rgb(24 39 65 / 7%);
+  --nav-hover: rgb(55 97 155 / 10%);
+  --pill-ink: var(--ink);
+  --pill-bg: linear-gradient(180deg, rgb(255 255 255 / 97%), rgb(233 241 253 / 88%));
+  --pill-shadow:
+    0 8px 16px -10px rgb(20 33 60 / 60%), inset 0 1px 0 rgb(255 255 255 / 95%),
+    0 0 0 1px rgb(55 97 155 / 10%);
 }
 
 .officer :global(.wordmark) {
@@ -65,14 +122,16 @@
 }
 
 .officer :global(.nav-item.active) {
-  background: rgb(55 97 155 / 10%);
+  background: transparent;
   color: var(--ink);
 }
 
 .officer :global(.hardware-toggle) {
+  min-height: 44px;
+  padding: 9px 16px;
+  border-color: rgb(255 255 255 / 85%);
   color: var(--muted);
-  background: transparent;
-  min-height: 40px;
+  background: rgb(255 255 255 / 55%);
   font-size: 13px;
 }
 
@@ -282,11 +341,13 @@
 @media (max-width: 700px) {
   .officer :global(.topbar) {
     top: 10px;
-    right: 10px;
-    left: 10px;
-    padding: 6px 10px;
+    width: calc(100% - 20px);
+    padding: 6px 8px 6px 14px;
     gap: 6px;
     flex-wrap: wrap;
+  }
+  .officer :global(.topbar):not(:has(> [data-liquid-glass])) {
+    border-radius: 26px;
   }
   .officer :global(.topbar nav) {
     gap: 0;

@@ -23,6 +23,7 @@ import {
   setSelectedBuilding,
 } from "./buildingLayer";
 import { describeBuilding, type BuildingFacts } from "./buildingSelection";
+import { paintNaturalFeatures } from "./naturalPalette";
 import { loadMapbox } from "./mapboxClient";
 
 interface BostonMapProps {
@@ -136,6 +137,8 @@ export function BostonMap({
           if (cancelled) return;
           try {
             add3DBuildings(map, themeRef.current);
+            // Colour the river and the parks before anything is drawn over them.
+            paintNaturalFeatures(map, themeRef.current);
             // Feature state does not survive a style change; drop the selection
             // rather than leave a highlight the map can no longer render.
             selectedIdRef.current = null;

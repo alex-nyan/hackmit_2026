@@ -13,6 +13,7 @@ import {
   setSelectedBuilding,
 } from "../boston-map/buildingLayer";
 import { describeBuilding, type BuildingFacts } from "../boston-map/buildingSelection";
+import { paintNaturalFeatures } from "../boston-map/naturalPalette";
 import { loadMapbox } from "../boston-map/mapboxClient";
 import { MAP_FOCUS, type MapFocus, type MapStatus, type MapTheme } from "../boston-map/types";
 import {
@@ -351,6 +352,8 @@ export function OperationsMap(props: OperationsMapProps) {
           if (disposed || fatal) return;
           try {
             add3DBuildings(map, latestRef.current.theme);
+            // Colour the river and the parks before anything is drawn over them.
+            paintNaturalFeatures(map, latestRef.current.theme);
             // Feature state does not survive a style change, so drop the
             // highlight rather than leave one the map can no longer draw.
             selectedBuildingId = null;
