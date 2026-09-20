@@ -1,0 +1,113 @@
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.name {
+  margin: 8px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.stage {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  margin-top: 10px;
+  /* Phones publish portrait and laptops publish landscape, so the box is
+     fixed and the frame is fitted into it rather than the other way around:
+     a card that changes height when a unit rotates their phone is a card
+     that shoves everything under it around. */
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+}
+
+.frame {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.stageHint {
+  display: grid;
+  margin: 0;
+  padding: 0 16px;
+  gap: 8px;
+  justify-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.frameNote {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.vital {
+  display: grid;
+  margin-top: 10px;
+  padding-top: 10px;
+  gap: 2px;
+  border-top: 1px solid var(--line);
+}
+
+.vitalLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.bpm {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.bpm small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.vitalMissing {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.vitalSource {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.connect {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  justify-self: start;
+}
+
+.connect:hover {
+  border-color: var(--muted);
+}

@@ -110,6 +110,7 @@ async function mount() {
       focusRequest={null}
       onStatusChange={status}
       onBuildingSelect={() => {}}
+      onSelectLiveDevice={() => {}}
     />,
   );
   await waitFor(() => expect(mocked.instances).toHaveLength(1));
@@ -128,6 +129,7 @@ describe("Mapbox lifecycle", () => {
         focusRequest={null}
         onStatusChange={status}
         onBuildingSelect={() => {}}
+        onSelectLiveDevice={() => {}}
       />,
     );
     expect(status).toHaveBeenLastCalledWith("missing-token");
@@ -145,6 +147,7 @@ describe("Mapbox lifecycle", () => {
         focusRequest={null}
         onStatusChange={status}
         onBuildingSelect={() => {}}
+        onSelectLiveDevice={() => {}}
       />,
     );
     expect(status).toHaveBeenLastCalledWith("error");
@@ -162,6 +165,7 @@ describe("Mapbox lifecycle", () => {
         focusRequest={null}
         onStatusChange={status}
         onBuildingSelect={() => {}}
+        onSelectLiveDevice={() => {}}
       />,
     );
     await waitFor(() => expect(status).toHaveBeenLastCalledWith("error"));
@@ -197,6 +201,7 @@ describe("Mapbox lifecycle", () => {
         focusRequest={null}
         onStatusChange={status}
         onBuildingSelect={() => {}}
+        onSelectLiveDevice={() => {}}
       />,
     );
     expect(mocked.instances).toHaveLength(1);
@@ -238,6 +243,7 @@ describe("Mapbox lifecycle", () => {
           focusRequest={null}
           onStatusChange={status}
           onBuildingSelect={() => {}}
+          onSelectLiveDevice={() => {}}
         />
       </StrictMode>,
     );
@@ -256,6 +262,7 @@ describe("Mapbox lifecycle", () => {
         focusRequest={null}
         onStatusChange={status}
         onBuildingSelect={() => {}}
+        onSelectLiveDevice={() => {}}
       />,
     );
     view.rerender(
@@ -266,6 +273,7 @@ describe("Mapbox lifecycle", () => {
         focusRequest={null}
         onStatusChange={status}
         onBuildingSelect={() => {}}
+        onSelectLiveDevice={() => {}}
       />,
     );
     await waitFor(() => expect(mocked.instances).toHaveLength(1));
@@ -285,6 +293,7 @@ describe("Mapbox lifecycle", () => {
         focusRequest={null}
         onStatusChange={status}
         onBuildingSelect={() => {}}
+        onSelectLiveDevice={() => {}}
       />,
     );
     view.unmount();
@@ -306,6 +315,7 @@ describe("Mapbox lifecycle", () => {
           focusRequest={null}
           onStatusChange={status}
           onBuildingSelect={() => {}}
+          onSelectLiveDevice={() => {}}
         />,
       );
     });
@@ -344,6 +354,7 @@ describe("building selection", () => {
         focusRequest={null}
         onStatusChange={status}
         onBuildingSelect={onBuildingSelect}
+        onSelectLiveDevice={() => {}}
       />,
     );
     await waitFor(() => expect(mocked.instances).toHaveLength(1));

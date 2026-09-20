@@ -224,6 +224,7 @@ const props = (overrides: Partial<OperationsMapProps> = {}): OperationsMapProps 
   onStopFollowing: vi.fn(),
   liveDevices: [],
   fixRequest: null,
+  onSelectLiveDevice: vi.fn(),
   onBuildingSelect: vi.fn(),
   ...overrides,
 });

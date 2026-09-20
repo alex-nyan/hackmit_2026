@@ -27,7 +27,7 @@ import { type MapFocus, type MapTheme, MAP_FOCUS } from "../boston-map/types";
 import { BuildingPanel } from "../boston-map/BuildingPanel";
 import type { BuildingFacts } from "../boston-map/buildingSelection";
 import { CapturePanel } from "@/features/camera-triage";
-import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-track";
+import { LiveTrackPanel, UnitCard, useLiveTrack, type LiveDevice } from "@/features/live-track";
 import { JoinCard, type JoinLink } from "@/features/join";
 import { OperationsMap } from "./OperationsMap";
 import { WorkspaceMapShell } from "./WorkspaceMapShell";
@@ -206,8 +206,17 @@ export function PawPatrol({
     latitude: number;
     nonce: number;
   } | null>(null);
+  // Which unit is open, by id rather than by value: the roster is replaced
+  // wholesale on every poll, so holding the device itself would pin the card to
+  // a fix from five seconds ago.
+  const [openDeviceId, setOpenDeviceId] = useState<string | null>(null);
+  // A unit that stops publishing leaves the roster, and its card leaves with
+  // it. That is the honest outcome — there is nothing left to describe.
+  const openDevice = liveDevices.find((device) => device.id === openDeviceId) ?? null;
   // The nonce is what makes a repeat click move the camera again.
   const handleFocusDevice = useCallback((device: LiveDevice) => {
+    // Opening the card does not depend on having a fix; centring the map does.
+    setOpenDeviceId(device.id);
     if (!device.fix) return;
     setFollowing(false);
     setFixRequest((previous) => ({
@@ -409,11 +418,19 @@ export function PawPatrol({
           onStopFollowing={() => setFollowing(false)}
           liveDevices={liveDevices}
           fixRequest={fixRequest}
+          onSelectLiveDevice={setOpenDeviceId}
           onBuildingSelect={handleBuildingSelect}
         />
         {view !== "officer" && (
           <div className="map-overlay">
             <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+            {openDevice && (
+              <UnitCard
+                device={openDevice}
+                heartRate={heartRate}
+                onDismiss={() => setOpenDeviceId(null)}
+              />
+            )}
             {view === "command" && <JoinCard join={join} />}
             <BuildingPanel building={building} onDismiss={() => setBuilding(null)} />
           </div>

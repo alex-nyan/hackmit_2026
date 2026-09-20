@@ -150,6 +150,41 @@ export function addLiveLayers(map: MapboxMap, theme: MapTheme) {
   }
 }
 
+/**
+ * How much slack a click gets, in pixels.
+ *
+ * The dot is drawn at seven. Asking somebody to land inside that with a
+ * trackpad — or a thumb — is asking them to miss, and a miss here does not
+ * read as a miss: it reads as a unit that cannot be opened.
+ */
+const HIT_PADDING = 9;
+
+/**
+ * The live unit under a pointer, if there is one.
+ *
+ * Kept next to the layer that draws them so the property name and the id it
+ * carries stay one fact. A map wanting this asks for it by point rather than
+ * registering a layer-scoped handler, because a click on a unit and a click on
+ * the building behind it are the same click and only one of them can win.
+ */
+export function liveDeviceAt(map: MapboxMap, point: { x: number; y: number }): string | null {
+  if (!map.getLayer(LIVE_POINT_LAYER_ID)) return null;
+
+  const box: [[number, number], [number, number]] = [
+    [point.x - HIT_PADDING, point.y - HIT_PADDING],
+    [point.x + HIT_PADDING, point.y + HIT_PADDING],
+  ];
+  // Queried features are described locally for the same reason the emitted
+  // ones are: `@types/geojson` is not a dependency, so `properties` has no
+  // type to read through.
+  const hits = map.queryRenderedFeatures(box, {
+    layers: [LIVE_POINT_LAYER_ID],
+  }) as unknown as Array<{ properties?: Record<string, unknown> | null }>;
+
+  const deviceId = hits[0]?.properties?.deviceId;
+  return typeof deviceId === "string" ? deviceId : null;
+}
+
 export function updateLiveLayers(map: MapboxMap, devices: LiveDevice[]) {
   const source = map.getSource(LIVE_SOURCE_ID) as
     { setData?: (data: LiveFeatureCollection) => void } | undefined;

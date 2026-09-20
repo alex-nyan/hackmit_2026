@@ -13,7 +13,8 @@ import {
 import { useCallback, useState } from "react";
 
 import { CapturePanel } from "@/features/camera-triage";
-import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-track";
+import { LiveTrackPanel, UnitCard, useLiveTrack, type LiveDevice } from "@/features/live-track";
+import { useHeartRate } from "@/features/heart-rate/useHeartRate";
 import { BostonMap } from "./BostonMap";
 import { BuildingPanel } from "./BuildingPanel";
 import type { BuildingFacts } from "./buildingSelection";
@@ -36,7 +37,17 @@ export function BostonMapShell() {
     nonce: number;
   } | null>(null);
 
+  // Held by id rather than by value: the roster is replaced wholesale on every
+  // poll, so keeping the device itself would pin the card to an old fix.
+  const [openDeviceId, setOpenDeviceId] = useState<string | null>(null);
+  const openDevice = liveDevices.find((device) => device.id === openDeviceId) ?? null;
+  // This console has no officer of its own, so the heart rate it can offer is
+  // whatever is paired to this browser. The card says so rather than filing the
+  // reading under the unit it is shown beside.
+  const heartRate = useHeartRate("map-console");
   const handleFocusDevice = useCallback((device: LiveDevice) => {
+    // Opening the card does not depend on having a fix; centring the map does.
+    setOpenDeviceId(device.id);
     if (!device.fix) return;
     setFocusRequest((previous) => ({
       longitude: device.fix!.longitude,
@@ -115,6 +126,7 @@ export function BostonMapShell() {
           focusRequest={focusRequest}
           onStatusChange={handleStatusChange}
           onBuildingSelect={handleBuildingSelect}
+          onSelectLiveDevice={setOpenDeviceId}
         />
 
         {status === "loading" && (
@@ -143,6 +155,13 @@ export function BostonMapShell() {
         <div className="map-panels">
           {status === "ready" && (
             <LiveTrackPanel state={liveTrack} onFocusDevice={handleFocusDevice} />
+          )}
+          {status === "ready" && openDevice && (
+            <UnitCard
+              device={openDevice}
+              heartRate={heartRate}
+              onDismiss={() => setOpenDeviceId(null)}
+            />
           )}
           {capturing && <CapturePanel sourceId="console" />}
           {status === "ready" && (

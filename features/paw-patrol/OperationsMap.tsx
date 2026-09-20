@@ -15,7 +15,12 @@ import {
 import { describeBuilding, type BuildingFacts } from "../boston-map/buildingSelection";
 import { loadMapbox } from "../boston-map/mapboxClient";
 import { MAP_FOCUS, type MapFocus, type MapStatus, type MapTheme } from "../boston-map/types";
-import { addLiveLayers, updateLiveLayers, type LiveDevice } from "@/features/live-track";
+import {
+  addLiveLayers,
+  liveDeviceAt,
+  updateLiveLayers,
+  type LiveDevice,
+} from "@/features/live-track";
 import { PEOPLE, personStatus } from "./scenario";
 import type { DemoState } from "./useScenario";
 import { vehicleAt, vehicleRoute } from "./vehicles/vehicleMotion";
@@ -39,6 +44,8 @@ export interface OperationsMapProps {
   liveDevices: LiveDevice[];
   /** Bumped to fly to a tracked unit, so repeat clicks still move the camera. */
   fixRequest: { longitude: number; latitude: number; nonce: number } | null;
+  /** A live unit was opened, or everything was clicked past and none is. */
+  onSelectLiveDevice: (deviceId: string | null) => void;
   onBuildingSelect: (building: BuildingFacts | null) => void;
 }
 /** The pulsing ground light under a unit. Green for officers, red for reports. */
@@ -420,6 +427,18 @@ export function OperationsMap(props: OperationsMapProps) {
         // race the way separate layer and map handlers would. A patrol vehicle
         // always wins the pixel it shares with the building behind it.
         const click = (event: MapMouseEvent) => {
+          // A live unit wins the pixel it shares with anything else. The
+          // scenario cars are a demonstration; the dot is somebody holding a
+          // phone, and it is the one a dispatcher meant to hit.
+          const live = liveDeviceAt(map, event.point);
+          if (live) {
+            latestRef.current.onSelectLiveDevice(live);
+            return;
+          }
+          // Anything that is not a live unit puts the open one away, so the
+          // card never goes on describing a dot the viewer has clicked past.
+          latestRef.current.onSelectLiveDevice(null);
+
           const id = nearestUnit(event);
           if (id) {
             latestRef.current.onSelect(id);
@@ -437,7 +456,10 @@ export function OperationsMap(props: OperationsMapProps) {
           latestRef.current.onBuildingSelect(facts);
         };
         const hover = (event: MapMouseEvent) => {
-          map.getCanvas().style.cursor = nearestUnit(event) || buildingAt(event) ? "pointer" : "";
+          map.getCanvas().style.cursor =
+            liveDeviceAt(map, event.point) || nearestUnit(event) || buildingAt(event)
+              ? "pointer"
+              : "";
         };
         const manualMove = (event: { originalEvent?: unknown }) => {
           if (event.originalEvent && latestRef.current.following)

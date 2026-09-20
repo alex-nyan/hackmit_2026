@@ -5,7 +5,13 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useRef } from "react";
 import type { Map as MapboxMap } from "mapbox-gl";
 
-import { addLiveLayers, updateLiveLayers, type LiveDevice } from "@/features/live-track";
+import {
+  LIVE_POINT_LAYER_ID,
+  addLiveLayers,
+  liveDeviceAt,
+  updateLiveLayers,
+  type LiveDevice,
+} from "@/features/live-track";
 import styles from "./BostonMap.module.css";
 import { MAP_FOCUS, type MapFocus, type MapTheme, type MapStatus } from "./types";
 import {
@@ -28,6 +34,8 @@ interface BostonMapProps {
   focusRequest: { longitude: number; latitude: number; nonce: number } | null;
   onStatusChange: (status: MapStatus) => void;
   onBuildingSelect: (building: BuildingFacts | null) => void;
+  /** A live unit was opened, or everything was clicked past and none is. */
+  onSelectLiveDevice: (deviceId: string | null) => void;
 }
 
 export function BostonMap({
@@ -37,6 +45,7 @@ export function BostonMap({
   focusRequest,
   onStatusChange,
   onBuildingSelect,
+  onSelectLiveDevice,
 }: BostonMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
@@ -46,10 +55,15 @@ export function BostonMap({
   const liveDevicesRef = useRef<LiveDevice[]>(liveDevices);
   const selectedIdRef = useRef<string | number | null>(null);
   const onBuildingSelectRef = useRef(onBuildingSelect);
+  const onSelectLiveDeviceRef = useRef(onSelectLiveDevice);
 
   useEffect(() => {
     onBuildingSelectRef.current = onBuildingSelect;
   }, [onBuildingSelect]);
+
+  useEffect(() => {
+    onSelectLiveDeviceRef.current = onSelectLiveDevice;
+  }, [onSelectLiveDevice]);
 
   useEffect(() => {
     focusRef.current = focus;
@@ -158,7 +172,20 @@ export function BostonMap({
         // One click handler decides both selection and dismissal, so the two
         // cannot race the way separate layer and map handlers would.
         map.on("click", (event) => {
-          if (cancelled || !map.getLayer(BUILDING_LAYER_ID)) return;
+          if (cancelled) return;
+
+          // A live unit wins the pixel it shares with the building behind it:
+          // one is scenery and the other is somebody holding a phone.
+          const live = liveDeviceAt(map, event.point);
+          if (live) {
+            onSelectLiveDeviceRef.current(live);
+            return;
+          }
+          // Anything else puts the open unit away, so the card never goes on
+          // describing a dot the viewer has clicked past.
+          onSelectLiveDeviceRef.current(null);
+
+          if (!map.getLayer(BUILDING_LAYER_ID)) return;
 
           const [hit] = map.queryRenderedFeatures(event.point, {
             layers: [BUILDING_LAYER_ID],
@@ -184,6 +211,13 @@ export function BostonMap({
           map.getCanvas().style.cursor = "pointer";
         });
         map.on("mouseleave", BUILDING_LAYER_ID, () => {
+          map.getCanvas().style.cursor = "";
+        });
+
+        map.on("mouseenter", LIVE_POINT_LAYER_ID, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", LIVE_POINT_LAYER_ID, () => {
           map.getCanvas().style.cursor = "";
         });
 
