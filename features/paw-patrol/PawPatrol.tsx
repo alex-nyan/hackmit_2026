@@ -29,6 +29,7 @@ import type { BuildingFacts } from "../boston-map/buildingSelection";
 import { CapturePanel } from "@/features/camera-triage";
 import { LiveTrackPanel, useLiveTrack, type LiveDevice } from "@/features/live-track";
 import { OperationsMap } from "./OperationsMap";
+import { WorkspaceMapShell } from "./WorkspaceMapShell";
 import officerStyles from "./OfficerWorkspace.module.css";
 import hospitalStyles from "./HospitalWorkspace.module.css";
 import { HospitalWorkspace } from "./HospitalWorkspace";
@@ -158,9 +159,12 @@ function HeartRateReadout({
 export function PawPatrol({
   workspace = null,
   officerMedia,
+  presentation = "map",
 }: {
   workspace?: Workspace | null;
   officerMedia?: OfficerMediaInput | null;
+  /** Dispatch defaults to the map; retain its detailed workflows for regression coverage. */
+  presentation?: "map" | "detailed";
 }) {
   const { time, running, readClock, dispatch, sceneOverride, panics, audit } = useScenario();
   // The only state shared across workspaces. Everything else stays local.
@@ -413,7 +417,7 @@ export function PawPatrol({
           ))}
         </div>
       </div>
-      {view === "command" && (
+      {view === "command" && presentation === "detailed" && (
         <>
           <div className="vehicle-telemetry" aria-label="Selected unit simulated position">
             <span>
@@ -433,15 +437,29 @@ export function PawPatrol({
               <i className="legend-officer" />
               Simulated patrol
             </span>
-            <span>
-              <i className="legend-route" />
-              Cached street routes · not navigation
-            </span>
           </div>
         </>
       )}
     </section>
   );
+
+  // Keep the shared state/subscription above mounted, but do not mount legacy
+  // panels (especially capture) in the new Dispatch presentation.
+  // Hospital keeps its dedicated camera and heart-rate overlay.
+  // Officer capture callbacks and all backend/live-mode paths remain unchanged.
+  if (view === "command" && presentation === "map") {
+    return (
+      <WorkspaceMapShell
+        workspace={workspace}
+        view={view}
+        onViewChange={setView}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        status={personStatus(person.id, time)}
+        map={map}
+      />
+    );
+  }
 
   return (
     <div

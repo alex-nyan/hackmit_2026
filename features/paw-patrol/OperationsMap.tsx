@@ -3,13 +3,7 @@
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useRef, useState } from "react";
 import { MapPin, RotateCw, TriangleAlert } from "lucide-react";
-import type {
-  GeoJSONSource,
-  GeoJSONSourceSpecification,
-  Map as MapboxMap,
-  Marker,
-  MapMouseEvent,
-} from "mapbox-gl";
+import type { Map as MapboxMap, Marker, MapMouseEvent } from "mapbox-gl";
 import {
   add3DBuildings,
   basemapStyle,
@@ -25,12 +19,8 @@ import { addLiveLayers, updateLiveLayers, type LiveDevice } from "@/features/liv
 import { PEOPLE, personStatus } from "./scenario";
 import type { DemoState } from "./useScenario";
 import { vehicleAt, vehicleRoute } from "./vehicles/vehicleMotion";
-import { patrolRouteColor, routeChevrons } from "./vehicles/routePresentation";
-import {
-  createPatrolVehicleLayer,
-  VEHICLE_LAYER_ID,
-  VEHICLE_MIN_ZOOM,
-} from "./vehicles/PatrolVehicleLayer";
+import { patrolRouteColor } from "./vehicles/routePresentation";
+import { createPatrolCarMarker, patrolCarScreenHeading } from "./vehicles/createPatrolCarMarker";
 import styles from "./OperationsMap.module.css";
 
 export interface OperationsMapProps {
@@ -64,38 +54,7 @@ type UnitMarker = {
   label: HTMLSpanElement;
   dispose: () => void;
 };
-const ROUTE_SOURCE = "paw-scenario-route";
-const ROUTE_LINE = "paw-scenario-route-line";
-const ROUTE_CASING = "paw-scenario-route-casing";
-const ARROW_SOURCE = "paw-route-arrows";
-const ARROW_LINE = "paw-route-arrow-line";
 const LOAD_TIMEOUT_MS = 20000;
-
-function presentedRoutes(time: number, selectedId: string) {
-  const routes = PEOPLE.flatMap((person, index) => {
-    const route = vehicleRoute(person.id, time);
-    return route && route.coordinates.length >= 2
-      ? [{ route, color: patrolRouteColor(index), selected: person.id === selectedId }]
-      : [];
-  });
-  const unique = new Map(routes.map((item) => [item.route.coordinates, item]));
-  for (const item of routes) if (item.selected) unique.set(item.route.coordinates, item);
-  return [...unique.values()].sort((a, b) => Number(a.selected) - Number(b.selected));
-}
-
-function routeData(
-  time: number,
-  selectedId: string,
-): Exclude<GeoJSONSourceSpecification["data"], string> {
-  return {
-    type: "FeatureCollection",
-    features: presentedRoutes(time, selectedId).map(({ route, color, selected }) => ({
-      type: "Feature",
-      properties: { unit: route.unitId, kind: route.kind, color, selected },
-      geometry: { type: "LineString", coordinates: route.coordinates.map((p) => [...p]) },
-    })),
-  };
-}
 
 export function OperationsMap(props: OperationsMapProps) {
   const { time, running, selectedId, focus, theme, recenterKey, following } = props;
@@ -108,7 +67,6 @@ export function OperationsMap(props: OperationsMapProps) {
     status: "loading" as MapStatus,
     message: "Bringing Boston into view…",
   });
-  const [fallback, setFallback] = useState(false);
   useEffect(() => {
     latestRef.current = props;
   }, [props]);
@@ -138,8 +96,7 @@ export function OperationsMap(props: OperationsMapProps) {
 
   useEffect(() => {
     let disposed = false,
-      fatal = false,
-      carsUnavailable = false;
+      fatal = false;
     let ownMap: MapboxMap | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let resizeObserver: ResizeObserver | undefined;
@@ -147,8 +104,6 @@ export function OperationsMap(props: OperationsMapProps) {
     let lastFrameAt = 0,
       frameTime = latestRef.current.readClock().time;
     let currentTheme = latestRef.current.theme,
-      routeKey = "",
-      arrowKey = "",
       lastLabelStamp = "";
     let selectedBuildingId: string | number | null = null;
     const markers: UnitMarker[] = [],
@@ -170,17 +125,11 @@ export function OperationsMap(props: OperationsMapProps) {
       clearTimer();
       report("error", message);
     };
-    const ready = () =>
-      !!ownMap &&
-      !fatal &&
-      ownMap.isStyleLoaded() &&
-      isBuildingMapReady(ownMap) &&
-      !!ownMap.getLayer(ROUTE_LINE) &&
-      ownMap.isSourceLoaded(ROUTE_SOURCE);
+    const ready = () => !!ownMap && !fatal && ownMap.isStyleLoaded() && isBuildingMapReady(ownMap);
     const checkReady = () => {
       if (!disposed && ready()) {
         clearTimer();
-        report("ready", "Street routes and patrol vehicles ready.");
+        report("ready", "Patrol vehicles ready.");
       }
     };
     const loading = () => {
@@ -255,18 +204,24 @@ export function OperationsMap(props: OperationsMapProps) {
           const marker = new mapboxgl.Marker({ element: anchor, anchor: "bottom" })
             .setLngLat(vehicleAt(person.id, frameTime).point)
             .addTo(map);
-          const directionElement = document.createElement("div");
+          const directionElement = createPatrolCarMarker();
           directionElement.className = styles.vehicleDirection;
           directionElement.style.setProperty("--route-color", patrolRouteColor(index));
-          directionElement.setAttribute("aria-hidden", "true");
           const direction = new mapboxgl.Marker({
             element: directionElement,
             anchor: "center",
-            rotationAlignment: "map",
-            pitchAlignment: "map",
+            rotationAlignment: "viewport",
+            // Keep the car's CSS-pixel footprint at every zoom and camera pitch.
+            pitchAlignment: "viewport",
           })
             .setLngLat(vehicleAt(person.id, frameTime).point)
-            .setRotation(vehicleAt(person.id, frameTime).heading)
+            .setRotation(
+              patrolCarScreenHeading(
+                map,
+                vehicleAt(person.id, frameTime).point,
+                vehicleAt(person.id, frameTime).heading,
+              ),
+            )
             .addTo(map);
           anchor.setAttribute("role", "presentation");
           anchor.removeAttribute("aria-label");
@@ -278,11 +233,10 @@ export function OperationsMap(props: OperationsMapProps) {
             dispose: () => button.removeEventListener("click", select),
           });
         }
-        const draw = () => {
+        const draw = (followCamera = true) => {
           if (disposed) return;
           const current = latestRef.current;
           frameTime = current.readClock().time;
-          const detailed = map.getZoom() >= VEHICLE_MIN_ZOOM && !carsUnavailable;
           const labelStamp = current.selectedId + ":" + Math.floor(frameTime * 4);
           markers.forEach(({ marker, direction, button, label }, i) => {
             const person = PEOPLE[i],
@@ -292,11 +246,13 @@ export function OperationsMap(props: OperationsMapProps) {
             marker.getElement().hidden = !available;
             direction.getElement().hidden = !available;
             if (!available) return;
-            marker.setLngLat(pose.point).setOffset(detailed ? [0, -24] : [0, -18]);
-            direction.setLngLat(pose.point).setRotation(pose.heading);
+            marker.setLngLat(pose.point).setOffset([0, -26]);
+            direction
+              .setLngLat(pose.point)
+              .setRotation(patrolCarScreenHeading(map, pose.point, pose.heading));
             direction.getElement().dataset.selected = String(selected);
-            direction.getElement().dataset.detail = String(detailed);
-            button.dataset.detail = String(detailed);
+            direction.getElement().dataset.emergency = String(pose.emergency);
+            direction.getElement().style.zIndex = selected ? "3" : "2";
             button.dataset.selected = String(selected);
             button.dataset.emergency = String(pose.emergency);
             marker.getElement().style.zIndex = selected ? "4" : "3";
@@ -312,24 +268,12 @@ export function OperationsMap(props: OperationsMapProps) {
             }
           });
           lastLabelStamp = labelStamp;
-          const nextKey =
-            current.selectedId +
-            ":" +
-            PEOPLE.map((p) => vehicleRoute(p.id, frameTime)?.id ?? "none").join(":");
-          const source = map.getSource(ROUTE_SOURCE) as GeoJSONSource | undefined;
-          if (source && nextKey !== routeKey) {
-            source.setData(routeData(frameTime, current.selectedId));
-            routeKey = nextKey;
-          }
-          const nextArrowKey = nextKey + ":" + map.getZoom().toFixed(1);
-          const arrows = map.getSource(ARROW_SOURCE) as GeoJSONSource | undefined;
-          if (arrows && nextArrowKey !== arrowKey) {
-            arrows.setData(
-              routeChevrons(presentedRoutes(frameTime, current.selectedId), map.getZoom()),
-            );
-            arrowKey = nextArrowKey;
-          }
-          if (current.following && vehicleRoute(current.selectedId, frameTime) && !map.isMoving())
+          if (
+            followCamera &&
+            current.following &&
+            vehicleRoute(current.selectedId, frameTime) &&
+            !map.isMoving()
+          )
             map.jumpTo({ center: vehicleAt(current.selectedId, frameTime).point });
           map.triggerRepaint();
         };
@@ -368,13 +312,6 @@ export function OperationsMap(props: OperationsMapProps) {
             duration: reducedMotion ? 0 : 850,
           });
         };
-        const vehicleFailure = () => {
-          carsUnavailable = true;
-          if (!disposed) {
-            setFallback(true);
-            updateScene();
-          }
-        };
         const restore = () => {
           if (disposed || fatal) return;
           try {
@@ -391,99 +328,11 @@ export function OperationsMap(props: OperationsMapProps) {
                   map.setPaintProperty(layer.id, "text-halo-width", 1.5);
                 }
               }
-            if (!map.getSource(ROUTE_SOURCE))
-              map.addSource(ROUTE_SOURCE, {
-                type: "geojson",
-                data: routeData(frameTime, latestRef.current.selectedId),
-              });
-            if (!map.getLayer(ROUTE_CASING))
-              map.addLayer({
-                id: ROUTE_CASING,
-                type: "line",
-                source: ROUTE_SOURCE,
-                layout: { "line-join": "round", "line-cap": "round" },
-                paint: {
-                  "line-color": latestRef.current.theme === "dark" ? "#172238" : "#ffffff",
-                  "line-width": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    12,
-                    ["case", ["get", "selected"], 7, 5],
-                    18,
-                    ["case", ["get", "selected"], 11, 8],
-                  ],
-                  "line-opacity": 0.92,
-                },
-              });
-            if (!map.getLayer(ROUTE_LINE))
-              map.addLayer({
-                id: ROUTE_LINE,
-                type: "line",
-                source: ROUTE_SOURCE,
-                layout: { "line-join": "round", "line-cap": "round" },
-                paint: {
-                  "line-color": ["get", "color"],
-                  "line-width": [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    12,
-                    ["case", ["get", "selected"], 4.5, 3],
-                    18,
-                    ["case", ["get", "selected"], 7, 4.5],
-                  ],
-                  "line-opacity": ["case", ["get", "selected"], 1, 0.78],
-                },
-              });
-            if (!map.getSource(ARROW_SOURCE)) {
-              map.addSource(ARROW_SOURCE, {
-                type: "geojson",
-                data: routeChevrons(
-                  presentedRoutes(frameTime, latestRef.current.selectedId),
-                  map.getZoom(),
-                ),
-              });
-            }
-            if (!map.getLayer(ARROW_LINE)) {
-              map.addLayer({
-                id: ARROW_LINE,
-                type: "line",
-                source: ARROW_SOURCE,
-                layout: { "line-cap": "round", "line-join": "round" },
-                paint: {
-                  "line-color": "#ffffff",
-                  "line-width": ["case", ["get", "selected"], 2.4, 1.8],
-                  "line-opacity": 0.95,
-                },
-              });
-            }
-            arrowKey = "";
-            if (!map.getLayer(VEHICLE_LAYER_ID)) {
-              carsUnavailable = false;
-              if (!disposed) setFallback(false);
-              try {
-                map.addLayer(
-                  createPatrolVehicleLayer({
-                    getVehicles: () =>
-                      PEOPLE.filter((p) => vehicleRoute(p.id, frameTime)).map((p) => ({
-                        id: p.id,
-                        ...vehicleAt(p.id, frameTime),
-                        selected: p.id === latestRef.current.selectedId,
-                      })),
-                    getSeconds: () => frameTime,
-                    getReducedMotion: () => reducedMotion,
-                    onFailure: vehicleFailure,
-                  }),
-                );
-              } catch {
-                vehicleFailure();
-              }
-            }
-            // Above the buildings and the route, so a real fix is never buried.
+            // DOM car icons persist across style changes, with no world-scale
+            // model underneath them or zoom-dependent representation switch.
+            // Live fixes stay above the buildings so they are never buried.
             addLiveLayers(map, latestRef.current.theme);
             updateLiveLayers(map, latestRef.current.liveDevices);
-            routeKey = "";
             updateScene();
             checkReady();
           } catch {
@@ -511,7 +360,6 @@ export function OperationsMap(props: OperationsMapProps) {
           setTheme: () => {
             if (disposed || currentTheme === latestRef.current.theme) return;
             currentTheme = latestRef.current.theme;
-            routeKey = "";
             loading();
             try {
               map.setStyle(basemapStyle(currentTheme));
@@ -520,11 +368,11 @@ export function OperationsMap(props: OperationsMapProps) {
             }
           },
         };
-        // Three custom meshes are not queryRenderedFeatures targets. Pick the
-        // current projected positions in CSS pixels, not the slower UI snapshot.
+        // Pick the car's fixed screen-sized footprint using the same continuous
+        // position as its marker, independently of zoom or the UI snapshot.
         const nearestUnit = (event: MapMouseEvent) => {
           let id: string | null = null,
-            distance = Math.min(26, Math.max(12, 14 * 2 ** (map.getZoom() - 18)));
+            distance = 24;
           for (const person of PEOPLE) {
             if (!vehicleRoute(person.id, frameTime)) continue;
             const p = map.project(vehicleAt(person.id, frameTime).point),
@@ -567,7 +415,9 @@ export function OperationsMap(props: OperationsMapProps) {
           if (event.originalEvent && latestRef.current.following)
             latestRef.current.onStopFollowing();
         };
-        const zoom = () => updateScene();
+        // Reproject headings on zoom, pan, rotation and pitch, even when paused.
+        // A camera event must never issue another follow-camera movement.
+        const cameraChanged = () => draw(false);
         const visibility = () => {
           if (document.hidden && frameId !== null) {
             cancelAnimationFrame(frameId);
@@ -596,7 +446,7 @@ export function OperationsMap(props: OperationsMapProps) {
         map.on("click", click);
         map.on("mousemove", hover);
         map.on("movestart", manualMove);
-        map.on("zoom", zoom);
+        map.on("move", cameraChanged);
         map.on("webglcontextlost", contextLost);
         map.on("webglcontextrestored", contextRestored);
         document.addEventListener("visibilitychange", visibility);
@@ -609,7 +459,7 @@ export function OperationsMap(props: OperationsMapProps) {
           map.off("click", click);
           map.off("mousemove", hover);
           map.off("movestart", manualMove);
-          map.off("zoom", zoom);
+          map.off("move", cameraChanged);
           map.off("webglcontextlost", contextLost);
           map.off("webglcontextrestored", contextRestored);
           document.removeEventListener("visibilitychange", visibility);
@@ -642,7 +492,7 @@ export function OperationsMap(props: OperationsMapProps) {
         marker.remove();
         direction.remove();
       });
-      ownMap?.remove(); // Mapbox calls custom-layer onRemove to release Three resources.
+      ownMap?.remove();
     };
   }, [attempt]);
 
@@ -654,11 +504,6 @@ export function OperationsMap(props: OperationsMapProps) {
         className={styles.canvas}
         aria-label="Interactive map of simulated patrol vehicles in Cambridge and Boston"
       />
-      {fallback && feedback.status === "ready" && (
-        <div className={styles.fallback} role="status">
-          3D vehicles unavailable · unit markers remain selectable
-        </div>
-      )}
       {feedback.status !== "ready" && (
         <div
           className={styles.feedback + (hasError ? " " + styles.error : "")}
