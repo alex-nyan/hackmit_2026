@@ -16,7 +16,7 @@ const statusLabels: Record<HeartRateConnection["status"], string> = {
   connecting: "Connecting",
   waiting: "Waiting for a reading",
   receiving: "Live device",
-  stale: "Reading stale",
+  stale: "No signal",
   disconnected: "Disconnected",
   error: "Connection issue",
 };
@@ -140,9 +140,10 @@ export function HeartRatePanel({
           panel cannot confirm who is wearing the device.
         </p>
         <p>
-          “Received” is when this browser received a reading, not the sensor measurement time.
-          Disconnecting or switching profiles clears the device reading. Demo playback and emergency
-          decisions remain separate.
+          “Received” is when this browser received a reading, not the sensor measurement time. Loss
+          of sensor contact clears the reading immediately when reported. If updates stop, the
+          reading clears after 3 seconds. Disconnecting or switching profiles also clears it. Demo
+          playback and emergency decisions remain separate.
         </p>
         <p>
           Only this tab receives the continuous readings; explicitly shared snapshots appear in

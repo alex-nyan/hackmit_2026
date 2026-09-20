@@ -34,7 +34,8 @@ interface Snapshot {
   supported: boolean | null;
 }
 
-const STALE_AFTER_MS = 30_000;
+// Clear a silent feed promptly; explicit no-contact/invalid packets clear immediately.
+const STALE_AFTER_MS = 3_000;
 const INITIAL: Snapshot = {
   mode: "demo",
   status: "idle",
@@ -111,7 +112,8 @@ class HeartRateStore {
         this.update({
           status: "stale",
           bpm: null,
-          message: "No usable reading for 30 seconds. Check HeartCast and sensor contact.",
+          message:
+            "No signal: no usable reading for 3 seconds. Check HeartCast and sensor contact.",
         });
     };
     if (remaining === 0) markStale();

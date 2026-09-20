@@ -130,7 +130,7 @@ function OfficerSignals({
         "Watch / heart-rate sensor · receiving in this tab; manually assigned to this profile, wearer identity not verified.";
     } else if (connection.status === "stale") {
       watchState = "waiting";
-      watchLabel = "Watch / heart-rate sensor · signal stale; no usable reading for 30 seconds";
+      watchLabel = "Watch / heart-rate sensor · no signal; no usable reading for 3 seconds";
     } else if (connection.status === "waiting") {
       watchState = "waiting";
       watchLabel = "Watch / heart-rate sensor · connected, waiting for a usable signal";
