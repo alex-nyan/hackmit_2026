@@ -29,12 +29,8 @@ describe("camera acquisition lifecycle", () => {
     const phone = cameraStream();
     const webcam = cameraStream();
     getUserMedia.mockResolvedValueOnce(phone.stream).mockResolvedValueOnce(webcam.stream);
-    const { result, rerender } = renderHook(
-      ({ cameraId }: { cameraId: string | null }) =>
-        useCameraTriage({ sourceId: "unit-01", cameraId }),
-      { initialProps: { cameraId: "iphone" as string | null } },
-    );
-    await act(async () => result.current.start());
+    const { result } = renderHook(() => useCameraTriage({ sourceId: "unit-01" }));
+    await act(async () => result.current.start("iphone"));
     expect(getUserMedia).toHaveBeenLastCalledWith({
       video: { deviceId: { exact: "iphone" } },
       audio: false,
@@ -45,7 +41,6 @@ describe("camera acquisition lifecycle", () => {
     expect(phone.stop).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
 
-    rerender({ cameraId: null });
     await act(async () => result.current.start());
     expect(getUserMedia).toHaveBeenLastCalledWith({
       video: { facingMode: "environment", width: { ideal: 1280 } },
@@ -172,6 +167,63 @@ describe("camera acquisition lifecycle", () => {
 
     expect(result.current.state.state).toBe("running");
     expect(newCamera.stop).not.toHaveBeenCalled();
+  });
+
+  it("waits for a phone that is still waking before settling for the webcam", async () => {
+    const phone = cameraStream();
+    getUserMedia
+      .mockRejectedValueOnce(new DOMException("Device in use", "NotReadableError"))
+      .mockResolvedValueOnce(phone.stream);
+    const { result } = renderHook(() => useCameraTriage({ sourceId: "unit-01" }));
+    let starting!: Promise<void>;
+    act(() => {
+      starting = result.current.start("iphone");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+      await starting;
+    });
+
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    expect(getUserMedia).toHaveBeenLastCalledWith({
+      video: { deviceId: { exact: "iphone" } },
+      audio: false,
+    });
+    expect(result.current.state.state).toBe("running");
+  });
+
+  it("falls back to any camera when the named one never arrives", async () => {
+    const webcam = cameraStream();
+    getUserMedia
+      .mockRejectedValueOnce(new DOMException("Not found", "NotFoundError"))
+      .mockRejectedValueOnce(new DOMException("Not found", "NotFoundError"))
+      .mockResolvedValueOnce(webcam.stream);
+    const { result } = renderHook(() => useCameraTriage({ sourceId: "unit-01" }));
+    let starting!: Promise<void>;
+    act(() => {
+      starting = result.current.start("iphone");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+      await starting;
+    });
+
+    // Running on the laptop beats reporting no camera at all, and the caller
+    // is told which one it got.
+    expect(getUserMedia).toHaveBeenLastCalledWith({ video: true, audio: false });
+    expect(result.current.state.state).toBe("running");
+  });
+
+  it("never retries a declined permission", async () => {
+    getUserMedia.mockRejectedValue(new DOMException("Declined", "NotAllowedError"));
+    const { result } = renderHook(() => useCameraTriage({ sourceId: "unit-01" }));
+    await act(async () => result.current.start("iphone"));
+
+    expect(getUserMedia).toHaveBeenCalledOnce();
+    expect(result.current.state).toEqual({
+      state: "denied",
+      reason: "Camera permission was declined.",
+    });
   });
 
   it("stops the camera when the tab goes into the background", async () => {

@@ -78,4 +78,17 @@ export type CaptureState =
   | { state: "requesting-camera" }
   | { state: "denied"; reason: string }
   | { state: "unsupported"; reason: string }
-  | { state: "running"; lastResult: TriageResult | null; lastError: string | null };
+  | {
+      state: "running";
+      /** The camera the browser actually handed over, which is the only
+       *  honest answer to "is this the phone or the laptop?". */
+      deviceLabel: string;
+      /**
+       * Whether this deployment has a triage service behind it at all.
+       * Distinct from an error: frames still publish to the body camera wall,
+       * there is simply no model reading them.
+       */
+      triageConfigured: boolean;
+      lastResult: TriageResult | null;
+      lastError: string | null;
+    };

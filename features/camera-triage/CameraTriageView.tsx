@@ -4,14 +4,15 @@ import { useState } from "react";
 
 import { describeTranscript } from "./audio";
 import styles from "./CameraTriageView.module.css";
+import { hasLabels } from "./devices";
 import { useAudioTranscription } from "./useAudioTranscription";
 import { useCameraTriage } from "./useCameraTriage";
 import { useCaptureDevices } from "./useCaptureDevices";
 
 export function CameraTriageView() {
   const [sourceId, setSourceId] = useState("unit-01");
-  const { devices, cameraId, setCameraId, refreshDevices } = useCaptureDevices();
-  const { state, videoRef, start, stop } = useCameraTriage({ sourceId, cameraId });
+  const { devices, cameraId, setCameraId, resolveDevices } = useCaptureDevices();
+  const { state, videoRef, start, stop } = useCameraTriage({ sourceId });
   const audio = useAudioTranscription(sourceId);
   const running = state.state === "running";
   const listening =
@@ -19,9 +20,8 @@ export function CameraTriageView() {
   const active = running || state.state === "requesting-camera";
 
   async function startCamera() {
-    setCameraId(cameraId);
-    await start();
-    await refreshDevices();
+    const chosen = await resolveDevices();
+    await start(chosen.cameraId);
   }
 
   return (
@@ -50,7 +50,7 @@ export function CameraTriageView() {
           </button>
         </div>
 
-        {devices.cameras.length > 1 && (
+        {devices.cameras.length > 1 && hasLabels(devices.cameras) && (
           <select
             className={styles.picker}
             value={cameraId ?? ""}
@@ -122,7 +122,19 @@ export function CameraTriageView() {
 
         {running && state.lastError && <p className={styles.error}>{state.lastError}</p>}
 
-        {running && !state.lastResult && !state.lastError && (
+        {running && state.deviceLabel && (
+          <p className={styles.notice}>Live on {state.deviceLabel}</p>
+        )}
+
+        {/* No triage service behind this deployment. Worth saying once,
+            plainly: the capture still works and still feeds the wall. */}
+        {running && !state.triageConfigured && (
+          <p className={styles.notice}>
+            No hazard triage configured here. Frames are still publishing to the body camera wall.
+          </p>
+        )}
+
+        {running && state.triageConfigured && !state.lastResult && !state.lastError && (
           <p className={styles.notice}>Sending frames…</p>
         )}
 

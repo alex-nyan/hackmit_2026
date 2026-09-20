@@ -54,15 +54,33 @@ describe.each([
     });
   });
 
-  it("shows device names revealed by permission without requiring a devicechange event", async () => {
-    enumerateDevices.mockResolvedValueOnce([info("webcam", "")]);
+  it("starts on the iPhone that permission reveals, rather than the webcam", async () => {
+    // A cold page sees two cameras it cannot tell apart, so it offers no picker.
+    enumerateDevices.mockResolvedValueOnce([info("webcam", ""), info("phone", "")]);
     render(view());
     await act(async () => vi.advanceTimersByTimeAsync(0));
     expect(screen.queryByRole("combobox")).toBeNull();
 
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Start" })));
+    expect(getUserMedia).toHaveBeenLastCalledWith({
+      video: { deviceId: { exact: "phone" } },
+      audio: false,
+    });
     expect(screen.getByRole("option", { name: phone.label })).toBeDefined();
-    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("");
+    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("phone");
+  });
+
+  it("keeps the webcam when that is what the operator picked", async () => {
+    render(view());
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "webcam" } });
+
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Start" })));
+    expect(getUserMedia).toHaveBeenCalledOnce();
+    expect(getUserMedia).toHaveBeenLastCalledWith({
+      video: { deviceId: { exact: "webcam" } },
+      audio: false,
+    });
   });
 });
 
@@ -81,4 +99,52 @@ it("lets the dashboard cancel a pending microphone grant", async () => {
   expect(microphone.track.stop).toHaveBeenCalledOnce();
   expect(screen.getByRole("button", { name: "Listen" })).toBeDefined();
   expect(getUserMedia).toHaveBeenCalledOnce();
+});
+
+describe("a deployment with no triage service behind it", () => {
+  beforeEach(() => {
+    // The frame loop reads real pixels off the video element, which jsdom
+    // does not supply on its own.
+    vi.spyOn(HTMLVideoElement.prototype, "videoWidth", "get").mockReturnValue(640);
+    vi.spyOn(HTMLVideoElement.prototype, "videoHeight", "get").mockReturnValue(480);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue(
+      "data:image/jpeg;base64,AAEC",
+    );
+  });
+
+  it("says so plainly instead of reporting an error on every frame", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        status: 503,
+        ok: false,
+        json: async () => ({ error: "not-configured", reason: "Set TRIAGE_URL." }),
+      })),
+    );
+    render(<CapturePanel sourceId="console" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Start" })));
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    expect(screen.getByText(/No hazard triage configured here/)).toBeDefined();
+    // The capture is working; nothing here is a failure.
+    expect(screen.queryByText(/Triage service returned/)).toBeNull();
+  });
+
+  it("still reports a service that is genuinely failing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ status: 500, ok: false, json: async () => ({}) })),
+    );
+    render(<CapturePanel sourceId="console" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Start" })));
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    expect(screen.getByText("Triage service returned 500.")).toBeDefined();
+    expect(screen.queryByText(/No hazard triage configured/)).toBeNull();
+  });
 });

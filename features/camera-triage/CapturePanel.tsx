@@ -1,6 +1,7 @@
 "use client";
 
 import { describeTranscript, type TranscriptionResult } from "./audio";
+import { hasLabels } from "./devices";
 import type { TriageResult } from "./types";
 import { useAudioTranscription } from "./useAudioTranscription";
 import { useCameraTriage } from "./useCameraTriage";
@@ -19,9 +20,9 @@ interface CapturePanelProps {
  * Camera is actually used: phone as the lens, laptop as the console.
  */
 export function CapturePanel({ sourceId, onResult, onTranscript }: CapturePanelProps) {
-  const { devices, cameraId, setCameraId, refreshDevices } = useCaptureDevices();
+  const { devices, cameraId, setCameraId, resolveDevices } = useCaptureDevices();
 
-  const { state, videoRef, start, stop } = useCameraTriage({ sourceId, cameraId, onResult });
+  const { state, videoRef, start, stop } = useCameraTriage({ sourceId, onResult });
   const audio = useAudioTranscription(sourceId, onTranscript);
   const running = state.state === "running";
   const busy = running || state.state === "requesting-camera";
@@ -29,10 +30,10 @@ export function CapturePanel({ sourceId, onResult, onTranscript }: CapturePanelP
     audio.state.state === "recording" || audio.state.state === "requesting-microphone";
 
   async function startCamera() {
-    // Freeze the choice before permission reveals more device names.
-    setCameraId(cameraId);
-    await start();
-    await refreshDevices();
+    // Permission is what reveals device names, so the phone can only be
+    // preferred over the built-in webcam once the list has been asked for.
+    const chosen = await resolveDevices();
+    await start(chosen.cameraId);
   }
 
   const selected = devices.cameras.find((device) => device.deviceId === cameraId);
@@ -50,7 +51,7 @@ export function CapturePanel({ sourceId, onResult, onTranscript }: CapturePanelP
         autoPlay
       />
 
-      {devices.cameras.length > 1 && (
+      {devices.cameras.length > 1 && hasLabels(devices.cameras) && (
         <select
           className="capture-card__picker"
           value={cameraId ?? ""}
@@ -88,6 +89,12 @@ export function CapturePanel({ sourceId, onResult, onTranscript }: CapturePanelP
 
       {!busy && selected && <p className="capture-card__note">Selected: {selected.label}</p>}
 
+      {/* Name the camera that is actually open: a body camera running on the
+          laptop's own lens looks identical to one running on the phone. */}
+      {running && state.deviceLabel && (
+        <p className="capture-card__note">Live on {state.deviceLabel}</p>
+      )}
+
       {audio.state.state === "requesting-microphone" && (
         <p className="capture-card__note">Waiting for microphone permission…</p>
       )}
@@ -99,6 +106,14 @@ export function CapturePanel({ sourceId, onResult, onTranscript }: CapturePanelP
       )}
 
       {running && state.lastError && <p className="capture-card__error">{state.lastError}</p>}
+
+      {/* No triage service behind this deployment. Worth saying once, plainly:
+          the capture is still working and still feeding the wall. */}
+      {running && !state.triageConfigured && (
+        <p className="capture-card__note">
+          No hazard triage configured here. Frames are still publishing to the body camera wall.
+        </p>
+      )}
 
       {running && state.lastResult && (
         <div className="capture-card__result">
